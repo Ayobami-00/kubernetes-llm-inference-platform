@@ -31,6 +31,7 @@ def configuration(mode="simulation"):
         "artifact_root": str(s.artifacts_root.resolve()),
         "artifact_claim": s.artifact_claim,
         "startup_allowance_seconds": s.runner_startup_allowance_seconds,
+        "finalization_allowance_seconds": 120,
         "kube_api_url": s.kube_api_url,
         "kube_ca_file": str(s.kube_ca_file),
         "kube_token_file": str(s.kube_token_file),

@@ -379,6 +379,15 @@ def test_workload_job_result_is_bound_to_management_identity(tmp_path, tamper):
     directory = runner.directory(handle)
     (directory / "run.json").write_text(json.dumps(data))
     (directory / "result.json").write_text(json.dumps(result))
+    (directory / "observation.json").write_text(
+        json.dumps(
+            {
+                "status": "completed",
+                "result": result,
+                "timeline_origin_at": now().isoformat(),
+            }
+        )
+    )
     observed = runner.observe(handle, uid)
     assert observed.status == ("completed" if tamper is None else "failed")
     if tamper:

@@ -35,6 +35,14 @@ implements Kubernetes control in two stages: persist intent, then create/adopt t
 Repeated API idempotency keys return the original attempt, including terminal attempts. Do not use
 `LocalRunnerAdapter` across Pods: it is only for local commands sharing one filesystem/PID namespace.
 
+For actual runner Jobs, terminal acceptance requires the saved completed observation,
+its result and the original timeline timestamp to agree. Atomic file replacement on
+shared storage can briefly expose different file generations to different Pods.
+Management observes `finalizing` for up to 120 seconds after the original Job's
+completion time, then fails inconsistent artifacts. The allowance is frozen with
+the execution binding and cannot reset when a management worker restarts. The
+dedicated contract-fixture adapter remains compatible with its simpler result protocol.
+
 ## Artifacts, credentials and resources
 
 Use the same `/artifacts` mount in preparation, management API/worker Pods and runner Jobs. Stage

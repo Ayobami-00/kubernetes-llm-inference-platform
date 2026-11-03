@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 from platform_contracts import Run, RunResult, RunSnapshot
@@ -309,15 +310,16 @@ class KubernetesJobRunner:
                 return RunnerObservation(status="running", stage="finalizing")
             try:
                 result = self.validated_result(handle)
+                saved = self.saved_observation(handle)
+                if self.binding["runner"] != "kubernetes-fixture:v1" and (
+                    not saved
+                    or saved.status != "completed"
+                    or saved.result != result
+                    or saved.timeline_origin_at is None
+                ):
+                    raise ValueError("Final observation is not yet consistent with the result")
             except (ValueError, OSError):
-                return RunnerObservation(
-                    status="failed",
-                    error={
-                        "code": "invalid_result",
-                        "message": "Completed Job has no valid shared RunResult",
-                    },
-                )
-            saved = self.saved_observation(handle)
+                return self.finalization_observation(job)
             return RunnerObservation(
                 status="completed",
                 result=result,
@@ -329,6 +331,26 @@ class KubernetesJobRunner:
             if observation.status == "running":
                 return observation
         return RunnerObservation(status="running", stage="preparing")
+
+    def finalization_observation(self, job):
+        # Separate Pods can briefly read different atomic-renamed files on RWX
+        # storage. Never commit a completed run from a stale queued observation.
+        # The recorded Job completion fixes the deadline across worker restarts.
+        completed = job.get("status", {}).get("completionTime")
+        if completed:
+            stamp = datetime.fromisoformat(completed.replace("Z", "+00:00"))
+            age = (datetime.now(UTC) - stamp).total_seconds()
+            if -5 <= age < self.binding.get("finalization_allowance_seconds", 120):
+                return RunnerObservation(status="running", stage="finalizing")
+        return RunnerObservation(
+            status="failed",
+            error={
+                "code": "invalid_result",
+                "message": (
+                    "Completed Job has no consistent final result/observation within its deadline"
+                ),
+            },
+        )
 
     def validated_result(self, handle):
         directory = self.directory(handle)
