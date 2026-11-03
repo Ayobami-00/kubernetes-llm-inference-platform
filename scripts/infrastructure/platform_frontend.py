@@ -7,6 +7,10 @@ from management_frontend import binding, check_targets, manifest
 from smoke import wait_until
 
 
+class TargetsNotReady(ValueError):
+    """Exact, owned targets exist but health checks have not recovered yet."""
+
+
 def prepare():
     from backend import initialize
 
@@ -55,8 +59,21 @@ def validate_targets(targets, nodes, selected):
     survivors = set(nodes.values()) - {selected}
     healthy = {t["Target"]["Id"] for t in targets if t["TargetHealth"]["State"] == "healthy"}
     if not survivors <= healthy:
-        raise ValueError("Both other management targets must remain healthy")
+        raise TargetsNotReady("Both other management targets must remain healthy")
     return {t["Target"]["Id"]: t["TargetHealth"]["State"] for t in targets}
+
+
+def wait_for_survivors(record):
+    # Kubernetes readiness can precede ALB health-check convergence after a
+    # reschedule. Retry only that observation; identity/ownership errors and
+    # mutations are never retried here, and EC2 remains unchanged until healthy.
+    def probe():
+        try:
+            return observed(record)
+        except TargetsNotReady:
+            return None
+
+    return wait_until(probe, "both surviving ALB targets healthy", timeout=180, interval=5)
 
 
 def require_detached(record):
@@ -67,7 +84,7 @@ def require_detached(record):
 def detach(record):
     from platform_resize import save
 
-    states = observed(record)
+    states = wait_for_survivors(record)
     if record["instance_id"] not in states:
         require_detached(record)
         return
@@ -94,7 +111,7 @@ def detach(record):
 def restore(record):
     from platform_resize import save
 
-    states = observed(record)
+    states = wait_for_survivors(record)
     if states.get(record["instance_id"]) != "healthy":
         record["frontend_restore_intent_at"] = utc_now()
         save(record)

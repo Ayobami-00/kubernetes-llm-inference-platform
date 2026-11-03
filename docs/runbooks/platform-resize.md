@@ -56,6 +56,11 @@ again only after worker/database recovery, and completion requires three healthy
 targets. Terraform retains durable attachment ownership; the maintenance journal
 records this temporary membership change and its compensation. An interrupted
 pre-apply drain can restore the original target through the abort procedure.
+After Kubernetes rescheduling, the operator allows up to 180 seconds for the two
+surviving targets' ALB checks to converge before deregistering anything. Identity
+or ownership mismatches fail immediately. Expiry preserves the interrupted drain
+for inspection and explicit abort; it never permits an EC2 restart without two
+healthy targets.
 
 CPU options are explicit: four cores and two threads per core for `m7i.2xlarge`.
 EC2 can otherwise preserve the old reduced CPU settings across a type change.

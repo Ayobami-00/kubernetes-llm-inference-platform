@@ -195,3 +195,35 @@ def test_frontend_drain_preserves_two_healthy_exact_survivors(monkeypatch):
     )
     with pytest.raises(ValueError, match="finish draining"):
         frontend.require_detached({"instance_id": "i-one"})
+
+
+def test_frontend_waits_for_health_convergence_without_retrying_identity_errors(monkeypatch):
+    stable = {"i-two": "healthy", "i-three": "healthy"}
+    observe = Mock(side_effect=[frontend.TargetsNotReady("not yet"), stable])
+    monkeypatch.setattr(frontend, "observed", observe)
+
+    def bounded_wait(probe, message, *, timeout, interval):
+        assert timeout == 180 and interval == 5
+        assert probe() is None
+        return probe()
+
+    monkeypatch.setattr(frontend, "wait_until", bounded_wait)
+    assert frontend.wait_for_survivors({}) == stable
+    observe.side_effect = ValueError("Unexpected target identity")
+    with pytest.raises(ValueError, match="identity"):
+        frontend.wait_for_survivors({})
+
+
+def test_frontend_never_deregisters_when_survivor_health_deadline_expires(monkeypatch):
+    monkeypatch.setattr(frontend, "observed", Mock(side_effect=frontend.TargetsNotReady("late")))
+
+    def deadline(probe, *_args, **_kwargs):
+        assert probe() is None
+        raise TimeoutError("survivor health deadline")
+
+    monkeypatch.setattr(frontend, "wait_until", deadline)
+    mutate = Mock()
+    monkeypatch.setattr(frontend, "Aws", mutate)
+    with pytest.raises(TimeoutError, match="deadline"):
+        frontend.detach({})
+    mutate.assert_not_called()
