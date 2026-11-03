@@ -69,6 +69,11 @@ but is deleted during approved full foundation teardown. Ansible must identify t
 data volume by EBS volume identity on Nitro/NVMe, not assume Linux `/dev/sdf` is its
 actual device name. Terraform never formats or mounts it.
 
+The explicit ENI owns source/destination checking and disables it for later mesh
+forwarding. The instance resource ignores only that same field: the pinned provider
+otherwise proposes its default `true`, while forbidding explicit configuration of
+the field together with a primary ENI. Other instance settings remain managed.
+
 ## Required subsequent WireGuard/Cilium work
 
 Ansible must establish direct host peers before kubeadm init/join. Configure the

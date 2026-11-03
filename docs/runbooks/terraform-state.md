@@ -50,6 +50,27 @@ reviewing both states; it refuses conflicting ownership and retains recovery sta
 The migration's `-force-copy` is used only when S3 has no bootstrap ownership state.
 It is never a conflict-resolution strategy.
 
+The pinned Terraform version was observed copying an identical local payload into
+an empty S3 backend with a new lineage and reset serial. The normal guard correctly
+stops in this case. Do not generally accept mismatched lineages. After comparing
+every resource/output and retaining both snapshots plus the S3 version ID, an
+explicit metadata-only repair is available:
+
+```bash
+python scripts/infrastructure/manage.py repair-migration-metadata \
+  --expected-remote-version <reviewed-S3-version-id> \
+  --expected-local-lineage <reviewed-original-lineage>
+```
+
+It requires the unchanged pre-migration recovery copy, complete payload equality,
+the exact reviewed S3 version, native lock ownership and an ETag-conditional write.
+It restores the original lineage/serial, retains the previous S3 version and emits
+a private repair receipt. Different resources/outputs are always refused. Rerun
+the bootstrap plan afterward; it should be clean. This explicit repair is distinct
+from discarding state or creating another ownership record. Terraform's
+[migration implementation](https://github.com/hashicorp/terraform/blob/v1.17.1/internal/states/statemgr/migrate.go)
+preserves lineage only when the participating state managers support it.
+
 Before manual recovery, preserve both local files and the relevant S3 object
 version IDs, compare lineages/serials/resources and verify the account. Do not use
 `state push -force`, delete locks, import existing objects into a second root, or

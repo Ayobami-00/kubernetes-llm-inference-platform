@@ -62,6 +62,42 @@ def main() -> None:
 
     foundation = ["network", "compute", "api", "identity-state", "operations"]
     regional = {"aws:RequestedRegion": ("string", [region])}
+    for action in ("ec2:CreateSubnet", "ec2:CreateRouteTable", "ec2:CreateSecurityGroup"):
+        for project, expected in ((PROJECT, True), ("unrelated", False)):
+            simulate(
+                f"{action} parent VPC {project}",
+                foundation,
+                action,
+                f"arn:aws:ec2:{region}:{account}:vpc/vpc-00000000000000001",
+                expected,
+                {**regional, "ec2:ResourceTag/Project": ("string", [project])},
+            )
+    for action in ("ec2:AuthorizeSecurityGroupIngress", "ec2:AuthorizeSecurityGroupEgress"):
+        for project, expected in ((PROJECT, True), ("unrelated", False)):
+            simulate(
+                f"{action} new rule {project}",
+                foundation,
+                action,
+                f"arn:aws:ec2:{region}:{account}:security-group-rule/*",
+                expected,
+                {**regional, "aws:RequestTag/Project": ("string", [project])},
+            )
+            simulate(
+                f"{action} parent group {project}",
+                foundation,
+                action,
+                f"arn:aws:ec2:{region}:{account}:security-group/sg-00000000000000001",
+                expected,
+                {**regional, "ec2:ResourceTag/Project": ("string", [project])},
+            )
+        simulate(
+            f"{action} untagged new rule denied",
+            foundation,
+            action,
+            f"arn:aws:ec2:{region}:{account}:security-group-rule/*",
+            False,
+            regional,
+        )
     simulate(
         "node passrole to EC2",
         foundation,

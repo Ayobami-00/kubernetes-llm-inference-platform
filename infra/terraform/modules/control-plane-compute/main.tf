@@ -63,6 +63,11 @@ resource "aws_instance" "node" {
   }
   tags       = merge(var.tags, { Name = "klip-${each.key}", Node = each.key })
   depends_on = [aws_iam_role_policy_attachment.ssm]
+  lifecycle {
+    # With an explicit primary interface the provider forbids setting this on
+    # the instance. The ENI resource owns it; ignore the instance's true default.
+    ignore_changes = [source_dest_check]
+  }
 }
 
 resource "aws_eip" "node" {

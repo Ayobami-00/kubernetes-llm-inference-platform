@@ -74,6 +74,19 @@ change the canonical IAM builder, regenerate its documents, validate and replan
 bootstrap. The foundation role cannot rewrite its own permissions. Once Terraform
 adopts the access objects, the old standalone CLI access writer must not be used.
 
+The live deployment exposed distinct EC2 authorization checks for existing parent
+VPCs and newly tagged security-group-rule ARNs. The canonical policy now separates
+parent ownership checks from request-tag checks on new resources. The pinned
+provider also reads `DescribeAddressesAttribute`; that read is region-scoped.
+
+If a provider creates an object but then fails only its refresh, Terraform may mark
+it tainted. Do not replace it to bypass the failed read. Preserve a private state
+backup, diagnose/fix the precise permission, verify the object's ID, ownership,
+region and expected configuration directly in AWS, and then clear only the
+reviewed creation-error taint with `terraform untaint <exact-resource-address>`.
+The initial EIP recovery followed this procedure and retained all three allocations.
+Generate a fresh plan afterward and reject unexpected replacement/destruction.
+
 ## Verify and leave running
 
 ```bash

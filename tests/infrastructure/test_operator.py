@@ -52,6 +52,12 @@ def test_already_applied_receipt_is_not_replayed(receipt):
         verify_receipt(receipt, receipt["plan_sha256"], "reviewed-source", "foundation")
 
 
+def test_completed_apply_is_not_replayed_after_migration_failure(receipt):
+    receipt["terraform_applied_at"] = "2026-11-03T00:00:00Z"
+    with pytest.raises(ValueError, match="already applied"):
+        verify_receipt(receipt, receipt["plan_sha256"], "reviewed-source", "foundation")
+
+
 def test_wrong_cloud_account_is_rejected_before_work(monkeypatch):
     monkeypatch.setattr(
         Aws, "call", lambda *args, **kwargs: {"Account": "999999999999", "Arn": "wrong"}

@@ -6,6 +6,7 @@
       "Effect": "Allow",
       "Action": [
         "ec2:DescribeAddresses",
+        "ec2:DescribeAddressesAttribute",
         "ec2:DescribeAvailabilityZones",
         "ec2:DescribeImages",
         "ec2:DescribeInstanceCreditSpecifications",
@@ -50,6 +51,41 @@
       ],
       "Resource": [
         "*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "CreateWithinOwnedVpc",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSubnet",
+        "ec2:CreateRouteTable",
+        "ec2:CreateSecurityGroup"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:vpc/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedSecurityGroupRules",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:security-group-rule/*"
       ],
       "Condition": {
         "StringEquals": {

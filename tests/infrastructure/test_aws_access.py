@@ -146,3 +146,30 @@ def test_smoke_requires_project_owned_instances(documents):
     operation = documents["operations"]["Statement"][0]
     assert operation["Condition"]["StringEquals"]["ssm:resourceTag/Project"] == MODULE["PROJECT"]
     assert operation["Resource"] == [f"arn:aws:ec2:eu-west-2:{ACCOUNT}:instance/*"]
+
+
+def test_network_creation_parent_permissions_require_owned_vpc(documents):
+    statement = next(
+        s for s in documents["network"]["Statement"] if s["Sid"] == "CreateWithinOwnedVpc"
+    )
+    assert set(statement["Action"]) == {
+        "ec2:CreateSubnet",
+        "ec2:CreateRouteTable",
+        "ec2:CreateSecurityGroup",
+    }
+    assert statement["Resource"] == [f"arn:aws:ec2:eu-west-2:{ACCOUNT}:vpc/*"]
+    assert statement["Condition"]["StringEquals"]["ec2:ResourceTag/Project"] == MODULE["PROJECT"]
+
+
+def test_new_rules_require_request_tags_and_owned_parent_groups(documents):
+    statement = next(
+        s for s in documents["network"]["Statement"] if s["Sid"] == "CreateTaggedSecurityGroupRules"
+    )
+    assert set(statement["Action"]) == {
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress",
+    }
+    assert statement["Resource"] == [f"arn:aws:ec2:eu-west-2:{ACCOUNT}:security-group-rule/*"]
+    assert statement["Condition"]["StringEquals"]["aws:RequestTag/Project"] == MODULE["PROJECT"]
+    parent = next(s for s in documents["network"]["Statement"] if s["Sid"] == "ManageOwnedNetwork")
+    assert parent["Condition"]["StringEquals"]["ec2:ResourceTag/Project"] == MODULE["PROJECT"]

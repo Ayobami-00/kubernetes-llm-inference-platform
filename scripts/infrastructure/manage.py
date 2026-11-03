@@ -8,7 +8,7 @@ import json
 import sys
 from pathlib import Path
 
-from backend import initialize, migrate_bootstrap
+from backend import initialize, migrate_bootstrap, repair_migration_metadata
 from common import (
     CONFIG,
     PROFILES,
@@ -178,7 +178,7 @@ def create_plan(
 
 
 def verify_receipt(receipt: dict, approval: str, current_source: str, root: str) -> None:
-    if receipt["root"] != root or receipt.get("applied_at"):
+    if receipt["root"] != root or receipt.get("applied_at") or receipt.get("terraform_applied_at"):
         raise ValueError("Plan root differs or this plan was already applied; generate a new plan")
     if receipt["preview"]:
         raise ValueError(
@@ -211,7 +211,15 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
             aws = Aws(PROFILES["foundation"])
             for node in allocation()["nodes"].values():
                 ssm_command(aws, node["instance_id"], assert_prebootstrap(include_etcd=True))
-    print(tf(root, "apply", "-input=false", str(receipt["plan_path"])))
+    try:
+        result = tf(root, "apply", "-input=false", str(receipt["plan_path"]))
+    except RuntimeError as error:
+        write_private(state_home() / f"reports/{root}-apply-error.txt", str(error))
+        raise
+    write_private(Path(receipt["plan_path"]).with_suffix(".apply.txt"), result)
+    receipt["terraform_applied_at"] = utc_now()
+    write_private(receipt_file, receipt)
+    print(result)
     if root == "bootstrap":
         migrate_bootstrap()
     receipt["applied_at"] = utc_now()
@@ -318,6 +326,7 @@ def main() -> None:
             "destroy",
             "profiles",
             "migrate-bootstrap",
+            "repair-migration-metadata",
         ],
     )
     parser.add_argument("--root", choices=list(ROOTS), default="foundation")
@@ -333,11 +342,15 @@ def main() -> None:
     parser.add_argument("--confirm-backup-verified", action="store_true")
     parser.add_argument("--ca-bundle", type=Path)
     parser.add_argument("--bootstrap-observations", type=Path)
+    parser.add_argument("--expected-remote-version")
+    parser.add_argument("--expected-local-lineage")
     args = parser.parse_args()
     if args.command == "init":
         initialize(args.root, preview=args.preview)
     elif args.command == "migrate-bootstrap":
         migrate_bootstrap()
+    elif args.command == "repair-migration-metadata":
+        repair_migration_metadata(args.expected_remote_version, args.expected_local_lineage)
     elif args.command == "plan":
         create_plan(
             args.root,

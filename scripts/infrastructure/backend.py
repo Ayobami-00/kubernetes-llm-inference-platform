@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import uuid
 from pathlib import Path
 
 from common import (
@@ -15,6 +16,7 @@ from common import (
     private_dir,
     state_home,
     tf,
+    utc_now,
     write_private,
 )
 
@@ -32,6 +34,141 @@ def state_fingerprint(value: dict) -> str:
     return hashlib.sha256(
         json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
     ).hexdigest()
+
+
+def verify_migration_metadata_only(local: dict, remote: dict, expected_lineage: str) -> None:
+    """Explicit recovery only: never use content equality to bypass normal lineage checks."""
+    if local["lineage"] != expected_lineage:
+        raise ValueError("Recovery source lineage differs from the explicitly reviewed lineage")
+    ignored = {"lineage", "serial", "terraform_version"}
+    source = {key: value for key, value in local.items() if key not in ignored}
+    destination = {key: value for key, value in remote.items() if key not in ignored}
+    if source != destination or not local.get("resources"):
+        raise ValueError("Migration payload differs; metadata-only repair is forbidden")
+
+
+def repair_migration_metadata(expected_version: str, expected_lineage: str) -> None:
+    """Repair a reviewed metadata-only migration under native lock and conditional write."""
+    if not expected_version or not expected_lineage:
+        raise ValueError("Explicit remote version and original local lineage are required")
+    aws = Aws(PROFILES["bootstrap"])
+    identity = aws.preflight("bootstrap")
+    folder = private_dir(state_home() / "bootstrap")
+    source = read_state(folder / "recovery-before-migration.json")
+    local = read_state(folder / "terraform.tfstate")
+    if source is None or local != source:
+        raise ValueError("Local state no longer matches the retained pre-migration recovery copy")
+    bucket, key, owner = CONFIG["state_bucket"], STATE_KEYS["bootstrap"], CONFIG["account_id"]
+    lock_id = str(uuid.uuid4())
+    lock = folder / "migration-repair-lock.json"
+    write_private(
+        lock,
+        {
+            "ID": lock_id,
+            "Operation": "OperationTypeMigrationMetadataRepair",
+            "Who": identity["Arn"],
+            "Version": "1.17.1",
+            "Created": utc_now(),
+            "Path": f"{bucket}/{key}",
+            "Info": "Reviewed identical-payload migration metadata repair",
+        },
+    )
+    aws.call(
+        "s3api",
+        "put-object",
+        "--bucket",
+        bucket,
+        "--key",
+        key + ".tflock",
+        "--body",
+        str(lock),
+        "--if-none-match",
+        "*",
+        "--expected-bucket-owner",
+        owner,
+    )
+    try:
+        destination = folder / "remote-before-metadata-repair.json"
+        write_private(destination, "")
+        metadata = aws.call(
+            "s3api",
+            "get-object",
+            "--bucket",
+            bucket,
+            "--key",
+            key,
+            "--expected-bucket-owner",
+            owner,
+            str(destination),
+        )
+        if metadata.get("VersionId") != expected_version:
+            raise ValueError("Remote state version changed after review; repair refused")
+        remote = read_state(destination)
+        verify_migration_metadata_only(local, remote, expected_lineage)
+        # Preserve every resource/output byte semantically, and retain the S3 version.
+        # Conditional write prevents overwriting an intervening non-Terraform writer.
+        repaired = folder / "metadata-repair-source.json"
+        write_private(repaired, local)
+        result = aws.call(
+            "s3api",
+            "put-object",
+            "--bucket",
+            bucket,
+            "--key",
+            key,
+            "--body",
+            str(repaired),
+            "--if-match",
+            metadata["ETag"],
+            "--expected-bucket-owner",
+            owner,
+            "--server-side-encryption",
+            "AES256",
+            "--content-type",
+            "application/json",
+        )
+        write_private(
+            folder / "metadata-repair-receipt.json",
+            {
+                "repaired_at": utc_now(),
+                "actor": identity["Arn"],
+                "before_version": expected_version,
+                "after_version": result.get("VersionId"),
+                "source_sha256": state_fingerprint(local),
+                "lineage": expected_lineage,
+            },
+        )
+    finally:
+        # Only this process's lock can be removed. A conflicting lock is retained.
+        observed_lock = folder / "observed-repair-lock.json"
+        write_private(observed_lock, "")
+        aws.call(
+            "s3api",
+            "get-object",
+            "--bucket",
+            bucket,
+            "--key",
+            key + ".tflock",
+            "--expected-bucket-owner",
+            owner,
+            str(observed_lock),
+        )
+        if json.loads(observed_lock.read_text()).get("ID") != lock_id:
+            raise ValueError("Lock ownership changed; refusing to remove it")
+        aws.call(
+            "s3api",
+            "delete-object",
+            "--bucket",
+            bucket,
+            "--key",
+            key + ".tflock",
+            "--expected-bucket-owner",
+            owner,
+        )
+    mode, _, remote = bootstrap_status(aws)
+    if mode != "remote" or remote != local:
+        raise ValueError("Remote repair verification failed; all recovery copies are retained")
+    print("Original bootstrap lineage/serial restored; identical payload and S3 versions verified")
 
 
 def classify_bootstrap(bucket_exists: bool, local: dict | None, remote: dict | None) -> str:

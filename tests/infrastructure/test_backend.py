@@ -96,3 +96,20 @@ def test_conflict_stops_before_backend_or_migration_commands(monkeypatch, tmp_pa
     with pytest.raises(ValueError, match="Conflicting"):
         backend.migrate_bootstrap()
     assert calls == []
+
+
+def test_explicit_metadata_repair_requires_identical_complete_payload():
+    local = state("original", 16, [{"instances": [{"id": "owned"}]}])
+    remote = {**local, "lineage": "migration", "serial": 1}
+    backend.verify_migration_metadata_only(local, remote, "original")
+    with pytest.raises(ValueError, match="reviewed lineage"):
+        backend.verify_migration_metadata_only(local, remote, "other")
+    with pytest.raises(ValueError, match="payload differs"):
+        backend.verify_migration_metadata_only(
+            local, {**remote, "outputs": {"new": "data"}}, "original"
+        )
+    with pytest.raises(ValueError, match="payload differs"):
+        backend.verify_migration_metadata_only(state(), state("other"), "one")
+    # Ordinary restart behavior must still refuse different lineages.
+    with pytest.raises(ValueError, match="Conflicting"):
+        classify_bootstrap(True, local, remote)

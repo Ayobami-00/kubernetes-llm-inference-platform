@@ -133,3 +133,4 @@ identities and saved-plan digests. Private credentials, recovery state and repor
 - [Inference origin updates](docs/runbooks/inference-dns.md)
 - [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
 - [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)
+- [Live foundation acceptance and Ansible handoff](docs/runbooks/aws-foundation-acceptance.md)
