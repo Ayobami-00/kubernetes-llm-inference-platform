@@ -5,15 +5,68 @@ import hashlib
 import io
 import json
 import tarfile
+import tempfile
 from datetime import UTC, datetime, timedelta
+from pathlib import Path
+from types import SimpleNamespace
 
+import cluster
+import cluster_acceptance
+import node_agent
 import pytest
 import yaml
 from cluster_backups import backup_fresh, validate_bundle
 from cluster_config import firewall, kubeadm_documents, node_configuration
 from cluster_models import PeerRegistry, WorkerRequest, assert_node_identity
 from cluster_verification import ready_node
-from node_agent import cluster_state, disk_decision, gateway_decision
+from node_agent import cluster_state, disk_decision, gateway_decision, validate_pod_mtu
+
+
+@pytest.mark.parametrize("existing", [False, True])
+def test_verification_cleans_only_its_own_fixture_on_failure(monkeypatch, existing):
+    calls, applied = [], []
+
+    def kubectl(*arguments):
+        calls.append(arguments)
+        return '{"metadata": {"name": "klip-acceptance"}}' if existing else ""
+
+    def fail():
+        raise RuntimeError("Network check failed")
+
+    monkeypatch.setattr(cluster, "kubectl", kubectl)
+    monkeypatch.setattr(cluster, "_verify_cluster_state", fail)
+    monkeypatch.setattr(cluster_acceptance, "remote_manifest", applied.append)
+    with pytest.raises(RuntimeError, match="Network check"):
+        cluster.verify()
+    assert bool(applied) is not existing
+    assert any(call[0] == "delete" for call in calls) is not existing
+
+
+def test_ssh_reuse_is_scoped_to_authenticated_access_settings(monkeypatch):
+    with tempfile.TemporaryDirectory(dir="/tmp", prefix="klip-") as folder:
+        _check_ssh_reuse(Path(folder), monkeypatch)
+
+
+def _check_ssh_reuse(tmp_path, monkeypatch):
+    monkeypatch.setattr(cluster, "state_home", lambda: tmp_path)
+    calls = []
+    monkeypatch.setattr(cluster, "checked", lambda arguments, **kwargs: calls.append(arguments))
+    fields = {
+        "ansible_host": "i-123",
+        "ansible_user": "ubuntu",
+        "ansible_ssh_private_key_file": "/operator/key",
+        "ansible_ssh_common_args": "-o UserKnownHostsFile=/operator/pins",
+    }
+    cluster.Host(fields).run(["true"])
+    cluster.Host(fields).run(["true"])
+    cluster.Host({**fields, "ansible_ssh_common_args": "-o UserKnownHostsFile=/new/pins"}).run(
+        ["true"]
+    )
+    paths = [next(arg for arg in call if arg.startswith("ControlPath=")) for call in calls]
+    assert paths[0] == paths[1] and paths[0] != paths[2]
+    assert "StrictHostKeyChecking=yes" in calls[0]
+    assert "ServerAliveCountMax=2" in calls[0]
+    assert (tmp_path / "ssh").stat().st_mode & 0o777 == 0o700
 
 
 @pytest.mark.parametrize(
@@ -26,10 +79,61 @@ def test_partial_bootstrap_never_initializes(paths, data):
 
 def test_healthy_bootstrap_is_recognized_without_reset():
     assert cluster_state(set(), False) == "uninitialized"
+    assert cluster_state({"manifests/.kubelet-keep"}, False) == "uninitialized"
     assert (
         cluster_state({"admin.conf", "pki/ca.crt", "manifests/kube-apiserver.yaml"}, True)
         == "initialized"
     )
+
+
+def test_package_marker_does_not_hide_partial_bootstrap_or_data():
+    for paths, data in (
+        ({"manifests/.kubelet-keep", "pki/ca.key"}, False),
+        ({"manifests/.kubelet-keep"}, True),
+    ):
+        with pytest.raises(ValueError, match="Partial"):
+            cluster_state(paths, data)
+
+
+def test_pod_mtu_checks_the_effective_route_not_only_the_interface():
+    assert validate_pod_mtu([{"mtu": 1420}], [{"dst": "default", "metrics": [{"mtu": 1370}]}]) == {
+        "pod_interface_mtu": 1420,
+        "pod_route_mtu": 1370,
+    }
+    for routes in ([], [{"dst": "default"}], [{"dst": "default", "metrics": [{"mtu": 1420}]}]):
+        with pytest.raises(ValueError, match="route"):
+            validate_pod_mtu([{"mtu": 1420}], routes)
+
+
+def test_mesh_renumber_removes_old_primary_before_reestablishing_assignment(monkeypatch, registry):
+    calls = []
+
+    def command(*args, **kwargs):
+        calls.append(args)
+        if args == ("ip", "-j", "address", "show", "dev", "wg0"):
+            return json.dumps(
+                [
+                    {
+                        "addr_info": [
+                            {"family": "inet", "local": "10.200.0.2", "prefixlen": 24},
+                            {"family": "inet", "local": "10.200.0.11", "prefixlen": 24},
+                        ]
+                    }
+                ]
+            )
+        return ""
+
+    monkeypatch.setattr(node_agent, "command", command)
+    monkeypatch.setattr(node_agent, "atomic", lambda *args: None)
+    monkeypatch.setattr(Path, "read_text", lambda *args: "example-key")
+    monkeypatch.setattr(
+        node_agent.subprocess, "run", lambda *args, **kwargs: SimpleNamespace(returncode=1)
+    )
+    node_agent.apply_mesh({"name": "cp-01", "api_routed_cidrs": []}, registry, {})
+    deletion = ("ip", "address", "del", "10.200.0.2/24", "dev", "wg0")
+    assignment = ("ip", "address", "replace", "10.200.0.11/24", "dev", "wg0")
+    assert calls.index(deletion) < calls.index(assignment)
+    assert sum(call[:3] == ("ip", "address", "del") for call in calls) == 1
 
 
 @pytest.mark.parametrize(
@@ -151,6 +255,7 @@ def test_configuration_keeps_real_api_and_kubelet_mount_guards(allocation):
     assert cluster["controlPlaneEndpoint"] == allocation["api"]["endpoint"].removeprefix("https://")
     assert cluster["etcd"]["local"]["dataDir"] == "/var/lib/etcd/data"
     assert documents[0]["localAPIEndpoint"]["advertiseAddress"] == "10.200.0.11"
+    assert documents[0]["bootstrapTokens"] == [{"ttl": "15m", "description": "klip initialization"}]
     assert "10.40.1.10" in cluster["apiServer"]["certSANs"]
     assert "PRIVATE KEY" not in yaml.safe_dump_all(documents)
     rules = firewall(config)

@@ -154,18 +154,16 @@ resource "aws_network_interface" "probe" {
   tags            = local.tags
 }
 resource "aws_eip" "probe" {
-  domain = "vpc"
-  tags   = local.tags
-}
-resource "aws_eip_association" "probe" {
-  allocation_id        = aws_eip.probe.id
-  network_interface_id = aws_network_interface.probe.id
-  depends_on           = [aws_instance.probe]
+  domain            = "vpc"
+  network_interface = aws_network_interface.probe.id
+  tags              = local.tags
+  depends_on        = [aws_instance.probe]
 }
 output "probe" {
   description = "Separate-network acceptance allocation; never a shared GPU inventory entry."
   value = {
     instance_id       = aws_instance.probe.id, public_ip = aws_eip.probe.public_ip,
+    allocation_id     = aws_eip.probe.id,
     availability_zone = aws_instance.probe.availability_zone,
     private_ip        = aws_instance.probe.private_ip, wireguard_ip = "10.200.0.2",
     vpc_id            = aws_vpc.probe.id, cidr = aws_vpc.probe.cidr_block

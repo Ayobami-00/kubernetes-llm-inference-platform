@@ -237,9 +237,47 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
 def verify_probe_teardown(evidence: dict) -> None:
     if not evidence or evidence.get("cluster_id") != CONFIG["cluster_id"]:
         raise ValueError("Explicit probe cleanup evidence is required")
-    current = json.loads(tf("probe", "output", "-json", "probe"))
-    if current["instance_id"] != evidence.get("probe_instance_id"):
-        raise ValueError("Probe teardown targets a different instance")
+    outputs = json.loads(tf("probe", "output", "-json"))
+    if "probe" in outputs:
+        current = outputs["probe"]["value"]
+        if current["instance_id"] != evidence.get("probe_instance_id"):
+            raise ValueError("Probe teardown targets a different instance")
+    else:
+        # A partial destroy may remove compute and outputs before releasing its
+        # address. Permit only the exact recorded, tagged residual allocation.
+        resources = (
+            json.loads(tf("probe", "show", "-json"))
+            .get("values", {})
+            .get("root_module", {})
+            .get("resources", [])
+        )
+        expected_tags = {
+            "Project": CONFIG["project"],
+            "Cluster": CONFIG["cluster_id"],
+            "ManagedBy": "terraform-network-probe",
+            "Node": "network-probe",
+        }
+        if len(resources) != 1 or resources[0]["address"] != "aws_eip.probe":
+            raise ValueError("Missing probe output; inspect partial teardown ownership")
+        values = resources[0]["values"]
+        if (
+            not evidence.get("probe_allocation_id")
+            or values["id"] != evidence["probe_allocation_id"]
+            or any(values.get("tags", {}).get(key) != value for key, value in expected_tags.items())
+        ):
+            raise ValueError("Partial teardown does not match the recorded unassociated probe EIP")
+        observed = Aws(PROFILES["foundation"]).call(
+            "ec2", "describe-addresses", "--allocation-ids", evidence["probe_allocation_id"]
+        )["Addresses"]
+        if (
+            len(observed) != 1
+            or observed[0].get("AssociationId")
+            or any(
+                {tag["Key"]: tag["Value"] for tag in observed[0].get("Tags", [])}.get(key) != value
+                for key, value in expected_tags.items()
+            )
+        ):
+            raise ValueError("Residual probe EIP is still associated or its live ownership differs")
     if not evidence.get("node_absent") or not evidence.get("peers_revoked"):
         raise ValueError("Remove probe Kubernetes membership and peers before teardown")
     from cluster import FOLDER, kubectl
@@ -300,6 +338,12 @@ def verify_teardown_evidence(evidence: dict) -> None:
 
 
 def destroy_plan(args: argparse.Namespace) -> None:
+    if args.root != "foundation":
+        raise ValueError(
+            "destroy-plan supports the foundation root only; "
+            "use the guarded acceptance cleanup workflow for probes "
+            "and retain backup/bootstrap roots"
+        )
     from smoke import assert_prebootstrap, ssm_command
 
     manifest = allocation()

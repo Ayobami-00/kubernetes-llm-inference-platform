@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import hashlib
 import json
+import time
 from datetime import UTC, datetime
 from pathlib import Path
 
@@ -60,14 +61,29 @@ def remove_host(name: str) -> None:
 def register_probe() -> dict:
     from cluster import FOLDER, Host, ansible
     from common import ensure_ssh_key
-    from smoke import ssm_command
+    from smoke import ssm_command, wait_until
 
     aws = Aws(PROFILES["foundation"])
     aws.preflight("foundation")
     probe = json.loads(tf("probe", "output", "-json", "probe"))
     if probe["cidr"] != "10.41.0.0/24":
         raise ValueError("Unexpected probe network")
-    keys = ssm_command(aws, probe["instance_id"], "cat /etc/ssh/ssh_host_ed25519_key.pub").strip()
+    wait_until(
+        lambda: any(
+            item.get("PingStatus") == "Online"
+            for item in aws.call(
+                "ssm",
+                "describe-instance-information",
+                "--filters",
+                json.dumps([{"Key": "InstanceIds", "Values": [probe["instance_id"]]}]),
+            )["InstanceInformationList"]
+        ),
+        "probe SSM registration",
+        timeout=180,
+    )
+    keys = ssm_command(aws, probe["instance_id"], "cat /etc/ssh/ssh_host_ed25519_key.pub")[
+        "stdout"
+    ].strip()
     known = FOLDER / "probe-known-hosts"
     write_private(known, f"{probe['instance_id']} {keys}\n")
     _, key = ensure_ssh_key()
@@ -359,6 +375,27 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                     "pod/" + pods[0]["metadata"]["name"],
                     "--timeout=" + str(min(request.remaining(), 300)) + "s",
                 )
+                from cluster import approve_serving_csrs
+
+                for attempt in range(30):
+                    approve_serving_csrs()
+                    try:
+                        host.run(
+                            [
+                                "sudo",
+                                "openssl",
+                                "verify",
+                                "-CAfile",
+                                "/etc/kubernetes/pki/ca.crt",
+                                "/var/lib/kubelet/pki/kubelet-server-current.pem",
+                            ]
+                        )
+                        break
+                    except RuntimeError:
+                        if attempt == 29:
+                            raise
+                        time.sleep(1)
+                result["stages"].append("serving_certificate_verified")
                 kubectl(
                     "-n",
                     "kube-system",

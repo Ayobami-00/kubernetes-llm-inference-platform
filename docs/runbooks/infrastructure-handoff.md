@@ -56,7 +56,8 @@ the code does not fabricate a CA reference or mark fixtures as live infrastructu
 
 C owns Lambda allocation/termination and durable job retries. B now provides
 versioned host-preparation/join/removal commands; see [worker operations](worker-host-operations.md).
-Their live Kubernetes acceptance remains pending rollout authorization.
+The [live CPU and generic AWS-worker acceptance](kubernetes-acceptance.md) passed.
+Actual Lambda/GPU validation remains a later integration milestone.
 The expected inputs are:
 
 | Input | Owner/source |

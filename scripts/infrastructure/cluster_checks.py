@@ -120,6 +120,12 @@ def main() -> None:
             )
         if item["kind"] == "CustomResourceDefinition":
             raise ValueError("CRDs must be installed explicitly, outside Helm releases")
+        if item["kind"] == "CiliumClusterwideNetworkPolicy":
+            policy = item["spec"]
+            if policy.get("enableDefaultDeny") != {"ingress": False, "egress": False} or policy.get(
+                "egressDeny"
+            ) != [{"toCIDR": ["169.254.169.254/32"]}]:
+                raise ValueError("Metadata guard must deny IMDS without isolating all Pod egress")
     (ROOT / "artifacts/helm-rendered.yaml").write_text(rendered.stdout)
     print(f"Rendered and checked {len(documents)} static release resources")
 

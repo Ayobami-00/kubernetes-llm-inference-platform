@@ -1,9 +1,60 @@
 import hashlib
 import json
+from types import SimpleNamespace
 
+import cluster
+import manage
 import pytest
 from common import CONFIG, Aws, write_private
 from manage import teardown_evidence, verify_receipt, verify_teardown_evidence
+
+
+@pytest.mark.parametrize("root", ["bootstrap", "backups", "dns", "probe"])
+def test_destroy_plan_rejects_other_roots_before_loading_foundation(root, monkeypatch):
+    monkeypatch.setattr(manage, "allocation", lambda: pytest.fail("Foundation must not be touched"))
+    with pytest.raises(ValueError, match="foundation root only"):
+        manage.destroy_plan(SimpleNamespace(root=root))
+
+
+@pytest.mark.parametrize("fault", [None, "wrong-id", "associated", "unrelated-resource"])
+def test_partial_probe_cleanup_checks_exact_live_allocation(tmp_path, monkeypatch, fault):
+    tags = {
+        "Project": CONFIG["project"],
+        "Cluster": CONFIG["cluster_id"],
+        "ManagedBy": "terraform-network-probe",
+        "Node": "network-probe",
+    }
+    resource = {"address": "aws_eip.probe", "values": {"id": "eipalloc-probe", "tags": tags}}
+    address = {"Tags": [{"Key": k, "Value": v} for k, v in tags.items()]}
+    evidence = {
+        "cluster_id": CONFIG["cluster_id"],
+        "probe_instance_id": "i-probe",
+        "probe_allocation_id": "eipalloc-probe",
+        "node_absent": True,
+        "peers_revoked": True,
+    }
+    if fault == "wrong-id":
+        resource["values"]["id"] = "eipalloc-other"
+    if fault == "associated":
+        address["AssociationId"] = "eipassoc-active"
+    if fault == "unrelated-resource":
+        resource["address"] = "aws_instance.probe"
+    monkeypatch.setattr(
+        manage,
+        "tf",
+        lambda root, command, *args: json.dumps(
+            {} if command == "output" else {"values": {"root_module": {"resources": [resource]}}}
+        ),
+    )
+    monkeypatch.setattr(manage.Aws, "call", lambda *args: {"Addresses": [address]})
+    monkeypatch.setattr(cluster, "FOLDER", tmp_path)
+    monkeypatch.setattr(cluster, "kubectl", lambda *args: "")
+    (tmp_path / "peers.json").write_text('{"peers": {}}')
+    if fault:
+        with pytest.raises(ValueError):
+            manage.verify_probe_teardown(evidence)
+    else:
+        manage.verify_probe_teardown(evidence)
 
 
 @pytest.fixture

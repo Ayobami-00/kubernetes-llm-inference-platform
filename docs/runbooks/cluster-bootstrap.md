@@ -38,6 +38,8 @@ apply previews or replace the original foundation state with preview state.
    key-verify-copy --copy /absolute/copied/key --confirm-independent-custody. Do not paste keys into chat or jobs.
 4. Run `make cluster-prepare`, then `make cluster-mesh`. Verify peers before
    `make cluster-bootstrap`. Control planes initialize/join one at a time.
+   The initialization token also has a 15-minute TTL and is explicitly revoked
+   after successful init; kubeadm's implicit 24-hour token is not used.
 5. Run `make cluster-deploy`. CRDs install explicitly, Cilium becomes ready, known
    kubelet serving CSRs are checked/approved, then metrics-server installs.
 6. Run `make cluster-backup` to schedule daily backups and obtain initial recovery
@@ -59,6 +61,11 @@ Generated inventory and strict known_hosts pins remain private. Refresh inventor
 on instance replacement; do not disable host-key checking. cluster.py uses a local
 SSM port-forward to16443, with tls-server-name set to the NLB hostname. It never
 uses insecure-skip-tls-verify. B's admin kubeconfig is not a Stream C credential.
+SSH-over-SSM allows 45 seconds for connection setup and reuses authenticated
+connections for 60 seconds. Control sockets stay in the private operator state and
+are keyed by the full access configuration, including pins and key references.
+An excessively long custom state path fails clearly because Unix sockets have a
+short path limit; select a shorter `KLIP_STATE_HOME` rather than disabling pinning.
 
 Use `cluster.py approve-csrs` for serving-certificate renewal after examining the
 pending requests. Approval checks authenticated node identity, provider ID, CSR
@@ -74,3 +81,26 @@ Full export follows live Pod/Service/DNS, WireGuard, etcd, MTU, packet-path and 
 checks. It emits real CA/node references under reports/infrastructure-inventory.json.
 Ship the public CA alongside inventory to C and map its file reference in C's
 artifact resolver. Keep admin kubeconfigs and CA private keys with B.
+
+Standalone `cluster.py verify` creates the three-replica smoke fixture when its
+namespace is absent, and removes that fixture on success or failure. An existing
+fixture is borrowed without taking ownership of its namespace. Full acceptance
+removes its smoke namespace after final verification. Exported observations record
+the successful network checks; the test service is not a permanent platform release.
+
+The [live acceptance report](kubernetes-acceptance.md) records the completed rollout,
+corrective work, clean repeat and final cleanup.
+
+## Interrupted temporary-resource cleanup
+
+The probe EIP resource owns its association directly, avoiding stale duplicate
+association ownership during destruction. Before teardown, acceptance records the
+provider instance ID and allocation ID in private `cluster/probe-cleanup.json`,
+after observing that the matching Kubernetes node and mesh peer are absent.
+
+If a partial destroy leaves only an unassociated EIP, preserve that receipt and
+refresh the destroy plan. `manage.create_plan('probe', phase='destroy', teardown=receipt)`
+and `manage.apply_plan('probe', plan_sha256, teardown=True)` recheck the exact EIP ID,
+Terraform tags, live AWS tags, association absence, node absence and peer revocation.
+Unexpected resources or mismatched identities stop recovery. Do not widen IAM
+permissions or delete resources outside Terraform to bypass stale state.

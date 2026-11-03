@@ -137,6 +137,7 @@ def kubeadm_documents(
         {
             "apiVersion": "kubeadm.k8s.io/v1beta4",
             "kind": "InitConfiguration",
+            "bootstrapTokens": [{"ttl": "15m", "description": "klip initialization"}],
             "localAPIEndpoint": local,
             "nodeRegistration": node,
             "patches": {"directory": "/etc/klip/patches"},

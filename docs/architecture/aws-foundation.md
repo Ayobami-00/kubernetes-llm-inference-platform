@@ -1,10 +1,11 @@
 # AWS foundation
 
-This slice prepares AWS resources for Ansible. The three EC2 hosts do not yet run a
-Kubernetes cluster. Terraform allocations, observed host access and cluster readiness
-are separate facts. AWS basic instance status checks and SSM provide this milestone's
-operational visibility; Prometheus, Grafana, Hubble, Loki, Tempo, OpenTelemetry and
-GPU/DCGM telemetry are deferred to the appropriate platform stages.
+Terraform provides the AWS resources used by the Ansible-managed Kubernetes cluster.
+Its allocations, observed host access and cluster readiness remain separate facts.
+See the [host and Kubernetes architecture](kubernetes-bootstrap.md) for WireGuard,
+kubeadm, Cilium, Hubble and metrics-server. AWS status checks and SSM complement
+those components. Prometheus, Grafana, Loki, Tempo, OpenTelemetry and GPU/DCGM
+telemetry remain deferred to later platform stages.
 
 ```mermaid
 flowchart LR
@@ -16,7 +17,7 @@ flowchart LR
   Client["Inference client"] -. "HTTPS directly to selected origin" .-> GPU
 ```
 
-The future cluster is kubeadm/containerd with three stacked etcd members. The
+The cluster uses kubeadm/containerd with three stacked etcd members. The
 management backend allocates Lambda VMs; Terraform owns only the AWS foundation.
 The backend and CPU environment stay outside the per-token serving path. No EKS,
 custom Lambda operator, provisioning CRD or Go controller is introduced.
@@ -49,14 +50,15 @@ routing only. There are no NAT gateways or public API load-balancer addresses.
 
 Public UDP 51820 is intentionally permitted for future ephemeral WireGuard peers.
 WireGuard authenticates peer keys at the host; opening its transport does not grant
-cluster membership. No WireGuard service or keys are installed in this slice.
+cluster membership. Ansible manages the WireGuard service and host-generated keys;
+Terraform never receives their private material.
 Public SSH and native API ingress are closed. The NLB accepts API traffic from CPU
 peers, and backends accept native TCP 6443 only from the NLB security group.
 Package HTTP/HTTPS, VPC DNS, WireGuard transport, private API traffic and IPv4
 fragmentation-needed messages are explicitly allowed. Unused AWS default security
 groups are not attached to project ENIs or the NLB.
 
-The generated NLB hostname is the future kubeadm `controlPlaneEndpoint` and a
+The generated NLB hostname is the kubeadm `controlPlaneEndpoint` and a
 certificate SAN. TCP passes through to API servers. Private IP targets have client
 IP preservation disabled so hosts can safely call their own load-balanced endpoint.
 The NLB balances across AZs and checks TCP 6443 every ten seconds, using thresholds
@@ -74,20 +76,21 @@ forwarding. The instance resource ignores only that same field: the pinned provi
 otherwise proposes its default `true`, while forbidding explicit configuration of
 the field together with a primary ENI. Other instance settings remain managed.
 
-## Required subsequent WireGuard/Cilium work
+## Ansible networking layer
 
-Ansible must establish direct host peers before kubeadm init/join. Configure the
-Kubernetes node and advertised addresses on the assigned WireGuard interface and
-Cilium VXLAN over that reachable host network. GPU-to-GPU traffic uses direct peers.
+Ansible establishes direct host peers before kubeadm init/join. Kubernetes node and
+advertised addresses use WireGuard, with Cilium VXLAN over that reachable host
+network. Future GPU-to-GPU traffic will use direct peers.
 This is one cluster, not ClusterMesh; host WireGuard is distinct from optional
 Cilium encryption, which is not added by this foundation.
 
 Remote clients need routes to all three API subnet prefixes through AWS WireGuard
-peers. The host design must supply SNAT/return routing and automatic peer-route
-failover, so a single CPU failure cannot cut off the private NLB. Source/destination
+peers. Host automation supplies scoped SNAT/return routing and local gateway
+failover. Source/destination
 checks are disabled on the ENIs for this purpose. Test remote API access through
 an AWS peer outage, as well as MTU, forwarding, return paths and cross-node Pod and
-Service communication. AWS-native smoke tests do not prove these properties.
+Service communication. The foundation's AWS-native smoke tests alone do not prove
+these properties; the cluster acceptance workflow performs the stronger checks.
 
 Inference DNS points directly to Lambda HTTPS gateway IPs. Gateway routing may
 select a vLLM Pod on another worker without traversing a second gateway. Pin a

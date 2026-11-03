@@ -36,10 +36,17 @@ cover the NLB hostname and declared native/WireGuard addresses. No public API or
 AWS SSH ingress is added. Operator API access uses an SSM tunnel with the original
 hostname for certificate verification. Inventories retain the real NLB endpoint.
 
-WireGuard MTU is1420; Cilium's underlying MTU override is1420, producing an expected
-IPv4 VXLAN Pod MTU of1370. Live checks inspect the actual Pod namespace and capture
-VXLAN on wg0. kube-proxy stays enabled. Cilium L7 proxy/Envoy and built-in encryption
+WireGuard MTU is 1420; Cilium's underlying MTU override is 1420. The Pod interface
+stays at 1420 while its default-route MTU is 1370, accounting for IPv4 VXLAN's
+50-byte overhead. Live checks inspect both values in the actual Pod namespace and
+capture VXLAN on wg0. See the [pinned Cilium MTU implementation](https://github.com/cilium/cilium/blob/v1.20.4/pkg/mtu/mtu.go).
+kube-proxy stays enabled. Cilium L7 proxy/Envoy and built-in encryption
 are disabled for this CPU milestone. Hubble records L3/L4 flows; its relay is private.
+
+The cluster-wide metadata guard explicitly denies `169.254.169.254/32` and sets
+`enableDefaultDeny` false for both directions. This prevents that guard from
+isolating unrelated DNS/API traffic while preserving its explicit deny. Subsequent
+tenant policies can establish their own default-deny rules. See [Cilium policy modes](https://docs.cilium.io/en/stable/security/policy/intro/).
 
 The etcd EBS filesystem mounts at `/var/lib/etcd`; the database uses its `data/`
 subdirectory so ext4's lost+found is not treated as cluster data. Kubelet requires

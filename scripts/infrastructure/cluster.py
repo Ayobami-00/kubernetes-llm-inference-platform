@@ -83,13 +83,31 @@ class Host:
             r"[a-z_][a-z0-9_-]*", fields["ansible_user"]
         ):
             raise ValueError("Invalid SSH host/user")
+        # Reuse the authenticated SSM tunnel across short reconciliation commands.
+        # Include pins/key/proxy settings in the socket identity, so changed access
+        # configuration cannot silently reuse a session authenticated differently.
+        identity = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:16]
+        control_path = private_dir(state_home() / "ssh") / identity
+        # OpenSSH appends a temporary suffix when creating the master socket.
+        if len(str(control_path).encode()) > 85:
+            raise ValueError("Operator state path is too long for an SSH control socket")
         return checked(
             [
                 "ssh",
                 "-o",
                 "BatchMode=yes",
                 "-o",
-                "ConnectTimeout=10",
+                "ConnectTimeout=45",
+                "-o",
+                "ControlMaster=auto",
+                "-o",
+                "ControlPersist=60",
+                "-o",
+                f"ControlPath={control_path}",
+                "-o",
+                "ServerAliveInterval=15",
+                "-o",
+                "ServerAliveCountMax=2",
                 "-o",
                 "StrictHostKeyChecking=yes",
                 "-i",
@@ -339,6 +357,8 @@ def bootstrap() -> dict:
             host.run(["sudo", "rm", "-f", "/etc/klip/kubeadm-validate.yaml"])
             if name == "cp-01":
                 documents = kubeadm_documents(config)
+                token = os.urandom(3).hex() + "." + os.urandom(8).hex()
+                documents[0]["bootstrapTokens"][0]["token"] = token
                 action = "init"
             else:
                 primary = Host(hosts["cp-01"])
@@ -380,6 +400,10 @@ def bootstrap() -> dict:
             host.put(path, yaml.safe_dump_all(documents))
             try:
                 host.run(["sudo", "kubeadm", action, "--config", path], timeout=900, secret=True)
+                if name == "cp-01":
+                    host.run(
+                        ["sudo", "kubeadm", "token", "delete", token.split(".")[0]], secret=True
+                    )
             finally:
                 host.run(["sudo", "rm", "-f", path])
                 if name != "cp-01":
@@ -569,6 +593,24 @@ def approve_serving_csrs() -> dict:
 
 
 def verify() -> dict:
+    from cluster_acceptance import remote_manifest
+
+    # A standalone check owns its temporary fixture. Acceptance may supply an
+    # existing fixture, which remains the caller's responsibility to remove.
+    created = not kubectl(
+        "get", "namespace", "klip-acceptance", "--ignore-not-found", "-o", "json"
+    ).strip()
+    try:
+        if created:
+            remote_manifest("deploy/releases/smoke.yaml")
+        kubectl("-n", "klip-acceptance", "rollout", "status", "deployment/smoke", "--timeout=300s")
+        return _verify_cluster_state()
+    finally:
+        if created:
+            kubectl("delete", "namespace", "klip-acceptance", "--wait=true", "--timeout=90s")
+
+
+def _verify_cluster_state() -> dict:
     from cluster_verification import verify_cluster
 
     result, nodes = verify_cluster(load_hosts(), kubectl)

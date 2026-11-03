@@ -142,7 +142,7 @@ def verify_cluster(hosts: dict, kubectl) -> tuple[dict, list[dict]]:
         )
         for target in smoke_pods:
             kubectl(
-                "-nn",
+                "-n",
                 "klip-acceptance",
                 "exec",
                 smoke["metadata"]["name"],
@@ -210,7 +210,7 @@ def verify_cluster(hosts: dict, kubectl) -> tuple[dict, list[dict]]:
                 "timeout",
                 "15",
                 "tcpdump",
-                "-n",
+                "-nn",
                 "-i",
                 "wg0",
                 "-c",

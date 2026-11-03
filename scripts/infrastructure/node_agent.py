@@ -59,6 +59,9 @@ def locked():
 
 
 def cluster_state(paths: set[str], data_present: bool) -> str:
+    # The kubelet Debian package keeps its initially empty static-Pod directory.
+    # This package marker is not evidence that kubeadm has initialized a cluster.
+    paths = paths - {"manifests/.kubelet-keep"}
     required = {"admin.conf", "manifests/kube-apiserver.yaml", "pki/ca.crt"}
     if not paths and not data_present:
         return "uninitialized"
@@ -243,6 +246,16 @@ def apply_mesh(config: dict, registry: dict, state: dict) -> None:
             command("wg", "syncconf", "wg0", temporary)
         finally:
             Path(temporary).unlink(missing_ok=True)
+    interfaces = json.loads(command("ip", "-j", "address", "show", "dev", "wg0"))
+    for address in interfaces[0].get("addr_info", []):
+        if address["family"] == "inet" and (
+            address["local"] != own["wireguard_ip"] or address["prefixlen"] != 24
+        ):
+            command(
+                "ip", "address", "del", f"{address['local']}/{address['prefixlen']}", "dev", "wg0"
+            )
+    # Removing an old primary can also remove Linux's secondary addresses;
+    # establish the authoritative assignment after removing obsolete addresses.
     command("ip", "address", "replace", own["wireguard_ip"] + "/24", "dev", "wg0")
     command("ip", "link", "set", "wg0", "mtu", "1420")
     for cidr in (
@@ -437,6 +450,17 @@ def backup(config: dict) -> dict:
         snapshot.unlink(missing_ok=True)
 
 
+def validate_pod_mtu(links: list[dict], routes: list[dict]) -> dict:
+    # Cilium keeps the veth at the base MTU and subtracts encapsulation overhead
+    # from the route MTU. Checking only eth0 misses the effective packet limit.
+    defaults = [route for route in routes if route.get("dst") == "default"]
+    if len(links) != 1 or links[0]["mtu"] != 1420:
+        raise ValueError("Pod interface MTU must match the WG1420 base")
+    if len(defaults) != 1 or defaults[0].get("metrics") != [{"mtu": 1370}]:
+        raise ValueError("Pod default route must use MTU1370 for VXLAN over WG1420")
+    return {"pod_interface_mtu": 1420, "pod_route_mtu": 1370}
+
+
 def pod_network() -> dict:
     endpoint = "--runtime-endpoint=unix:///run/containerd/containerd.sock"
     pods = command("crictl", endpoint, "pods", "--name", "smoke", "-q").splitlines()
@@ -444,9 +468,8 @@ def pod_network() -> dict:
         raise ValueError("No smoke Pod sandbox exists on this host")
     pid = json.loads(command("crictl", endpoint, "inspectp", pods[0]))["info"]["pid"]
     links = json.loads(command("nsenter", "-t", str(pid), "-n", "ip", "-j", "link", "show", "eth0"))
-    if links[0]["mtu"] != 1370:
-        raise ValueError(f"Pod MTU is {links[0]['mtu']}, expected 1370 for VXLAN over WG1420")
-    return {"pod_mtu": links[0]["mtu"]}
+    routes = json.loads(command("nsenter", "-t", str(pid), "-n", "ip", "-j", "route", "show"))
+    return validate_pod_mtu(links, routes)
 
 
 def main() -> None:

@@ -184,6 +184,16 @@ def worker_probe() -> dict:
     write_private(path, request)
     try:
         joined = operate_worker("worker-join", path)
+        host = Host(load_hosts()["network-probe"])
+        addresses = json.loads(host.run(["ip", "-j", "address", "show", "dev", "wg0"]))
+        if {
+            address["local"] for address in addresses[0]["addr_info"] if address["family"] == "inet"
+        } != {"10.200.0.64"}:
+            raise ValueError("Worker retained an obsolete WireGuard address")
+        if not all(host.agent("route")["healthy"].values()):
+            raise ValueError("Worker cannot probe all CPU gateways after address reconciliation")
+        if "serving_certificate_verified" not in joined["stages"]:
+            raise ValueError("Worker join did not verify its kubelet serving certificate")
         request.update(
             operation_id="probe-remove-" + str(int(time.time())),
             node_uid=joined["node_uid"],
@@ -195,6 +205,8 @@ def worker_probe() -> dict:
             "joined": joined["node_uid"],
             "removed": removed["status"] == "completed",
             "gpu_runtime": False,
+            "wireguard_address_unique": True,
+            "serving_certificate_verified": True,
         }
     finally:
         credential.unlink(missing_ok=True)
@@ -216,6 +228,7 @@ def acceptance() -> dict:
     stopped_name = "cp-01"
     report = {
         "schema_version": "klip-acceptance.v1",
+        "status": "running",
         "started_at": utc_now(),
         "samples": [],
         "cleanup_errors": [],
@@ -265,8 +278,12 @@ def acceptance() -> dict:
                     recovered = True
             except (RuntimeError, OSError):
                 sample["success"] = False
+            sample["completed_offset_s"] = round(time.monotonic() - start, 2)
             report["samples"].append(sample)
             if recovered:
+                if sample["completed_offset_s"] > 90:
+                    raise ValueError("Private API gateway recovery exceeded 90 seconds")
+                report["recovery_s"] = sample["completed_offset_s"]
                 break
             time.sleep(2)
         if not recovered:
@@ -295,7 +312,11 @@ def acceptance() -> dict:
             or ca_before != (FOLDER / "ca.crt").read_bytes()
         ):
             raise ValueError("Bootstrap rerun changed cluster identity")
-        report["status"] = "passed"
+        report["checks_passed"] = True
+    except BaseException as error:
+        report["status"] = "failed"
+        report["error_type"] = type(error).__name__
+        raise
     finally:
         try:
             aws.call("ec2", "start-instances", "--instance-ids", stopped)
@@ -327,14 +348,14 @@ def acceptance() -> dict:
                     "Probe worker remains joined; complete UID-guarded removal before destroying it"
                 )
             operate_worker("probe-cleanup", None)
-            report["probe_instance_id"] = json.loads(tf("probe", "output", "-json", "probe"))[
-                "instance_id"
-            ]
+            probe = json.loads(tf("probe", "output", "-json", "probe"))
+            report["probe_instance_id"] = probe["instance_id"]
             write_private(
                 FOLDER / "probe-cleanup.json",
                 {
                     "cluster_id": "klip",
                     "probe_instance_id": report["probe_instance_id"],
+                    "probe_allocation_id": probe["allocation_id"],
                     "node_absent": True,
                     "peers_revoked": True,
                 },
@@ -347,9 +368,20 @@ def acceptance() -> dict:
             apply_plan("probe", plan["plan_sha256"], teardown=True)
         except Exception as error:
             report["cleanup_errors"].append(f"Probe cleanup: {error}")
+        if report["cleanup_errors"]:
+            report["status"] = "failed"
         report["finished_at"] = utc_now()
         write_private(FOLDER / "acceptance.json", report)
     if report["cleanup_errors"]:
         raise ValueError("Acceptance cleanup needs attention; inspect private acceptance report")
-    verify()
+    try:
+        verify()
+        kubectl("delete", "namespace", "klip-acceptance", "--wait=true", "--timeout=90s")
+        report.update(status="passed", smoke_removed=True)
+    except BaseException as error:
+        report.update(status="failed", error_type=type(error).__name__)
+        raise
+    finally:
+        report["finished_at"] = utc_now()
+        write_private(FOLDER / "acceptance.json", report)
     return report

@@ -114,3 +114,12 @@ Reviewed implementation SHA-256: `0b44ade763c062fa9f8c93ab9f196cfb3cf16ce3fe9eeb
 | foundation | Saved real plan | `c8097da1fa547b49d183e1259b4abf504d58f968e99797156904ab087bd245d5` |
 | backups-preview | No; preview only | `8ea0bb0e1f7d47250ab43b40b8e1bd61b674c726b08864af15bc33ebe7fcde41` |
 | probe-preview | No; preview only | `0784e185207d33d6ef9d6b5f1a19a08c28d938d24040d38554447c991f5d17bc` |
+
+## Rollout outcome
+
+Live rollout for commit `ae9f6c9` was subsequently authorized. The
+[acceptance report](../runbooks/kubernetes-acceptance.md) records the applied resources,
+corrections, 40.1-second measured gateway recovery, verified backups/restore,
+automated worker lifecycle repeat and cleanup. The table above remains the original
+review record; those plans must not be reused after source changes. Final zero-change
+plans and their source hashes remain in the private operator evidence.

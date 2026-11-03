@@ -32,6 +32,10 @@ address, publishes a complete klip-peers.v1 registry at the next revision, and i
 mesh reconciliation before join. Peers use direct /32 paths. Registry updates reject
 stale revisions, duplicate identities/keys/addresses and changes to fixed CPU slots.
 The API prefixes move independently under the host route-helper lock.
+Address reconciliation removes an obsolete IPv4 assignment before re-establishing
+the registry's sole address. This also handles Linux removing secondary addresses
+when an old primary is removed. Acceptance checks direct gateway probes again after
+the temporary peer changes from `.2` to the reserved worker address `.64`.
 
 The initial B executor can reconcile CPU hosts through its own MFA/SSM identity.
 A C-facing executor must retain that foundation credential boundary: invoke B's
@@ -43,6 +47,9 @@ Join is generic Kubernetes preparation. It returns actual Kubernetes name/UID an
 observed host/WireGuard/Kubernetes readiness; GPU runtime remains false. Driver,
 Toolkit, device plugin, DCGM and model readiness belong to the later GPU milestone.
 The temporary AWS acceptance worker is never emitted as a Lambda GPU inventory node.
+Before reporting Cilium readiness, join validates and approves only known kubelet
+serving CSRs, then verifies the installed serving certificate against the cluster
+CA. This uses B's privileged executor; C does not receive blanket CSR approval rights.
 
 Removal requires matching provider ID and node UID, respects drain/PDB/deadline
 failures, stops kubelet, disables API routing, revokes direct peers, then deletes

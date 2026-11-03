@@ -37,6 +37,9 @@ of all control-plane hosts. Full disaster recovery requires a separate reviewed
 maintenance procedure: stop all old members, verify one selected snapshot/CA and
 Secret-encryption key, restore a new coherent member set, reconfigure static Pods,
 then verify API writes, controllers, node certificates, workloads and inventories.
+Revoke recovered bootstrap tokens and temporary test/service-account credentials
+before accepting a restored cluster: an older snapshot can contain credentials
+that were revoked after that snapshot was taken.
 Do not mix restored and old live members. For one failed member, preserve quorum
 and use explicit member replacement rather than restoring the entire cluster.
 

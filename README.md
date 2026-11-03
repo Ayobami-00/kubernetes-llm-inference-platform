@@ -109,13 +109,14 @@ client will be added when the management API routes exist.
 
 ## AWS foundation
 
-Stream B's Terraform slice prepares three continuously running CPU hosts in London for a later
-self-managed Kubernetes bootstrap. It includes native S3 state locking, imported access-bootstrap
+Stream B's Terraform foundation provides three continuously running CPU hosts in London for the
+self-managed Kubernetes cluster. It includes native S3 state locking, imported access-bootstrap
 IAM, a private API NLB, dedicated etcd disks and a separately authorized inference DNS root.
 Ansible host preparation, direct WireGuard peers, guarded kubeadm bootstrap, Cilium/Hubble,
 metrics-server, encrypted etcd backups and generic worker operations are implemented as a
-separate rollout. Their live acceptance is pending authorization; the foundation acceptance
-report remains the source for checks already performed. Terraform does not provision Lambda GPU VMs.
+separate rollout. [Live cluster acceptance](docs/runbooks/kubernetes-acceptance.md) passed,
+including external API gateway failover, snapshot restore and generic worker join/removal.
+Terraform does not provision Lambda GPU VMs.
 
 ```bash
 make infra-tools
@@ -136,6 +137,7 @@ identities and saved-plan digests. Private credentials, recovery state and repor
 - [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
 - [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)
 - [Live foundation acceptance and Ansible handoff](docs/runbooks/aws-foundation-acceptance.md)
+- [Live Kubernetes acceptance and cleanup](docs/runbooks/kubernetes-acceptance.md)
 
 ## CPU cluster bootstrap
 

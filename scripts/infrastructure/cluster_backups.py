@@ -266,6 +266,24 @@ def operate_backup(
             continue
         Host(fields).run(["sudo", "systemctl", "is-active", "klip-etcd-backup.timer"])
         Host(fields).run(["sudo", "systemctl", "is-enabled", "klip-etcd-backup.timer"])
+        if (
+            Host(fields)
+            .run(
+                [
+                    "sudo",
+                    "systemctl",
+                    "show",
+                    "klip-etcd-backup.service",
+                    "--property=Result",
+                    "--value",
+                ]
+            )
+            .strip()
+            != "success"
+        ):
+            raise ValueError(
+                f"Latest scheduled backup service failed for {name}; inspect its journal"
+            )
         receipt = Host(fields).agent("status")["backup"]
         if not receipt:
             raise ValueError(f"No successful backup observed for {name}")

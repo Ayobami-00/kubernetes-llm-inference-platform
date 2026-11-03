@@ -31,7 +31,7 @@ VERSIONS = {
     "ansible-lint": "26.10.1",
     "hubble": "1.20.2",
     "session-manager-plugin": "1.2.896.0",
-    "metadata-guard-chart": "0.1.0",
+    "metadata-guard-chart": "0.1.1",
 }
 
 
