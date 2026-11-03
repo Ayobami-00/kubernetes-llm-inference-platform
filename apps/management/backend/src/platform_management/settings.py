@@ -27,6 +27,14 @@ class Settings(BaseSettings):
         "requests": {"cpu": "100m", "memory": "128Mi"},
         "limits": {"cpu": "2", "memory": "2Gi"},
     }
+    runner_node_selector: dict[str, str] = {"node-role.kubernetes.io/control-plane": ""}
+    runner_tolerations: list[dict[str, str]] = [
+        {
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        }
+    ]
     serving_namespace: str = "llm-d"
     runner_namespace: str = "klip"
     runner_secret_refs: list[str] = []

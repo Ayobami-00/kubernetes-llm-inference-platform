@@ -10,7 +10,8 @@
       ],
       "Resource": [
         "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/cluster-backups/terraform.tfstate",
-        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/network-probe/terraform.tfstate"
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/network-probe/terraform.tfstate",
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/platform-workers/terraform.tfstate"
       ]
     },
     {
@@ -23,7 +24,8 @@
       ],
       "Resource": [
         "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/cluster-backups/terraform.tfstate.tflock",
-        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/network-probe/terraform.tfstate.tflock"
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/network-probe/terraform.tfstate.tflock",
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/platform-workers/terraform.tfstate.tflock"
       ]
     },
     {

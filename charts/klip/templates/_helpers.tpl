@@ -42,6 +42,10 @@
   value: {{ .Values.runner.command | toJson | quote }}
 - name: MANAGEMENT_RUNNER_RESOURCES
   value: {{ .Values.runner.resources | toJson | quote }}
+- name: MANAGEMENT_RUNNER_NODE_SELECTOR
+  value: {{ .Values.runner.nodeSelector | toJson | quote }}
+- name: MANAGEMENT_RUNNER_TOLERATIONS
+  value: {{ .Values.runner.tolerations | toJson | quote }}
 {{- end -}}
 {{- define "klip.mounts" -}}
 - {name: management-secrets, mountPath: /run/secrets/management, readOnly: true}

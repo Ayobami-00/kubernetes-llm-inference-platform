@@ -21,6 +21,7 @@ ROOTS = {
     "dns": TERRAFORM / "environments/inference-dns",
     "backups": TERRAFORM / "environments/cluster-backups",
     "probe": TERRAFORM / "environments/network-probe",
+    "platform": TERRAFORM / "environments/platform-workers",
 }
 STATE_KEYS = {
     "bootstrap": "state-bootstrap/terraform.tfstate",
@@ -28,6 +29,7 @@ STATE_KEYS = {
     "dns": "inference-dns/terraform.tfstate",
     "backups": "cluster-backups/terraform.tfstate",
     "probe": "network-probe/terraform.tfstate",
+    "platform": "platform-workers/terraform.tfstate",
 }
 PROFILES = {
     "bootstrap": "kubernetes-llm-bootstrap",
@@ -35,6 +37,7 @@ PROFILES = {
     "dns": "kubernetes-llm-dns",
     "backups": "kubernetes-llm-foundation",
     "probe": "kubernetes-llm-foundation",
+    "platform": "kubernetes-llm-foundation",
 }
 
 
@@ -163,7 +166,7 @@ class Aws:
         else:
             name = (
                 "kubernetes-llm-foundation-deployer"
-                if root in {"foundation", "backups", "probe"}
+                if root in {"foundation", "backups", "probe", "platform"}
                 else "kubernetes-llm-inference-dns-deployer"
             )
             valid = identity["Arn"].startswith(

@@ -49,6 +49,8 @@ def build_documents(
     node_profile = f"{iam}:instance-profile{IAM_PATH}klip-control-plane"
     probe_role = f"{iam}:role{IAM_PATH}klip-network-probe"
     probe_profile = f"{iam}:instance-profile{IAM_PATH}klip-network-probe"
+    platform_role = f"{iam}:role{IAM_PATH}klip-platform-worker"
+    platform_profile = f"{iam}:instance-profile{IAM_PATH}klip-platform-worker"
     backup_policy = f"{iam}:policy{IAM_PATH}kubernetes-llm-node-backup"
     backup_bucket = f"arn:aws:s3:::klip-backups-{account_id}-{region}"
     instance_backup = backup_bucket + "/clusters/klip/${aws:userid}/*"
@@ -344,7 +346,7 @@ def build_documents(
         allow(
             "CreateBoundedNodeRole",
             ["iam:CreateRole", "iam:PutRolePermissionsBoundary"],
-            [node_role, probe_role],
+            [node_role, probe_role, platform_role],
             StringEquals={"iam:PermissionsBoundary": boundary},
         ),
         allow(
@@ -362,12 +364,12 @@ def build_documents(
                 "iam:GetRolePolicy",
                 "iam:ListInstanceProfilesForRole",
             ],
-            [node_role, probe_role],
+            [node_role, probe_role, platform_role],
         ),
         allow(
             "AttachOnlySsmCore",
             ["iam:AttachRolePolicy", "iam:DetachRolePolicy"],
-            [node_role, probe_role],
+            [node_role, probe_role, platform_role],
             ArnEquals={"iam:PolicyARN": ssm_core},
         ),
         allow(
@@ -379,7 +381,7 @@ def build_documents(
         allow(
             "PassOnlyNodeRoleToEc2",
             ["iam:PassRole"],
-            [node_role, probe_role],
+            [node_role, probe_role, platform_role],
             StringEquals={"iam:PassedToService": "ec2.amazonaws.com"},
         ),
         allow(
@@ -394,7 +396,7 @@ def build_documents(
                 "iam:UntagInstanceProfile",
                 "iam:ListInstanceProfileTags",
             ],
-            [node_profile, probe_profile],
+            [node_profile, probe_profile, platform_profile],
         ),
         allow(
             "ReadNodePolicyVersions",
@@ -402,6 +404,15 @@ def build_documents(
             [boundary, ssm_core, backup_policy],
         ),
         allow("IdentifySession", ["sts:GetCallerIdentity"], ["*"]),
+        allow(
+            "ReadPlatformQuotas",
+            ["servicequotas:GetServiceQuota"],
+            [
+                f"arn:aws:servicequotas:{region}:{account_id}:ec2/{code}"
+                for code in ("L-0263D0A3", "L-1216C47A")
+            ],
+            StringEquals=regional,
+        ),
     )
     node_boundary = policy(
         allow("UploadOwnRecoveryBundle", ["s3:PutObject"], [instance_backup]),
@@ -497,7 +508,7 @@ def build_documents(
     )
     backup_states = [
         f"arn:aws:s3:::{state_bucket}/{name}/terraform.tfstate"
-        for name in ("cluster-backups", "network-probe")
+        for name in ("cluster-backups", "network-probe", "platform-workers")
     ]
     backups = policy(
         allow("ReadWriteAdditionalState", ["s3:GetObject", "s3:PutObject"], backup_states),

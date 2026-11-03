@@ -11,7 +11,7 @@ import sys
 import tempfile
 
 from common import CONFIG, ROOT, ROOTS, TERRAFORM, tool
-from configuration import validate_configuration
+from configuration import validate_configuration, validate_platform_configuration
 
 
 def check_command(arguments: list[str]) -> None:
@@ -24,6 +24,7 @@ def main() -> None:
     parser.add_argument("--lock-platforms", action="store_true")
     args = parser.parse_args()
     validate_configuration(CONFIG)
+    validate_platform_configuration(CONFIG, json.loads((TERRAFORM / "platform.json").read_text()))
     pins = json.loads((TERRAFORM / "toolchain.json").read_text())
     if (ROOT / ".terraform-version").read_text().strip() != pins["terraform"]["version"]:
         raise ValueError("Terraform version pin drift")

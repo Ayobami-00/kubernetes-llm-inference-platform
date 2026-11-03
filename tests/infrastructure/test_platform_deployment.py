@@ -1,5 +1,6 @@
 """HA deployment policy and verified database transport, independent of cloud access."""
 
+import json
 from pathlib import Path
 from shutil import which
 from subprocess import run
@@ -106,6 +107,11 @@ def test_database_tls_applies_to_migration_api_and_worker():
         env = {item["name"]: item.get("value") for item in container["env"]}
         assert env["MANAGEMENT_DATABASE_REQUIRE_TLS"] == "true"
         assert env["MANAGEMENT_DATABASE_CA_FILE"] == "/run/secrets/database/ca.crt"
+        if resource["kind"] == "Deployment":
+            assert json.loads(env["MANAGEMENT_RUNNER_NODE_SELECTOR"]) == {
+                "klip.dev/node-role": "platform"
+            }
+            assert json.loads(env["MANAGEMENT_RUNNER_TOLERATIONS"]) == []
         volume = next(item for item in pod["volumes"] if item["name"] == "database-ca")
         assert volume["secret"]["secretName"] == "klip-db-ca"
         assert next(item for item in container["volumeMounts"] if item["name"] == "database-ca")[

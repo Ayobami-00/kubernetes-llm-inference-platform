@@ -20,6 +20,17 @@ platform-check:
 platform-schema-fetch:
 	$(PYTHON) scripts/infrastructure/platform_checks.py --fetch-schemas
 
+.PHONY: infra-platform-preview infra-platform-plan infra-platform-apply
+infra-platform-preview:
+	$(OPERATOR) plan --root platform --preview
+
+infra-platform-plan:
+	$(OPERATOR) plan --root platform
+
+infra-platform-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed platform plan digest'; exit 1)
+	$(OPERATOR) apply --root platform --approve-plan "$(PLAN_SHA)"
+
 infra-lock:
 	$(PYTHON) scripts/infrastructure/checks.py --lock-platforms
 

@@ -18,6 +18,15 @@ rendering or a successful stub run does not satisfy a live gate.
 | Rebuild | Actual retained-state teardown, restore, fresh UI-provisioned A10 and repeated run | Pending |
 | Expansion | Sequential A100 profiles, separate mixed capacity, all scenarios and failure campaign | Pending |
 
+The additional CPU allocation is defined in a separate `platform` Terraform root;
+see the [worker allocation runbook](../runbooks/platform-workers.md). Its live preview
+contains only creates; no added CPU or GPU instance has been launched yet. The Lambda
+credential is configured at the existing ignored secret path and read-only API checks
+confirmed A10 capacity and a plain Ubuntu image. Those observations are not reservations.
+The regional IP quota is five while the planned layout needs six. An automatic-only
+increase to eight is pending; no support case was created. Live application of the
+worker plan rechecks quota/usage before any paid mutation.
+
 Start with one A10. Shared/CodeAgent testing later uses one 8×A100 **80 GB** VM
 sequentially; simultaneous mixed scenarios require additional authorized capacity. A single
 GPU host has expected inference downtime during host failure. Experimental SLO violations
@@ -36,6 +45,10 @@ remain available; single-fault and rollout behavior still require live verificat
 The API, workers and migration Job share verified database TLS configuration. Connection
 pool health checks remain enabled. The CA must be mounted and conflicting URL settings
 fail closed without printing the URL.
+
+Runner CPU placement and tolerations are frozen in new execution bindings. The HA overlay
+targets platform workers; historical bindings without these fields retain their original
+control-plane placement. Resource/placement changes cannot rewrite an existing attempt.
 
 `charts/klip-database` provides the CloudNativePG resource definitions. See its README for
 durability, restore and identity prerequisites. `deploy/platform-services.lock.json` pins
@@ -58,3 +71,9 @@ The initial baseline on 3 November 2026 passed 373 root Python tests (18 optiona
 read-only AWS query confirmed the three existing control-plane instances running across
 London's three configured AZs. These observations do not establish application or GPU
 readiness. Live gates remain pending.
+
+The foundation implementation subsequently passed 414 root Python tests, 71 management
+database tests, four new Terraform provider-mock cases, TFLint for both new Terraform
+units, Helm/custom-resource validation, Ruff/formatting and generated schema/OpenAPI
+checks. The earlier frontend checks remain unchanged and passing. Eighteen root tests
+are optional skips; these checks do not claim the full CPU integration or live gates.

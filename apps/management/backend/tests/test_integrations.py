@@ -290,6 +290,31 @@ def mock_runner(tmp_path):
     return KubernetesJobRunner(config, "fixture-run", client=client), state
 
 
+def test_runner_placement_is_frozen_and_legacy_bindings_keep_their_original_nodes(tmp_path):
+    runner, _ = mock_runner(tmp_path)
+    inputs = RunSnapshot.model_validate(snapshot()["snapshot"])
+    handle = runner.prepare(inputs, "op-legacy-placement")
+    old_pod = runner.template(handle)["spec"]["template"]["spec"]
+    assert old_pod["nodeSelector"] == {"node-role.kubernetes.io/control-plane": ""}
+    assert old_pod["tolerations"][0]["key"] == "node-role.kubernetes.io/control-plane"
+    runner.binding.update(
+        runner_node_selector={"klip.dev/node-role": "platform"}, runner_tolerations=[]
+    )
+    with pytest.raises(ValueError, match="Execution binding differs"):
+        runner.template(handle)
+    # A new placement requires a new binding/attempt, never an in-place rewrite.
+    with pytest.raises(ValueError, match="Immutable attempt files differ"):
+        runner.prepare(inputs, "op-legacy-placement")
+    handle = runner.prepare(inputs, "op-platform-placement")
+    pod = runner.template(handle)["spec"]["template"]["spec"]
+    assert pod["nodeSelector"] == {"klip.dev/node-role": "platform"}
+    assert pod["tolerations"] == []
+    assert pod["automountServiceAccountToken"] is False
+    pod["nodeSelector"]["untrusted-mutation"] = "true"
+    assert runner.binding["runner_node_selector"] == {"klip.dev/node-role": "platform"}
+    runner.close()
+
+
 def test_ambiguous_job_creation_reconciles_and_missing_uid_is_not_recreated(tmp_path):
     runner, state = mock_runner(tmp_path)
     handle = runner.prepare(RunSnapshot.model_validate(snapshot()["snapshot"]), "op-fixture")

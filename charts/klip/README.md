@@ -1,7 +1,8 @@
 # KLIP management chart
 
-C-owned API, durable workers, compiled web application and migration hook. Install PostgreSQL first
-using the separate `klip-postgresql` chart. Supply existing authentication/database Secrets, an exact
+C-owned API, durable workers, compiled web application and migration hook. Install PostgreSQL first:
+use `klip-postgresql` for the local proof, or `klip-database` for the HA deployment below.
+Supply existing authentication/database Secrets, an exact
 public origin and a shared RWX artifact claim. Defaults keep every real mutation adapter unconfigured.
 
 See [deployment instructions](../../docs/development/management-deployment.md),

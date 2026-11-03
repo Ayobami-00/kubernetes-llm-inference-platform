@@ -22,6 +22,8 @@ def configuration(mode="simulation"):
         "runner_image": s.runner_image,
         "runner_command": s.runner_command,
         "runner_resources": s.runner_resources,
+        "runner_node_selector": s.runner_node_selector,
+        "runner_tolerations": s.runner_tolerations,
         "namespace": s.runner_namespace,
         "serving_namespace": s.serving_namespace,
         "service_account": s.runner_service_account,

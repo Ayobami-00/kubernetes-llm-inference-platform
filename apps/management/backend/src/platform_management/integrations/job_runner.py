@@ -1,5 +1,6 @@
 """Durable Kubernetes Job transport for execute-only runner commands."""
 
+import copy
 import hashlib
 import json
 import os
@@ -39,9 +40,9 @@ def frozen_file(path, content):
 
 class KubernetesJobRunner:
     def __init__(self, binding, run_id, outcome="passing", client=None):
-        self.binding, self.run_id, self.outcome = binding, run_id, outcome
-        self.root = Path(binding["artifact_root"]).resolve()
-        self.client = client or ClusterClient(binding)
+        self.binding, self.run_id, self.outcome = copy.deepcopy(binding), run_id, outcome
+        self.root = Path(self.binding["artifact_root"]).resolve()
+        self.client = client or ClusterClient(self.binding)
 
     def close(self):
         self.client.close()
@@ -129,7 +130,10 @@ class KubernetesJobRunner:
         return key
 
     def manifest(self, handle):
-        return json.loads((self.directory(handle) / "manifest.json").read_text())
+        manifest = json.loads((self.directory(handle) / "manifest.json").read_text())
+        if manifest["binding_sha256"] != digest(self.binding):
+            raise ValueError("Execution binding differs from the frozen attempt")
+        return manifest
 
     def labels(self, handle):
         return {
@@ -161,14 +165,21 @@ class KubernetesJobRunner:
                         "terminationGracePeriodSeconds": 40,
                         "serviceAccountName": self.binding.get("service_account", "klip-runner"),
                         "automountServiceAccountToken": False,
-                        "nodeSelector": {"node-role.kubernetes.io/control-plane": ""},
-                        "tolerations": [
-                            {
-                                "key": "node-role.kubernetes.io/control-plane",
-                                "operator": "Exists",
-                                "effect": "NoSchedule",
-                            }
-                        ],
+                        # Missing fields preserve historical execution bindings;
+                        # recovery never follows a new worker's settings.
+                        "nodeSelector": self.binding.get(
+                            "runner_node_selector", {"node-role.kubernetes.io/control-plane": ""}
+                        ),
+                        "tolerations": self.binding.get(
+                            "runner_tolerations",
+                            [
+                                {
+                                    "key": "node-role.kubernetes.io/control-plane",
+                                    "operator": "Exists",
+                                    "effect": "NoSchedule",
+                                }
+                            ],
+                        ),
                         "securityContext": {
                             "runAsNonRoot": True,
                             "runAsUser": 10001,
@@ -230,7 +241,7 @@ class KubernetesJobRunner:
             pod["containers"][0]["volumeMounts"].append(
                 {"name": volume, "mountPath": "/run/secrets/runner/" + name, "readOnly": True}
             )
-        return job
+        return copy.deepcopy(job)
 
     def validate_job(self, job, handle, expected_uid=None):
         meta = job["metadata"]

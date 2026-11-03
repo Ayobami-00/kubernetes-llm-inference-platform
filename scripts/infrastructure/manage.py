@@ -12,6 +12,7 @@ from backend import initialize, migrate_bootstrap, repair_migration_metadata
 from common import (
     CONFIG,
     PROFILES,
+    ROOT,
     ROOTS,
     Aws,
     ensure_ssh_key,
@@ -72,6 +73,13 @@ def input_values(root: str, origins_file: Path | None, deletion_protection: bool
         return values
     if root == "bootstrap":
         return {"adopt_existing_access": True}
+    if root == "platform":
+        from configuration import validate_platform_configuration
+
+        platform = json.loads((ROOT / "infra/terraform/platform.json").read_text())
+        validate_platform_configuration(CONFIG, platform)
+        public, _ = ensure_ssh_key()
+        return {"ssh_public_key": public, "deletion_protection": deletion_protection}
     if root == "probe":
         public, _ = ensure_ssh_key()
         return {"ssh_public_key": public}
@@ -208,6 +216,12 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
     if (receipt["phase"] in {"unprotect", "destroy"}) != teardown:
         raise ValueError("Use the explicit destroy command for teardown plans")
     Aws(PROFILES[root]).preflight(root)
+    if root == "platform" and receipt["phase"] == "apply":
+        from platform_capacity import ensure_capacity
+
+        document = json.loads(tf(root, "show", "-json", receipt["plan_path"]))
+        evidence = ensure_capacity(Aws(PROFILES[root]), document)
+        write_private(Path(receipt["plan_path"]).with_suffix(".capacity.json"), evidence)
     if teardown:
         if root == "probe":
             verify_probe_teardown(receipt["teardown"])

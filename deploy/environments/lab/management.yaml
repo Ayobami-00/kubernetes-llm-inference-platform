@@ -15,6 +15,10 @@ database:
   requireTLS: true
   caSecret: klip-db-ca
 runner:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: null
+    klip.dev/node-role: platform
+  tolerations: []
   resources:
     requests: {cpu: "1", memory: 512Mi}
     limits: {cpu: "2", memory: 2Gi}

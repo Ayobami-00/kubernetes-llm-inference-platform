@@ -32,6 +32,12 @@ runner:
   resources:
     requests: {cpu: 100m, memory: 128Mi}
     limits: {cpu: "2", memory: 2Gi}
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: ""
+  tolerations:
+    - key: node-role.kubernetes.io/control-plane
+      operator: Exists
+      effect: NoSchedule
   secretRefs: []
   servingNamespace: llm-d
 imagePullSecrets: []

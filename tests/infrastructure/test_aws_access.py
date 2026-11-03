@@ -87,6 +87,7 @@ def test_role_creation_and_passrole_cannot_escape_node_boundary(documents):
     assert create["Resource"] == [
         f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-control-plane",
         f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-network-probe",
+        f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-platform-worker",
     ]
     assert create["Condition"]["StringEquals"]["iam:PermissionsBoundary"].endswith(
         "/kubernetes-llm-control-plane-boundary"

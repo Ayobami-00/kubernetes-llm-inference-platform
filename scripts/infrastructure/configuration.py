@@ -70,6 +70,46 @@ def validate_configuration(config: dict, reserved_cidrs: list[str] | None = None
         raise ValueError("Worker range conflicts with foundation hosts or the WireGuard network")
 
 
+def validate_platform_configuration(project: dict, platform: dict) -> None:
+    """Keep persistent workers distinct from control planes and dynamic GPU addresses."""
+    validate_configuration(project)
+    if set(platform) != {"schema_version", "instance_type", "root_volume_gib", "nodes"}:
+        raise ValueError("Unknown or missing platform capacity fields")
+    if platform["schema_version"] != "klip-platform-capacity.v1":
+        raise ValueError("Unknown platform capacity version")
+    if not re.fullmatch(r"[a-z][a-z0-9]*\.[a-z0-9]+", platform["instance_type"]):
+        raise ValueError("Use an explicit EC2 instance type")
+    size = platform["root_volume_gib"]
+    if type(size) is not int or size < 40:
+        raise ValueError("Platform root volumes require at least 40 integer GiB")
+    if set(platform["nodes"]) != {"platform-01", "platform-02", "platform-03"}:
+        raise ValueError("Exactly three persistent platform worker slots are required")
+    addresses = {ipaddress.IPv4Address(node["private_ip"]) for node in project["nodes"].values()}
+    for index, (name, node) in enumerate(sorted(platform["nodes"].items())):
+        if set(node) != {"foundation_slot", "availability_zone", "private_ip", "wireguard_ip"}:
+            raise ValueError("Unknown or missing platform worker fields")
+        expected = f"cp-0{index + 1}"
+        if node["foundation_slot"] != expected:
+            raise ValueError(f"{name} must use its corresponding foundation subnet")
+        source = project["nodes"][expected]
+        if node["availability_zone"] != source["availability_zone"]:
+            raise ValueError("Platform worker availability zone differs from its foundation subnet")
+        subnet = ipaddress.IPv4Network(source["public_subnet_cidr"])
+        address = ipaddress.IPv4Address(node["private_ip"])
+        if (
+            address not in subnet
+            or int(address) - int(subnet.network_address) < 4
+            or address == subnet.broadcast_address
+            or address in addresses
+        ):
+            raise ValueError(
+                "Platform address overlaps another host or is not usable in its subnet"
+            )
+        addresses.add(address)
+        if node["wireguard_ip"] != f"10.200.0.{64 + index}":
+            raise ValueError("The first three worker addresses are reserved for platform hosts")
+
+
 def validate_origins(origins: dict) -> None:
     if not isinstance(origins, dict):
         raise ValueError("Origins must be a map keyed by stable origin ID")

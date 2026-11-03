@@ -44,7 +44,8 @@
       ],
       "Resource": [
         "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-platform-worker"
       ],
       "Condition": {
         "StringEquals": {
@@ -70,7 +71,8 @@
       ],
       "Resource": [
         "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-platform-worker"
       ]
     },
     {
@@ -82,7 +84,8 @@
       ],
       "Resource": [
         "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-platform-worker"
       ],
       "Condition": {
         "ArnEquals": {
@@ -114,7 +117,8 @@
       ],
       "Resource": [
         "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-platform-worker"
       ],
       "Condition": {
         "StringEquals": {
@@ -137,7 +141,8 @@
       ],
       "Resource": [
         "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-control-plane",
-        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-network-probe"
+        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-network-probe",
+        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-platform-worker"
       ]
     },
     {
@@ -162,6 +167,22 @@
       "Resource": [
         "*"
       ]
+    },
+    {
+      "Sid": "ReadPlatformQuotas",
+      "Effect": "Allow",
+      "Action": [
+        "servicequotas:GetServiceQuota"
+      ],
+      "Resource": [
+        "arn:aws:servicequotas:eu-west-2:127811062476:ec2/L-0263D0A3",
+        "arn:aws:servicequotas:eu-west-2:127811062476:ec2/L-1216C47A"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
     }
   ]
 }

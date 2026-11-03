@@ -80,6 +80,29 @@ def test_exact_reviewed_plan_is_required(receipt):
         verify_receipt(receipt, "another-plan", "reviewed-source", "foundation")
 
 
+def test_platform_apply_rechecks_headroom_before_any_paid_mutation(receipt, tmp_path, monkeypatch):
+    import platform_capacity
+
+    receipt.update(root="platform", phase="apply")
+    path = tmp_path / "receipt.json"
+    path.write_text(json.dumps(receipt))
+    monkeypatch.setattr(manage, "plan_paths", lambda *_: (None, path))
+    monkeypatch.setattr(manage, "source_digest", lambda: "reviewed-source")
+    monkeypatch.setattr(manage.Aws, "preflight", lambda *_: {})
+
+    def reject(*_):
+        raise ValueError("Insufficient quota")
+
+    def terraform(root, action, *args):
+        assert action == "show", "Terraform apply must not run without regional headroom"
+        return "{}"
+
+    monkeypatch.setattr(platform_capacity, "ensure_capacity", reject)
+    monkeypatch.setattr(manage, "tf", terraform)
+    with pytest.raises(ValueError, match="Insufficient quota"):
+        manage.apply_plan("platform", receipt["plan_sha256"])
+
+
 def test_preview_plans_can_never_be_applied(receipt):
     receipt["preview"] = True
     with pytest.raises(ValueError, match="Preview"):
