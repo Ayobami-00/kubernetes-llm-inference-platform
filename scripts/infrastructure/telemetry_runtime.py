@@ -21,6 +21,96 @@ def folder():
     return private_dir(state_home() / "cluster/observability/thanos")
 
 
+def reconcile(approval):
+    """Retire only an observed, fully rolled-back first install; never replay it."""
+    from cluster import kubectl
+
+    current = json.loads((folder() / "active.json").read_text())
+    if current["approval_sha256"] != approval:
+        raise ValueError("Select the original interrupted telemetry operation")
+    if current["status"] == "failed":
+        return current
+    if current["status"] != "interrupted" or current.get("interrupted_stage") != "installing":
+        raise ValueError("Only a separately observed atomic install rollback can be retired")
+    secrets = json.loads(
+        kubectl(
+            "-n",
+            "observability",
+            "get",
+            "secret",
+            "-l",
+            "owner=helm,name=klip-thanos",
+            "-o",
+            "json",
+        )
+    )["items"]
+    workloads = json.loads(
+        kubectl(
+            "-n",
+            "observability",
+            "get",
+            "deployments,statefulsets,pods",
+            "-l",
+            "app.kubernetes.io/instance=klip-thanos",
+            "-o",
+            "json",
+        )
+    )["items"]
+    if secrets or workloads:
+        raise ValueError(
+            "Helm release or workloads remain; preserve the ambiguous original attempt"
+        )
+    claims = retained_claims()
+    current.update(
+        status="failed", reconciled_at=utc_now(), rollback_observed=True, retained_claims=claims
+    )
+    write_private(folder() / (approval + ".result.json"), current)
+    write_private(folder() / "active.json", current)
+    return current
+
+
+def retained_claims():
+    from cluster import kubectl
+    from monitoring_runtime import get
+
+    claims = json.loads(
+        kubectl(
+            "-n",
+            "observability",
+            "get",
+            "pvc",
+            "-l",
+            "app.kubernetes.io/instance=klip-thanos",
+            "-o",
+            "json",
+        )
+    )["items"]
+    expected = {
+        "data-klip-thanos-compactor-0": "10Gi",
+        "data-klip-thanos-storegateway-0": "5Gi",
+        "data-klip-thanos-storegateway-1": "5Gi",
+    }
+    if any(claim["metadata"]["name"] not in expected for claim in claims):
+        raise ValueError("Unexpected retained Thanos claim")
+    result = {}
+    for name in expected:
+        claim = get("pvc", name, "observability")
+        if not claim:
+            continue
+        spec = claim["spec"]
+        labels = claim["metadata"].get("labels", {})
+        if (
+            labels.get("app.kubernetes.io/instance") != "klip-thanos"
+            or labels.get("app.kubernetes.io/name") != "thanos"
+            or spec.get("storageClassName") != "klip-gp3"
+            or spec.get("accessModes") != ["ReadWriteOnce"]
+            or spec["resources"]["requests"]["storage"] != expected[name]
+        ):
+            raise ValueError("Unexpected retained Thanos volume; no implicit adoption/deletion")
+        result[name] = {"uid": claim["metadata"]["uid"], "spec_sha256": sha(spec)}
+    return result
+
+
 def prepare(directory):
     active = folder() / "active.json"
     if active.exists() and json.loads(active.read_text())["status"] not in {"installed", "failed"}:
@@ -32,6 +122,7 @@ def prepare(directory):
     identities = verify_roles()
     render("thanos")
     security = assess(directory)
+    claims = retained_claims()
     plan = {
         "schema_version": "klip-telemetry-component-plan.v1",
         "component": "thanos",
@@ -41,6 +132,7 @@ def prepare(directory):
         "source_sha256": source_digest(),
         "security_directory": str(directory.resolve()),
         "security": security,
+        "retained_claims": claims,
         "values": thanos_values(),
         "roles_verified_at": identities["verified_at"],
         "node_uids": {name: item["uid"] for name, item in capacity["nodes"].items()},
@@ -113,9 +205,18 @@ def apply(approval):
     verify_roles()
     assess(Path(plan["security_directory"]))
     render("thanos")
+    if plan.get("retained_claims", {}) != retained_claims():
+        raise ValueError("Retained Thanos volume identity changed after planning")
     active = {"approval_sha256": approval, "status": "validating", "started_at": utc_now()}
     write_private(active_path, active)
     try:
+        from observability_release import validate_pod_admission
+
+        documents = [
+            d for d in yaml.safe_load_all((CACHE / "thanos-rendered.yaml").read_text()) if d
+        ]
+        active["pod_specs_admitted"] = validate_pod_admission(documents)
+        write_private(active_path, active)
         Host(load_hosts()["cp-01"]).run(
             [
                 "sudo",
@@ -181,7 +282,7 @@ def apply(approval):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["prepare", "apply", "observe"])
+    parser.add_argument("command", choices=["prepare", "apply", "observe", "reconcile"])
     parser.add_argument("--security-directory", type=Path)
     parser.add_argument("--approve-plan")
     args = parser.parse_args()
@@ -191,6 +292,8 @@ def main():
             if not args.security_directory:
                 parser.error("--security-directory is required")
             result = prepare(args.security_directory)
+        elif args.command == "reconcile":
+            result = reconcile(args.approve_plan)
         elif args.command == "apply":
             result = apply(args.approve_plan)
         else:

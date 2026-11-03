@@ -46,3 +46,31 @@ def test_terminal_reuse_never_reinstalls_and_conflicting_values_are_rejected(mon
     (tmp_path / "plan.json").write_text(json.dumps(plan))
     with pytest.raises(ValueError, match="exact prepared"):
         runtime.apply(approval)
+
+
+@pytest.mark.parametrize("remaining", ["secrets", "workloads", None])
+def test_failed_first_install_requires_observed_complete_rollback(monkeypatch, tmp_path, remaining):
+    import cluster
+
+    active = {
+        "approval_sha256": "synthetic",
+        "status": "interrupted",
+        "interrupted_stage": "installing",
+    }
+    (tmp_path / "active.json").write_text(json.dumps(active))
+    monkeypatch.setattr(runtime, "folder", lambda: tmp_path)
+    monkeypatch.setattr(runtime, "retained_claims", lambda: {})
+
+    def observe(*args):
+        objects = remaining == ("secrets" if "secret" in args else "workloads")
+        return json.dumps({"items": [{"synthetic": True}] if objects else []})
+
+    monkeypatch.setattr(cluster, "kubectl", observe)
+    if remaining:
+        with pytest.raises(ValueError, match="ambiguous"):
+            runtime.reconcile("synthetic")
+        assert json.loads((tmp_path / "active.json").read_text()) == active
+    else:
+        result = runtime.reconcile("synthetic")
+        assert result["status"] == "failed" and result["rollback_observed"]
+        assert (tmp_path / "synthetic.result.json").exists()

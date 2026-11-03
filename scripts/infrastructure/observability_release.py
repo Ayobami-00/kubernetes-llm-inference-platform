@@ -233,6 +233,78 @@ def thanos_values() -> dict:
     return values
 
 
+def check_pod_security(pod: dict) -> None:
+    """Controllers are not Pods: reject template omissions before Helm waits."""
+    context = pod.get("securityContext", {})
+    containers = pod.get("initContainers", []) + pod.get("containers", [])
+    for container in containers:
+        security = container.get("securityContext", {})
+        if security.get("seccompProfile", context.get("seccompProfile", {})).get("type") != (
+            "RuntimeDefault"
+        ):
+            raise ValueError("Every telemetry container requires RuntimeDefault seccomp")
+        if (
+            not security.get("runAsNonRoot", context.get("runAsNonRoot", False))
+            or security.get("runAsUser", context.get("runAsUser")) == 0
+            or security.get("privileged", False)
+            or security.get("allowPrivilegeEscalation") is not False
+            or "ALL" not in security.get("capabilities", {}).get("drop", [])
+            or security.get("capabilities", {}).get("add")
+            or security.get("readOnlyRootFilesystem") is not True
+            or any(port.get("hostPort") for port in container.get("ports", []))
+        ):
+            raise ValueError("Telemetry container security boundary is incomplete")
+
+
+def validate_pod_admission(documents: list[dict]) -> list[str]:
+    """Validate Pod specs/PSS without creating workloads or assuming future SAs exist."""
+    import copy
+
+    from cluster import Host, load_hosts
+
+    host = Host(load_hosts()["cp-01"])
+    admitted = []
+    for document in documents:
+        if document.get("kind") not in {"Deployment", "StatefulSet"}:
+            continue
+        pod = {"apiVersion": "v1", "kind": "Pod", **copy.deepcopy(document["spec"]["template"])}
+        pod["metadata"].update(
+            name=document["metadata"]["name"] + "-admission-canary", namespace="observability"
+        )
+        # SAs may not exist until Helm creates them. This preflight validates
+        # PSS/spec only; actual exact-subject federation is verified after rollout.
+        pod["spec"]["serviceAccountName"] = "default"
+        pod["spec"]["automountServiceAccountToken"] = False
+        for claim in document["spec"].get("volumeClaimTemplates", []):
+            pod["spec"].setdefault("volumes", []).append(
+                {
+                    "name": claim["metadata"]["name"],
+                    "persistentVolumeClaim": {
+                        "claimName": claim["metadata"]["name"]
+                        + "-"
+                        + document["metadata"]["name"]
+                        + "-0"
+                    },
+                }
+            )
+        host.run(
+            [
+                "sudo",
+                "kubectl",
+                "--kubeconfig=/etc/kubernetes/admin.conf",
+                "create",
+                "--dry-run=server",
+                "-f",
+                "-",
+                "-o",
+                "name",
+            ],
+            data=json.dumps(pod),
+        )
+        admitted.append(document["metadata"]["name"])
+    return admitted
+
+
 def check_render(documents: list[dict]) -> None:
     """Reject hidden image defaults, non-expiring tokens and accidental host access."""
     pinned = {image(name) for name in json.loads(LOCK.read_text())["images"]}
@@ -267,6 +339,7 @@ def check_render(documents: list[dict]) -> None:
             raise ValueError("Non-expiring Kubernetes API token is forbidden")
         if doc.get("kind") in {"Deployment", "DaemonSet", "StatefulSet"}:
             pod = doc["spec"]["template"]["spec"]
+            check_pod_security(pod)
             if pod.get("hostNetwork") or pod.get("hostPID") or pod.get("hostIPC"):
                 raise ValueError("Monitoring workloads cannot bypass Pod networking/isolation")
             if doc["kind"] in {"Deployment", "StatefulSet"} and any(

@@ -430,3 +430,25 @@ analysis are retained as security evidence. No Critical findings were reported;
 High findings require individual runtime review before monitoring installation.
 The Thanos 0.42.5 candidate reduces the original scan's High count from 23 to 11;
 its image is not authorized merely by this scan. No GPU has been allocated.
+
+The private monitoring core installed on 2026-11-03 and admission was verified
+fail-closed at 22:18:51 UTC. Both Prometheus replicas subsequently scraped all
+43 initial targets successfully. Kubelet scraping verifies serving certificates
+against the Kubernetes CA; the host firewall permits only the three reserved
+platform-worker WireGuard addresses on TCP 10250. The update ran sequentially
+across all six CPU hosts, preserving node identities, etcd health and database
+replicas. Controller-manager, scheduler, etcd and kube-proxy metrics remain
+disabled until authenticated endpoints are configured.
+
+The exact monitoring-image review accepts 36 individually recorded High findings
+under restricted runtime conditions, with no Critical findings and a seven-day
+expiry. These vulnerabilities remain outstanding. Local checks passed 670 tests
+(17 optional skips), Ruff and formatting. The preceding combined CI baseline at
+`1b5424e` passed all four application/infrastructure workflows.
+
+Thanos plan `f5d777b637bb4805c0ebe377e230c5cf6176e9dd810ee4a73575cada1e997014`
+started its atomic install at 22:34 UTC. Query replicas started; Kubernetes rejected
+the store/compactor Pods because upstream component defaults override the global
+seccomp setting. This is a failed acceptance, not a usable retained-metrics path.
+The installation must roll back before a corrected, separately identified plan.
+No GPU is rented while this prerequisite work proceeds.

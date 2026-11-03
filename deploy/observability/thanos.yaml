@@ -37,6 +37,7 @@ query:
     - --query.timeout=30s
     - --query.max-concurrent=10
     - --query.max-concurrent-select=4
+    - --no-query.partial-response
   resources:
     requests: {cpu: 100m, memory: 256Mi}
     limits: {cpu: '1', memory: 1Gi}
@@ -45,6 +46,13 @@ query:
 storegateway:
   enabled: true
   replicaCount: 2
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile: {type: RuntimeDefault}
   serviceAccount:
     create: true
     name: klip-thanos-store
@@ -64,6 +72,13 @@ storegateway:
 compactor:
   enabled: true
   replicaCount: 1
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile: {type: RuntimeDefault}
   serviceAccount:
     create: true
     name: klip-thanos-compactor

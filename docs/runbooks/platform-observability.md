@@ -225,6 +225,21 @@ host identities. Completion checks the 2/2/1 workload topology; verify both hot
 replicas, query deduplication and actual object upload separately. Prometheus uses
 the standard two-hour blocks, so an empty initial bucket is not an upload proof.
 
+Thanos query defaults to failing a query when a store response is incomplete;
+dashboards must not silently treat partial responses as complete data. Its
+StatefulSet Pod security contexts are explicit because the upstream component
+defaults override global settings. Static validation checks every application
+and init container, and server dry-runs validate Pod specs/PSS before Helm.
+The Pod dry-run uses the existing default ServiceAccount because Helm has not
+created the component accounts yet; actual federation remains a separate live
+postcondition.
+
+If a first atomic Thanos install rolls back, `make thanos-reconcile PLAN_SHA=...`
+requires the release Secrets and all its workloads to be absent. It records the
+attempt as failed and preserves verified retained-volume identities; it never
+reruns the failed transition. An existing or pending Helm revision is ambiguous
+and rejected. A corrected install requires a new source-bound plan.
+
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and
 buffered collectors. Tempo 3 distributed mode requires Kafka; the initial small

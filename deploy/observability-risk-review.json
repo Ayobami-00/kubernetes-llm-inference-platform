@@ -5,7 +5,7 @@
   "scan_source_commit": "07f64053b32508bc4d6e1dd1014790130b8a7211",
   "configuration": {
     "values_sha256": "4db60ed201dcec052ec5832256524ec070f1de340737316a5bf956c15111b66f",
-    "thanos_values_sha256": "af45b56068b407b0e043933fb776bfad008dc5fbf8c3d1af353b910f0b499148",
+    "thanos_values_sha256": "6586d02c7020cab596bd2eb095ef937615b902753637dd1217a6b3a95fb9ee0a",
     "boundary_sha256": "1349b58feaabddcc246b40979493d327e464e8d2ca639bf98df31413012f2042",
     "chart_sha256": "fc8fe107f94a3009c04af63a03fb811393970db0eb973a9c513941acfce565c1"
   },
@@ -333,5 +333,6 @@
     "Source analysis is conservative; absence from its output does not waive a finding.",
     "This review does not authorize public telemetry, tenant-controlled scrape configuration or arbitrary external data sources."
   ],
-  "configuration_amended_at": "2026-11-03T22:28:42.724411+00:00"
+  "configuration_amended_at": "2026-11-03T22:28:42.724411+00:00",
+  "amended_at": "2026-11-03T22:45:11.409835+00:00"
 }

@@ -153,7 +153,7 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
-.PHONY: thanos-render thanos-prepare thanos-apply thanos-observe
+.PHONY: thanos-render thanos-prepare thanos-apply thanos-observe thanos-reconcile
 thanos-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render --release thanos
 
@@ -167,6 +167,10 @@ thanos-apply:
 
 thanos-observe:
 	$(PYTHON) scripts/infrastructure/telemetry_runtime.py observe
+
+thanos-reconcile:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the original interrupted install'; exit 2)
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py reconcile --approve-plan "$(PLAN_SHA)"
 
 .PHONY: monitoring-prepare monitoring-apply monitoring-observe monitoring-firewall monitoring-reconcile
 monitoring-firewall:
