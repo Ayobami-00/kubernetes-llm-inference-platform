@@ -47,5 +47,9 @@ jobs:
       - name: Fetch checksum-locked service charts
         run: uv run --locked --group infrastructure python scripts/infrastructure/platform_services.py fetch
       - run: make infra-check
+        env:
+          # Plugin release metadata otherwise shares the runner's unauthenticated
+          # GitHub API quota. This job token has contents:read only.
+          GITHUB_TOKEN: ${{ github.token }}
       - name: Validate HA database charts against pinned upstream schemas
         run: uv run --locked --group infrastructure python scripts/infrastructure/platform_checks.py --fetch-schemas
