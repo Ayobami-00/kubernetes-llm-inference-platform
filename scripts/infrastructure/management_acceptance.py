@@ -51,7 +51,7 @@ class PrivateHTTPSHandler(urllib.request.HTTPSHandler):
 
 
 @contextmanager
-def forwarding(log):
+def forwarding(log, *, target="service/klip-web"):
     from cluster import FOLDER, kubeconfigs, tunnel
 
     with socket.socket() as reservation:
@@ -67,7 +67,7 @@ def forwarding(log):
                 "-n",
                 "klip",
                 "port-forward",
-                "service/klip-web",
+                target,
                 f"{port}:8443",
                 "--address",
                 "127.0.0.1",

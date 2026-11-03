@@ -57,6 +57,20 @@ Client-controlled SNI cannot select another file. This uses the
 without an extra watcher, API permissions or shared process namespace. Verify
 actual renewal/handshakes before claiming this behavior is live-proven.
 
+```sh
+make management-verify-renewal OPERATION=<stable-12-character-hex-id>
+```
+
+This bounded test triggers the same manual issuance status transition as the pinned
+[upstream cmctl command](https://github.com/cert-manager/cmctl/blob/v2.6.1/pkg/renew/renew.go),
+adding UID/resourceVersion preconditions and durable submission intent. An ambiguous
+submission is reconciled rather than blindly repeated. It reads only public
+certificates, requires a new leaf public key with an unchanged CA, verifies TLS
+handshakes against each exact web Pod and confirms unchanged Pod UIDs/restart counts.
+It then authenticates again through the HTTPS Service. A successful forced renewal
+proves operator issuance and mounted-certificate propagation; it does not measure
+a complete 90-day automatic renewal interval or ACM public-certificate renewal.
+
 The lab HTTPS Service uses NodePort 30443 for the dedicated external frontend.
 Internal probes must verify the internal CA and hostname.
 The generic chart ingress supports its existing TLS-termination mode with native

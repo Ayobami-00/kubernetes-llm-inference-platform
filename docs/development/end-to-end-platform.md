@@ -309,3 +309,18 @@ Local checks now include 562 passing root tests (17 optional skips). The private
 deployment is not an external-frontend or failure-recovery proof. Certificate
 rotation, PostgreSQL/application failover, monitoring, live GPU lifecycle and
 destroy/rebuild acceptance remain required. No Lambda GPU has been allocated.
+
+The dedicated three-zone management ALB, ACM certificate and two-rule WAF are now
+applied from an encoded, saved 17-create Terraform plan. Public management DNS is
+still unpublished. The current estimate is $43.40/month at one average LCU, before
+request/transfer/tax charges. The next application release adds the HTTPS NodePort,
+bounded proxy trust and API ingress policy; fresh three-target health and verified
+authenticated HTTPS are mandatory before DNS activation.
+
+Forced cert-manager renewal `57ccd657bb0b` passed at 2026-11-03 19:27:00 UTC on the
+initial release: leaf revision 1 became 2, its public key changed, the CA remained
+unchanged and both exact web Pods served the new certificate without a Pod/container
+restart. Authenticated HTTPS still returned all 21 retained runs. This proves the
+tested issuance/mount/cache path, not a full calendar renewal interval or ACM
+renewal. Local checks now pass 576 root tests (17 optional skips), with current
+schemas and clean Ruff/formatting. Failure recovery and GPU gates remain pending.

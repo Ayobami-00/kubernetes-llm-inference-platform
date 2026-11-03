@@ -128,6 +128,11 @@ management-frontend-activate:
 management-frontend-deactivate:
 	$(PYTHON) scripts/infrastructure/management_frontend.py deactivate
 
+.PHONY: management-verify-renewal
+management-verify-renewal:
+	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
+	$(PYTHON) scripts/infrastructure/management_renewal.py --operation "$(OPERATION)"
+
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
 	$(PYTHON) scripts/infrastructure/image_credentials.py prepare
