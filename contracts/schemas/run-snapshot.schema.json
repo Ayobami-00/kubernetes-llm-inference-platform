@@ -492,6 +492,13 @@
           "title": "Backend",
           "type": "string"
         },
+        "chat_template_kwargs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Chat Template Kwargs",
+          "type": "object"
+        },
         "dtype": {
           "default": "bfloat16",
           "enum": [
@@ -582,6 +589,15 @@
             "benchmark"
           ],
           "title": "Mode",
+          "type": "string"
+        },
+        "serving_stack": {
+          "default": "llm-d-vllm",
+          "enum": [
+            "direct-vllm",
+            "llm-d-vllm"
+          ],
+          "title": "Serving Stack",
           "type": "string"
         },
         "stub_preset": {
@@ -1031,7 +1047,8 @@
         "managed_by": {
           "enum": [
             "foundation",
-            "management"
+            "management",
+            "external"
           ],
           "title": "Managed By",
           "type": "string"
@@ -1151,6 +1168,13 @@
         },
         "artifact": {
           "$ref": "#/$defs/Artifact"
+        },
+        "chat_template_kwargs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Chat Template Kwargs",
+          "type": "object"
         },
         "customer_ref": {
           "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",

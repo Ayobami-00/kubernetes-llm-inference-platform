@@ -134,7 +134,9 @@ def test_dataset_and_prepared_bundle_preserve_existing_references(client):
     bundle = {"id": "fixture-prepared", "fixture": True, "snapshot": snap}
     accepted = receipt(client, post(client, "prepared-runs", bundle))
     assert accepted["status"] == "completed"
-    assert client.get("/api/v1/prepared-runs").json()[0]["snapshot"] == snap
+    assert client.get("/api/v1/prepared-runs").json()[0]["snapshot"] == RunSnapshot.model_validate(
+        snap
+    ).model_dump(mode="json")
     report = client.post(
         "/api/v1/runs/preflight",
         json={
@@ -319,6 +321,43 @@ def test_job_exit_requires_a_valid_shared_result_and_confirmed_stop(tmp_path):
     state["pods"] = []
     assert runner.stop(handle, uid)
     assert (directory / "cancel-requested").exists()
+    runner.close()
+
+
+@pytest.mark.parametrize("tamper", [None, "run-id", "snapshot", "result"])
+def test_workload_job_result_is_bound_to_management_identity(tmp_path, tamper):
+    runner, state = mock_runner(tmp_path)
+    runner.binding["runner"] = "kubernetes-workload-stub:v1"
+    runner.binding["runner_command"] = [
+        "workload-runner",
+        "execute",
+        "--manifest",
+        "{attempt_dir}/manifest.json",
+    ]
+    data = snapshot()
+    data["snapshot"]["target"] = {
+        "mode": "local-stub",
+        "endpoint": "http://stub.test/v1/chat/completions",
+    }
+    snap = RunSnapshot.model_validate(data["snapshot"])
+    handle = runner.prepare(snap, "op-workload")
+    uid = runner.ensure_started(handle)
+    state["job"]["status"] = {"conditions": [{"type": "Complete", "status": "True"}]}
+    data["id"], data["snapshot"] = "fixture-run", snap.model_dump(mode="json")
+    result = copy.deepcopy(data["result"])
+    if tamper == "run-id":
+        data["id"] = "different-run"
+    if tamper == "snapshot":
+        data["snapshot"]["scenario"]["seed"] += 1
+    if tamper == "result":
+        result["notes"] = "Different assessment"
+    directory = runner.directory(handle)
+    (directory / "run.json").write_text(json.dumps(data))
+    (directory / "result.json").write_text(json.dumps(result))
+    observed = runner.observe(handle, uid)
+    assert observed.status == ("completed" if tamper is None else "failed")
+    if tamper:
+        assert observed.error.code == "invalid_result"
     runner.close()
 
 

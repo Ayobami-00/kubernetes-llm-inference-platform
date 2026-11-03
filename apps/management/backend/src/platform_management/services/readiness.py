@@ -8,7 +8,7 @@ from platform_contracts.common import is_image_pin
 from platform_management.api.schemas import Preflight, ReadinessCheck
 from platform_management.db.models import ArtifactCheck, Observation, PreparedRun, Resource
 from platform_management.integrations.registry import configuration
-from platform_management.services.common import now
+from platform_management.services.common import digest, now
 from platform_management.services.imports import artifact_references
 from platform_management.settings import get_settings
 
@@ -57,6 +57,7 @@ def assess(db, body, snap):
         real["runner"] == "kubernetes:v1"
         and is_image_pin(real["runner_image"])
         and bool(real["runner_command"])
+        and real["runner_image"] == snap.versions.runner_image
     )
     check(
         "runner-adapter",
@@ -162,19 +163,29 @@ def assess(db, body, snap):
         real_group = bool(
             matches
             and row.payload.get("mode") == "real"
+            and (
+                not snap.target
+                or snap.target.serving_stack != "direct-vllm"
+                or row.payload.get("endpoint") == str(snap.target.endpoint)
+            )
             and not row.payload["group"].get("fixture")
         )
+        if real_group and row.payload.get("ownership") == "external":
+            real_group = row.payload.get("inventory_id") == (inv.snapshot_id if inv else None)
         check(
             "lease-" + spec.id,
-            "Managed capacity and remaining lease",
+            "Observed capacity and remaining lease",
             real_group and lease_ready,
-            "Real execution requires matching managed real capacity with enough remaining lease",
+            "Real execution requires matching measured capacity with enough remaining lease",
             spec.ref,
         )
         nodes = [n for n in inv.nodes if n.worker_group_ref == spec.ref] if inv else []
         live_nodes = {n["uid"]: n for n in observation.get("nodes", [])}
         gpu_ready = len(nodes) >= spec.desired_instances and all(
-            n.readiness.host
+            0
+            <= (now() - n.observed_at).total_seconds()
+            <= get_settings().cluster_observation_max_age_seconds
+            and n.readiness.host
             and n.readiness.wireguard
             and n.readiness.kubernetes
             and n.readiness.cilium
@@ -185,6 +196,14 @@ def assess(db, body, snap):
             and live_nodes[n.kubernetes.uid]["gpus"] >= spec.hardware.gpu_count
             for n in nodes
         )
+        members = {m.get("node_uid"): m for m in state.get("members", [])}
+        if real_group:
+            gpu_ready = gpu_ready and all(
+                n.kubernetes
+                and n.kubernetes.uid in members
+                and members[n.kubernetes.uid]["provider_instance_id"] == n.provider_instance_id
+                for n in nodes
+            )
         check(
             "gpu-" + spec.id,
             "GPU worker evidence",
@@ -212,8 +231,16 @@ def assess(db, body, snap):
             "serving-" + binding.deployment_id,
             "Serving readiness",
             cluster_ready
+            and sim_ready
+            and row.payload.get("mode") == "real"
             and live.get("ready", False)
             and live.get("profile_ref") == profile.ref
+            and (
+                not row.payload.get("kubernetes_uid")
+                or live.get("uid") == row.payload["kubernetes_uid"]
+            )
+            and profile.engine.image in live.get("images", [])
+            and live.get("profile_sha256") == digest(profile.model_dump(mode="json"))
             and live.get("replicas", 0) >= profile.topology.replicas,
             "Deployment readiness and exact profile identity must be observed separately",
             binding.deployment_id,
@@ -228,6 +255,13 @@ def assess(db, body, snap):
         executable=all(c.status == "ready" for c in checks),
         contract_blockers=errors,
         runtime_blockers=runtime,
-        simulation_available=not sim_blockers,
+        simulation_available=not sim_blockers
+        or bool(
+            prepared
+            and prepared.fixture
+            and snap.target
+            and snap.target.mode == "local-stub"
+            and configuration()["runner"] == "kubernetes-workload-stub:v1"
+        ),
         checks=checks,
     )

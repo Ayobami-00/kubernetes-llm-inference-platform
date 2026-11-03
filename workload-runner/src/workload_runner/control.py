@@ -51,6 +51,14 @@ def preflight(snapshot):
     for variable in snapshot.target.credential_env.values():
         if not os.environ.get(variable):
             raise ValueError(f"missing credential environment reference: {variable}")
+    for value in credential_values(snapshot):
+        if value in snapshot.model_dump_json() or any(
+            value.encode() in artifact_path(p.artifact.uri, p.artifact.sha256).read_bytes()
+            for p in snapshot.preparation
+        ):
+            raise ValueError(
+                "frozen inputs contain an endpoint credential value; create clean inputs"
+            )
     try:
         version = importlib.metadata.version("aiperf")
     except importlib.metadata.PackageNotFoundError:
@@ -59,14 +67,14 @@ def preflight(snapshot):
         raise ValueError("execution requires the pinned benchmark extra: aiperf==0.13.0")
 
 
-def initialize_attempt(snapshot, directory):
+def initialize_attempt(snapshot, directory, *, run_id=None):
     directory.mkdir(parents=True, exist_ok=True)
     if (directory / "run.json").exists():
         raise ValueError(
             "execution attempt already exists; historical inputs cannot be overwritten"
         )
     run = Run(
-        id="attempt-" + digest(str(directory.resolve()).encode())[:24],
+        id=run_id or "attempt-" + digest(str(directory.resolve()).encode())[:24],
         fixture=snapshot.target.mode == "local-stub",
         status="queued",
         created_at=utcnow(),
@@ -99,6 +107,9 @@ def result_artifacts(directory):
         "snapshot": "snapshot.json",
         "preparation": "preparation.json",
         "clock": "engine-clock.json",
+        "report": "report.md",
+        "engine-log": "engine.log",
+        "readiness": "readiness.json",
     }
     raw = directory / "aiperf"
     if raw.is_dir():
@@ -111,13 +122,20 @@ def result_artifacts(directory):
             },
         )
         filenames["raw-index"] = "raw-index.json"
-    return {
+    artifacts = {
         name: dict(
             uri=(directory / filename).as_uri(), sha256=digest((directory / filename).read_bytes())
         )
         for name, filename in filenames.items()
         if (directory / filename).is_file()
     }
+    if raw.is_dir():
+        for index, path in enumerate(sorted(raw.rglob("*"))):
+            if path.is_file():
+                artifacts[f"raw-{index}"] = dict(
+                    uri=path.as_uri(), sha256=digest(path.read_bytes())
+                )
+    return artifacts
 
 
 def engine_completed(directory, returncode, requests):
@@ -144,7 +162,28 @@ def persist_run(directory, data):
         run = Run.model_validate(data)
         atomic_json(directory / "heartbeat.json", dict(pid=os.getpid(), at=utcnow()))
         atomic_json(directory / "run.json", run)
+        if (directory / "manifest.json").exists():
+            publish_observation(directory, run)
         return run
+
+
+def publish_observation(directory, run):
+    """Publish C's protocol without interpreting remote process IDs or Job ownership."""
+    clock_path = directory / "engine-clock.json"
+    origin = None
+    if clock_path.is_file():
+        clock = json.loads(clock_path.read_text())
+        origin = datetime.fromtimestamp(clock["epoch_ns"] / 1e9, UTC)
+    observation = RunnerObservation(
+        status=run.status,
+        stage=run.stage,
+        result=run.result,
+        error=run.error,
+        timeline_origin_at=origin,
+    )
+    if run.result is not None:
+        atomic_json(directory / "result.json", run.result)
+    atomic_json(directory / "observation.json", observation)
 
 
 def target_readiness(snapshot):
@@ -159,15 +198,50 @@ def target_readiness(snapshot):
             if response.json().get("fixture") is not True:
                 raise ValueError("local-stub target did not identify itself as a fixture endpoint")
         else:
+            probes = []
+            profiles = {p.ref: p for p in snapshot.serving_profiles}
+            bindings = {b.customer_ref: b for b in snapshot.bindings}
             for customer in snapshot.customers:
                 variable = snapshot.target.credential_env.get(customer.id)
                 headers = {"Authorization": "Bearer " + os.environ[variable]} if variable else {}
-                response = client.get(origin + "/v1/models", headers=headers)
+                profile = profiles[bindings[customer.ref].serving_profile_ref]
+                if snapshot.target.serving_stack == "direct-vllm":
+                    response = client.get(origin + "/v1/models", headers=headers)
+                    response.raise_for_status()
+                    if response.json().get("fixture") is True:
+                        raise ValueError("benchmark target identifies itself as a fixture endpoint")
+                    if customer.model_alias not in {item["id"] for item in response.json()["data"]}:
+                        raise ValueError(
+                            f"endpoint is not ready for model alias {customer.model_alias}"
+                        )
+                # Gateways need not expose a model catalogue. Probe each routed alias using an
+                # unscored, bounded call without benchmark records or quality inputs.
+                payload = dict(
+                    model=customer.model_alias,
+                    messages=[{"role": "user", "content": "Reply OK."}],
+                    max_tokens=1,
+                    temperature=0.0,
+                    stream=False,
+                )
+                if profile.engine.chat_template_kwargs:
+                    payload["chat_template_kwargs"] = profile.engine.chat_template_kwargs
+                response = client.post(
+                    str(snapshot.target.endpoint), headers=headers, json=payload, timeout=30
+                )
                 response.raise_for_status()
-                if customer.model_alias not in {item["id"] for item in response.json()["data"]}:
-                    raise ValueError(
-                        f"endpoint is not ready for model alias {customer.model_alias}"
-                    )
+                body = response.json()
+                if body.get("fixture") is True:
+                    raise ValueError("benchmark target identifies itself as a fixture endpoint")
+                if not body.get("choices"):
+                    raise ValueError("benchmark readiness probe returned no completion")
+                probes.append(
+                    {
+                        "customer_ref": customer.ref,
+                        "model_alias": customer.model_alias,
+                        "status": response.status_code,
+                    }
+                )
+            return probes
 
 
 def execute(directory: Path):
@@ -199,7 +273,9 @@ def execute(directory: Path):
                 build_engine_inputs(run.snapshot, directory)
                 raise RuntimeError("execution cancelled before engine launch")
             preflight(run.snapshot)
-            target_readiness(run.snapshot)
+            probes = target_readiness(run.snapshot)
+            if probes:
+                atomic_json(directory / "readiness.json", probes)
             build_engine_inputs(run.snapshot, directory)
             environment = dict(os.environ, PLATFORM_RUN_DIR=str(directory))
             start = time.monotonic()
@@ -243,8 +319,8 @@ def execute(directory: Path):
                             raise RuntimeError("AIPerf export/shutdown watchdog expired")
                     if (directory / "cancel-requested").exists():
                         interrupted = True
-                    if elapsed > budget + 120:
-                        raise RuntimeError("AIPerf startup/execution watchdog expired")
+                    if not clock_file.exists() and elapsed > 120:
+                        raise RuntimeError("AIPerf startup watchdog expired")
                     data["stage"] = stage
                     if persist_run(directory, data).status != "running":
                         raise RuntimeError("attempt ownership was lost")
@@ -335,6 +411,13 @@ def execute(directory: Path):
         scrub_artifacts(directory, run.snapshot)
         final = persist_run(directory, data)
         write_report(final, directory)
+        if final.result:
+            data = final.model_dump(mode="json")
+            data["result"]["artifacts"] = result_artifacts(directory)
+            final = Run.model_validate(data)
+            atomic_json(directory / "run.json", final)
+        if (directory / "manifest.json").exists():
+            publish_observation(directory, final)
         return final
 
 

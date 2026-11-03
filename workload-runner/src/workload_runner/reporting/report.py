@@ -17,6 +17,8 @@ def write_report(run, directory):
         f"Execution: **{run.status}**",
         f"Measurement validity: **{result.validity if result else 'unavailable'}**",
         f"Performance verdict: **{result.slo_verdict if result else 'not_evaluated'}**",
+        f"Serving stack: `{run.snapshot.target.serving_stack}`" if run.snapshot.target else "",
+        f"Client endpoint: `{run.snapshot.target.endpoint}`" if run.snapshot.target else "",
         "",
         "Phases and windows use the frozen scenario. Percentiles use nearest rank. "
         "Warmup cohorts and drain sends are unscored; failures count against attainment.",

@@ -10,8 +10,10 @@ import time
 import httpx
 import pytest
 from jsonschema import Draft202012Validator
+from test_managed import handoff
 from workload_runner.artifacts import read_jsonl
 from workload_runner.control import LocalRunnerAdapter, execute, initialize_attempt
+from workload_runner.managed import execute_manifest
 
 pytestmark = pytest.mark.skipif(
     os.environ.get("RUN_AIPERF_INTEGRATION") != "1",
@@ -77,8 +79,13 @@ def test_all_synthetic_paths(scenario, compile_scenario, tmp_path, endpoint, rep
     snapshot = compile_scenario(scenario)
     snapshot.target.endpoint = endpoint
     directory = tmp_path / "execution"
-    initialize_attempt(snapshot, directory)
-    run = execute(directory)
+    manifest = handoff(snapshot, directory)
+    before = manifest.with_name("snapshot.json").read_bytes()
+    run = execute_manifest(manifest)
+    assert run.id == "run-management-test"
+    assert manifest.with_name("snapshot.json").read_bytes() == before
+    assert manifest.with_name("result.json").exists()
+    assert json.loads(manifest.with_name("observation.json").read_text())["status"] == "completed"
     assert run.status == "completed", run.error
     assert run.result.requests.not_sent == 0
     assert run.result.requests.failed == 0

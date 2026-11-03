@@ -48,6 +48,13 @@
     "artifact": {
       "$ref": "#/$defs/Artifact"
     },
+    "chat_template_kwargs": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Chat Template Kwargs",
+      "type": "object"
+    },
     "customer_ref": {
       "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
       "title": "Customer Ref",

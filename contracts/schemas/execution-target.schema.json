@@ -28,6 +28,15 @@
       "title": "Mode",
       "type": "string"
     },
+    "serving_stack": {
+      "default": "llm-d-vllm",
+      "enum": [
+        "direct-vllm",
+        "llm-d-vllm"
+      ],
+      "title": "Serving Stack",
+      "type": "string"
+    },
     "stub_preset": {
       "default": "healthy",
       "enum": [

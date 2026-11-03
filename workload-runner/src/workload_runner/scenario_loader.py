@@ -28,16 +28,22 @@ def default_bindings(catalog, scenario_ref):
     result = []
     for ref in catalog.get("scenario", scenario_ref).participants:
         customer = catalog.get("customer", ref)
-        profile = next(
+        profiles = [
             p
             for p in catalog.records["serving-profile"].values()
             if p.model.alias == customer.model_alias
-        )
-        group = next(
+        ]
+        if len(profiles) != 1:
+            raise ValueError(f"{ref}: ambiguous serving profiles; supply explicit bindings")
+        profile = profiles[0]
+        groups = [
             g
             for g in catalog.records["worker-group"].values()
             if g.worker_class == profile.worker_class
-        )
+        ]
+        if len(groups) != 1:
+            raise ValueError(f"{ref}: ambiguous worker groups; supply explicit bindings")
+        group = groups[0]
         result.append(
             ServingBinding(
                 customer_ref=ref,
@@ -71,20 +77,51 @@ def compile_run(
     *,
     smoke=False,
     bindings=None,
+    inventory=None,
+    versions=None,
+    sustained=False,
 ):
+    if smoke and sustained:
+        raise ValueError("smoke and sustained variants are mutually exclusive")
+    if target.mode == "benchmark" and bindings is None:
+        raise ValueError("benchmark planning requires explicit pinned serving bindings")
     base = build_run_snapshot(
-        catalog, scenario_ref, bindings or default_bindings(catalog, scenario_ref)
+        catalog,
+        scenario_ref,
+        bindings if bindings is not None else default_bindings(catalog, scenario_ref),
+        inventory=inventory,
+        versions=versions,
     )
     data = base.model_dump(mode="json")
     data["target"] = target.model_dump(mode="json")
     data["versions"]["aiperf_version"] = "0.13.0"
     data["versions"]["evaluator_version"] = "0.1.0"
     identity = digest(
-        canonical({"base": base, "preparations": preparations, "target": target, "smoke": smoke})
+        canonical(
+            {
+                "base": base,
+                "preparations": preparations,
+                "target": target,
+                "smoke": smoke,
+                "sustained": sustained,
+            }
+        )
     )[:12]
-    data["scenario"]["id"] += ("-smoke-" if smoke else "-prepared-") + identity
+    data["scenario"]["id"] += (
+        "-smoke-" if smoke else "-sustained-" if sustained else "-prepared-"
+    ) + identity
     data["scenario"]["revision"] = 1
     data["scenario"]["notes"] = f"Derived from {base.scenario.ref}; immutable inputs {identity}."
+    if sustained:
+        if [(p["id"], p["duration_s"]) for p in data["scenario"]["phases"]] != [
+            ("steady", 180),
+            ("burst", 60),
+            ("recovery", 360),
+        ]:
+            raise ValueError(
+                "sustained variant requires the canonical steady/burst/recovery phases"
+            )
+        data["scenario"]["phases"][2]["duration_s"] = 960
     if smoke:
         if target.mode != "local-stub":
             raise ValueError(
@@ -175,11 +212,20 @@ def compile_run(
         **{value: key for key, value in ref_map.items()},
         "source_scenario_ref": base.scenario.ref,
         "source_snapshot_sha256": digest(canonical(base)),
+        "duration_variant": "smoke" if smoke else "sustained-20m" if sustained else "canonical",
     }
     data["target"]["credential_env"] = {
         id_map.get(key, key): value for key, value in data["target"]["credential_env"].items()
     }
     snapshot = RunSnapshot.model_validate(data)
+    profiles = {p.ref: p for p in snapshot.serving_profiles}
+    for binding in snapshot.bindings:
+        source_ref = snapshot.derivation[binding.customer_ref]
+        if (
+            preparations[source_ref].chat_template_kwargs
+            != profiles[binding.serving_profile_ref].engine.chat_template_kwargs
+        ):
+            raise ValueError("prepared and serving chat-template settings differ")
     admissions = []
     for customer in snapshot.customers:
         entries = prepared_entries[customer.ref]
@@ -245,4 +291,16 @@ def compile_run(
             raise ValueError("plan directory already contains different immutable inputs")
     write_jsonl(output / "admission-schedule.jsonl", admissions)
     atomic_json(output / "snapshot.json", snapshot)
+    atomic_json(
+        output / "management-bundle.json",
+        {
+            "source": "stream-a-preparation",
+            "provenance": "synthetic" if target.mode == "local-stub" else "unverified",
+            "document": {
+                "id": "prepared-run-" + digest(canonical(snapshot))[:24],
+                "fixture": target.mode == "local-stub",
+                "snapshot": snapshot,
+            },
+        },
+    )
     return snapshot

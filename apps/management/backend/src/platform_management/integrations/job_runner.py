@@ -5,7 +5,7 @@ import json
 import os
 from pathlib import Path
 
-from platform_contracts import RunResult
+from platform_contracts import Run, RunResult, RunSnapshot
 
 from platform_management.integrations.cluster_client import ClusterClient
 from platform_management.integrations.runner import RunnerObservation
@@ -62,6 +62,13 @@ class KubernetesJobRunner:
 
     def prepare(self, snapshot, key):
         directory = self.directory(key)
+        workload_stub = self.binding["runner"] == "kubernetes-workload-stub:v1"
+        if workload_stub and (snapshot.target is None or snapshot.target.mode != "local-stub"):
+            raise ValueError("The workload stub adapter requires a frozen local-stub target")
+        if self.binding["runner"] == "kubernetes:v1" and (
+            snapshot.target is None or snapshot.target.mode != "benchmark"
+        ):
+            raise ValueError("Real runner execution requires a benchmark target")
         if self.binding["mode"] == "real":
             checks = inspect_artifacts(snapshot.model_dump(mode="json"), self.root)
             if not checks or any(c["status"] != "verified" for c in checks):
@@ -107,7 +114,7 @@ class KubernetesJobRunner:
             "snapshot_sha256": hashlib.sha256(snapshot_bytes).hexdigest(),
             "binding_sha256": digest(self.binding),
             "argv": expanded,
-            "fixture": fixture,
+            "fixture": fixture or workload_stub,
             "deadline_seconds": snapshot.scenario.warmup.duration_s
             + snapshot.scenario.measurement_duration_s
             + snapshot.scenario.drain_timeout_s
@@ -185,7 +192,8 @@ class KubernetesJobRunner:
                                         "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}},
                                     }
                                 ],
-                                "resources": {
+                                "resources": self.binding.get("runner_resources")
+                                or {
                                     "requests": {"cpu": "100m", "memory": "128Mi"},
                                     "limits": {"cpu": "2", "memory": "2Gi"},
                                 },
@@ -266,8 +274,13 @@ class KubernetesJobRunner:
             if c.get("status") == "True"
         }
         if "Failed" in conditions:
+            partial = self.saved_observation(handle)
+            if partial and partial.result:
+                self.validated_result(handle)
             return RunnerObservation(
                 status="failed",
+                result=partial.result if partial else None,
+                timeline_origin_at=partial.timeline_origin_at if partial else None,
                 error={
                     "code": "runner_failed",
                     "message": "Runner Job failed or exceeded its deadline",
@@ -280,9 +293,7 @@ class KubernetesJobRunner:
             ):
                 return RunnerObservation(status="running", stage="finalizing")
             try:
-                result = RunResult.model_validate_json(
-                    (self.directory(handle) / "result.json").read_text()
-                )
+                result = self.validated_result(handle)
             except (ValueError, OSError):
                 return RunnerObservation(
                     status="failed",
@@ -291,13 +302,39 @@ class KubernetesJobRunner:
                         "message": "Completed Job has no valid shared RunResult",
                     },
                 )
-            return RunnerObservation(status="completed", result=result)
+            saved = self.saved_observation(handle)
+            return RunnerObservation(
+                status="completed",
+                result=result,
+                timeline_origin_at=saved.timeline_origin_at if saved else None,
+            )
         path = self.directory(handle) / "observation.json"
         if path.exists():
             observation = RunnerObservation.model_validate_json(path.read_text())
             if observation.status == "running":
                 return observation
         return RunnerObservation(status="running", stage="preparing")
+
+    def validated_result(self, handle):
+        directory = self.directory(handle)
+        result = RunResult.model_validate_json((directory / "result.json").read_text())
+        if self.binding["runner"] != "kubernetes-fixture:v1":
+            run = Run.model_validate_json((directory / "run.json").read_text())
+            snapshot = RunSnapshot.model_validate_json((directory / "snapshot.json").read_text())
+            if (
+                run.id != self.run_id
+                or run.snapshot != snapshot
+                or run.result != result
+                or run.fixture != self.manifest(handle)["fixture"]
+            ):
+                raise ValueError("Runner result disagrees with the frozen management execution")
+        return result
+
+    def saved_observation(self, handle):
+        path = self.directory(handle) / "observation.json"
+        if not path.is_file():
+            return None
+        return RunnerObservation.model_validate_json(path.read_text())
 
     def stop(self, handle, uid=None):
         frozen_file(self.directory(handle) / "cancel-requested", b"cancelled")

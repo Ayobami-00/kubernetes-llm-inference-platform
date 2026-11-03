@@ -770,6 +770,17 @@
       "DeploymentView": {
         "additionalProperties": false,
         "properties": {
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
           "group_id": {
             "title": "Group Id",
             "type": "string"
@@ -778,10 +789,33 @@
             "title": "Id",
             "type": "string"
           },
+          "kubernetes_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubernetes Uid"
+          },
           "mode": {
-            "const": "simulation",
             "default": "simulation",
+            "enum": [
+              "simulation",
+              "real"
+            ],
             "title": "Mode",
+            "type": "string"
+          },
+          "ownership": {
+            "default": "management",
+            "enum": [
+              "management",
+              "external"
+            ],
+            "title": "Ownership",
             "type": "string"
           },
           "profile": {
@@ -848,6 +882,13 @@
             "default": "vllm",
             "title": "Backend",
             "type": "string"
+          },
+          "chat_template_kwargs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Chat Template Kwargs",
+            "type": "object"
           },
           "dtype": {
             "default": "bfloat16",
@@ -1059,6 +1100,15 @@
             "title": "Mode",
             "type": "string"
           },
+          "serving_stack": {
+            "default": "llm-d-vllm",
+            "enum": [
+              "direct-vllm",
+              "llm-d-vllm"
+            ],
+            "title": "Serving Stack",
+            "type": "string"
+          },
           "stub_preset": {
             "default": "healthy",
             "enum": [
@@ -1133,6 +1183,129 @@
           }
         },
         "title": "ExecutionVersions",
+        "type": "object"
+      },
+      "ExternalCapacity": {
+        "additionalProperties": false,
+        "properties": {
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalDeployment"
+            },
+            "minItems": 1,
+            "title": "Deployments",
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "inventory_id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Inventory Id",
+            "type": "string"
+          },
+          "worker_groups": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalGroup"
+            },
+            "minItems": 1,
+            "title": "Worker Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "inventory_id",
+          "worker_groups",
+          "deployments"
+        ],
+        "title": "ExternalCapacity",
+        "type": "object"
+      },
+      "ExternalCapacityImport": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ExternalCapacity"
+          },
+          "provenance": {
+            "const": "measured",
+            "default": "measured",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "document"
+        ],
+        "title": "ExternalCapacityImport",
+        "type": "object"
+      },
+      "ExternalDeployment": {
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "group_id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kubernetes_uid": {
+            "minLength": 1,
+            "title": "Kubernetes Uid",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ServingProfile"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "profile",
+          "kubernetes_uid",
+          "endpoint"
+        ],
+        "title": "ExternalDeployment",
+        "type": "object"
+      },
+      "ExternalGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/WorkerGroup"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "group"
+        ],
+        "title": "ExternalGroup",
         "type": "object"
       },
       "Fault": {
@@ -1404,10 +1577,33 @@
             "title": "Id",
             "type": "string"
           },
+          "inventory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Id"
+          },
           "mode": {
-            "const": "simulation",
             "default": "simulation",
+            "enum": [
+              "simulation",
+              "real"
+            ],
             "title": "Mode",
+            "type": "string"
+          },
+          "ownership": {
+            "default": "management",
+            "enum": [
+              "management",
+              "external"
+            ],
+            "title": "Ownership",
             "type": "string"
           }
         },
@@ -1979,7 +2175,8 @@
           "managed_by": {
             "enum": [
               "foundation",
-              "management"
+              "management",
+              "external"
             ],
             "title": "Managed By",
             "type": "string"
@@ -2313,6 +2510,13 @@
           },
           "artifact": {
             "$ref": "#/components/schemas/Artifact"
+          },
+          "chat_template_kwargs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Chat Template Kwargs",
+            "type": "object"
           },
           "customer_ref": {
             "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
@@ -3334,6 +3538,18 @@
             "default": "management",
             "title": "Source",
             "type": "string"
+          },
+          "timeline_origin_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Origin At"
           }
         },
         "required": [
@@ -6853,6 +7069,135 @@
           }
         ],
         "summary": "Import Dataset",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/v1/imports/external-capacity": {
+      "post": {
+        "operationId": "importExternalCapacity",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalCapacityImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Import External Capacity",
         "tags": [
           "Integrations"
         ]

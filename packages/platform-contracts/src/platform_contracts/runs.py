@@ -263,6 +263,7 @@ class RunnerObservation(ContractModel):
     stage: Literal["preparing", "warming_up", "measuring", "draining", "finalizing"] | None = None
     result: RunResult | None = None
     error: ErrorInfo | None = None
+    timeline_origin_at: Timestamp | None = None
 
 
 class Run(RuntimeRecord):

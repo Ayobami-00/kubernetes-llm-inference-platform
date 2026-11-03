@@ -120,6 +120,16 @@ def validate_snapshot(snapshot: RunSnapshot) -> None:
     reservations = defaultdict(int)
     for binding in snapshot.bindings:
         customer = customers[binding.customer_ref]
+        source_ref = snapshot.derivation.get(customer.ref, customer.ref)
+        for manifest in snapshot.preparation:
+            if (
+                manifest.customer_ref == source_ref
+                and manifest.chat_template_kwargs
+                != profiles[binding.serving_profile_ref].engine.chat_template_kwargs
+            ):
+                raise ValueError(
+                    f"{manifest.id}: prepared data uses different chat-template settings"
+                )
         profile = profiles[binding.serving_profile_ref]
         group = groups[binding.worker_group_ref]
         if customer.model_alias != profile.model.alias:
@@ -268,6 +278,13 @@ def validate_for_execution(snapshot: RunSnapshot) -> None:
     for binding in snapshot.bindings:
         customer = customers[binding.customer_ref]
         refs = [customer.workload.dataset_ref]
+        source_ref = snapshot.derivation.get(customer.ref, customer.ref)
+        for manifest in snapshot.preparation:
+            if (
+                manifest.customer_ref == source_ref
+                and manifest.tokenizer_id != profiles[binding.serving_profile_ref].model.repository
+            ):
+                errors.append(f"{manifest.id}: tokenizer repository differs from serving model")
         if warmup_ref := snapshot.scenario.warmup.datasets.get(customer.id):
             refs.append(warmup_ref)
         for ref in refs:
@@ -290,7 +307,12 @@ def validate_for_execution(snapshot: RunSnapshot) -> None:
         "evaluator": versions.evaluator_version,
         **{
             key: versions.platform_versions.get(key)
-            for key in ("kubernetes", "cilium", "llm-d", "vllm", "model-pool-chart")
+            for key in ("kubernetes", "cilium", "vllm")
+            + (
+                ("serving-chart",)
+                if snapshot.target and snapshot.target.serving_stack == "direct-vllm"
+                else ("model-pool-chart", "llm-d")
+            )
         },
     }
     for name, version in version_values.items():

@@ -2,12 +2,19 @@ import { useState } from 'react';
 import { useQuery } from '@tanstack/react-query';
 import { Check, FileUp, Loader2 } from 'lucide-react';
 import { endpoints as e, unwrap, mutationHeaders } from '../../api/client';
-import type { InventoryImport, DatasetImport, PreparedImport, RunImport } from '../../api/client';
+import type {
+  InventoryImport,
+  DatasetImport,
+  PreparedImport,
+  RunImport,
+  ExternalCapacityImport,
+} from '../../api/client';
 import { Badge, formatDate } from '../../components/Inspector';
 import type { Act } from '../../components/Inspector';
 
 const kinds = {
   inventory: 'Infrastructure inventory',
+  'external-capacity': 'B-managed GPU capacity',
   datasets: 'Dataset manifest',
   'prepared-runs': 'Prepared run bundle',
   runs: 'Historical run',
@@ -54,6 +61,13 @@ export default function ImportsPage({ act, busy }: { act: Act; busy: boolean }) 
       if (kind === 'inventory')
         await unwrap(
           e.importInventory({ headers: mutationHeaders(), body: base as InventoryImport }),
+        );
+      else if (kind === 'external-capacity')
+        await unwrap(
+          e.importExternalCapacity({
+            headers: mutationHeaders(),
+            body: base as ExternalCapacityImport,
+          }),
         );
       else if (kind === 'datasets')
         await unwrap(e.importDataset({ headers: mutationHeaders(), body: base as DatasetImport }));

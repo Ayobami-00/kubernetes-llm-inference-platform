@@ -3,7 +3,7 @@ FROM python:3.12.13-bookworm@sha256:3cd9086bdb30f7c9bc08a3fa621d9842e0d3f6f9291a
 COPY --from=uv /uv /bin/uv
 WORKDIR /app
 COPY . .
-RUN uv sync --locked --package workload-runner --all-extras --no-dev --no-editable
+RUN --mount=type=cache,target=/root/.cache/uv uv sync --locked --package workload-runner --all-extras --no-dev --no-editable
 FROM python:3.12.13-slim@sha256:229a2c5bfa27522db7815ea81f9bed70af17ccb9de9fc7ad142b1877b5830d36
 COPY --from=build /app /app
 RUN mkdir -p /workspace /home/runner \

@@ -410,6 +410,10 @@ export type DeliveryPolicy = {
  */
 export type DeploymentView = {
     /**
+     * Endpoint
+     */
+    endpoint?: string | null;
+    /**
      * Group Id
      */
     group_id: string;
@@ -418,9 +422,17 @@ export type DeploymentView = {
      */
     id: string;
     /**
+     * Kubernetes Uid
+     */
+    kubernetes_uid?: string | null;
+    /**
      * Mode
      */
-    mode?: 'simulation';
+    mode?: 'simulation' | 'real';
+    /**
+     * Ownership
+     */
+    ownership?: 'management' | 'external';
     profile: ServingProfile;
     /**
      * Status
@@ -458,6 +470,12 @@ export type EngineSettings = {
      * Backend
      */
     backend?: 'vllm';
+    /**
+     * Chat Template Kwargs
+     */
+    chat_template_kwargs?: {
+        [key: string]: JsonValue;
+    };
     /**
      * Dtype
      */
@@ -576,6 +594,10 @@ export type ExecutionTarget = {
      */
     mode: 'local-stub' | 'benchmark';
     /**
+     * Serving Stack
+     */
+    serving_stack?: 'direct-vllm' | 'llm-d-vllm';
+    /**
      * Stub Preset
      */
     stub_preset?: 'healthy' | 'slow-first' | 'slow-completion' | 'reject' | 'error' | 'timeout' | 'interrupted' | 'shared-overload';
@@ -603,6 +625,77 @@ export type ExecutionVersions = {
      * Runner Image
      */
     runner_image?: string | null;
+};
+
+/**
+ * ExternalCapacity
+ */
+export type ExternalCapacity = {
+    /**
+     * Deployments
+     */
+    deployments: Array<ExternalDeployment>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Inventory Id
+     */
+    inventory_id: string;
+    /**
+     * Worker Groups
+     */
+    worker_groups: Array<ExternalGroup>;
+};
+
+/**
+ * ExternalCapacityImport
+ */
+export type ExternalCapacityImport = {
+    document: ExternalCapacity;
+    /**
+     * Provenance
+     */
+    provenance?: 'measured';
+    /**
+     * Source
+     */
+    source: string;
+};
+
+/**
+ * ExternalDeployment
+ */
+export type ExternalDeployment = {
+    /**
+     * Endpoint
+     */
+    endpoint: string;
+    /**
+     * Group Id
+     */
+    group_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kubernetes Uid
+     */
+    kubernetes_uid: string;
+    profile: ServingProfile;
+};
+
+/**
+ * ExternalGroup
+ */
+export type ExternalGroup = {
+    group: WorkerGroup;
+    /**
+     * Id
+     */
+    id: string;
 };
 
 /**
@@ -784,9 +877,17 @@ export type GroupView = {
      */
     id: string;
     /**
+     * Inventory Id
+     */
+    inventory_id?: string | null;
+    /**
      * Mode
      */
-    mode?: 'simulation';
+    mode?: 'simulation' | 'real';
+    /**
+     * Ownership
+     */
+    ownership?: 'management' | 'external';
 };
 
 /**
@@ -1129,7 +1230,7 @@ export type NodeObservation = {
     /**
      * Managed By
      */
-    managed_by: 'foundation' | 'management';
+    managed_by: 'foundation' | 'management' | 'external';
     /**
      * Observed At
      */
@@ -1300,6 +1401,12 @@ export type PreparationManifest = {
         [key: string]: number;
     };
     artifact: Artifact;
+    /**
+     * Chat Template Kwargs
+     */
+    chat_template_kwargs?: {
+        [key: string]: JsonValue;
+    };
     /**
      * Customer Ref
      */
@@ -1859,6 +1966,10 @@ export type RunView = {
      * Source
      */
     source?: string;
+    /**
+     * Timeline Origin At
+     */
+    timeline_origin_at?: string | null;
 };
 
 /**
@@ -3604,6 +3715,65 @@ export type ImportDatasetResponses = {
 };
 
 export type ImportDatasetResponse = ImportDatasetResponses[keyof ImportDatasetResponses];
+
+export type ImportExternalCapacityData = {
+    body: ExternalCapacityImport;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports/external-capacity';
+};
+
+export type ImportExternalCapacityErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ImportExternalCapacityError = ImportExternalCapacityErrors[keyof ImportExternalCapacityErrors];
+
+export type ImportExternalCapacityResponses = {
+    /**
+     * Successful Response
+     */
+    202: ImportAccepted;
+};
+
+export type ImportExternalCapacityResponse = ImportExternalCapacityResponses[keyof ImportExternalCapacityResponses];
 
 export type ImportInventoryData = {
     body: InventoryImport;

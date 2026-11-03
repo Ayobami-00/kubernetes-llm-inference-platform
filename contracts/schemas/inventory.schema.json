@@ -187,7 +187,8 @@
         "managed_by": {
           "enum": [
             "foundation",
-            "management"
+            "management",
+            "external"
           ],
           "title": "Managed By",
           "type": "string"

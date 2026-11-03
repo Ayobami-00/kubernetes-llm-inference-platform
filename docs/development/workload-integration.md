@@ -1,58 +1,111 @@
-# Stream A integration notes for B and C
+# Stream A integration with B and C
 
-The workspace adds `workload-runner`, `slo-evaluator` and `inference-stub`. The root lockfile includes
-optional AIPerf 0.13.0 and data dependencies. Normal `uv sync --locked --all-packages` keeps AIPerf
-optional; execution hosts/images additionally install the runner's extras. The management backend
-Dockerfile copies the new workspace members so its locked workspace installation still resolves.
+A runs preparation, planning, AIPerf and evaluation. C owns the management API, durable imports,
+execution bindings and Kubernetes Job lifecycle. B owns capacity, cluster preparation, storage and
+serving releases. There are no new Lambda mutations in this integration.
 
-Shared schema version remains `0.1`. Existing fixtures still validate. New compatible snapshot
-fields carry target, preparation, delivery policy and lineage. New schemas cover prepared entries,
-admissions, normalized requests/sessions and runner observations. Token counts may now be null when
-unknown. C's generated OpenAPI/client are regenerated from real routes. The UI renders unknown
-usage explicitly instead of crashing or presenting unknown values as measured zeroes.
+## Execution protocol
 
-## C: runner protocol
+C selects `kubernetes-workload-stub:v1` for A's actual fixture-labelled local workloads, or
+`kubernetes:v1` for real benchmarks. Its existing `kubernetes-fixture:v1` adapter remains a separate
+synthetic contract test. The configured runner command is:
 
-```python
-from pathlib import Path
-from workload_runner.control import LocalRunnerAdapter
-
-runner = LocalRunnerAdapter(Path("/durable/workload-attempts"))
-handle = runner.launch(snapshot, operation_key="management-operation-id")
-observation = runner.observe(handle)
-# observation.status, observation.stage, observation.result, observation.error
-runner.stop(handle)
+```json
+["workload-runner", "execute", "--manifest", "{attempt_dir}/manifest.json"]
 ```
 
-`snapshot` is the shared `RunSnapshot` produced by planning. `handle` is opaque to C. For this local
-adapter it resolves to an attempt directory; management stores it unchanged. `launch` returns
-quickly after durable creation and process launch. Repeated identical operation keys reuse the
-attempt without new preflight or credentials checks; conflicting inputs fail. `observe` returns
-the existing management observation shape and detects lost attempts. Results validate against the
-same `RunResult` used by C. Management's simulated adapter remains unchanged; API/DB wiring stays
-with C. The local process adapter does not introduce another HTTP API.
+C stages a `management-runner.v1` manifest and snapshot under the shared artifact root. Its bridge
+owns the permanent start claim. A checks the snapshot checksum and fixture identity, preserves the
+snapshot bytes, uses C's run ID, and executes once. An interrupted attempt never starts a new clock.
+`execution-identity.json` records C's operation/attempt ID and binding checksum.
 
-Use a stable durable artifact root on one runner host, with the same path and PID namespace for
-launch/observe/stop. File locks serialize launch and observation updates. This local adapter is
-not a distributed job scheduler. C can later supply Kubernetes-job submission behind the same
-protocol; B owns the Job/Helm infrastructure. See the recovery runbook for liveness behavior.
+A atomically publishes `observation.json` and `result.json`. The observation contains `status`,
+`stage`, `result`, `error` and optional `timeline_origin_at`; C now uses the shared model. The origin
+is the engine's paired monotonic/UTC origin, including warmup. `RunView.timeline_origin_at` exposes
+it for correlation. C waits for Job completion and validates the complete run against its frozen
+snapshot. Nonzero exits and cancellation retain partial results. A violating or invalid assessment
+is distinct from an execution failure.
 
-Preparation and compilation happen before the snapshot freezes. C may invoke the Python planner
-or CLI in its durable preparation job, then submit the frozen snapshot. Endpoint credentials are
-environment variable names keyed by derived customer IDs. The planner maps authored customer IDs
-to those derived IDs. Secret values are resolved only during execution and are excluded from
-snapshots/retained exports. Never put credentials in endpoint URLs.
+C verifies/registers result artifacts before its terminal transaction. The run inspector and
+Integrations page offer downloads only for registered, checksummed files. Raw exports, normalized
+records, the report and quality evidence are included. Collection does not change historical results.
 
-## B: packaging and storage
+The public control boundary remains launch/stop/observe with opaque, durable handles. C's worker
+implements Kubernetes control in two stages: persist intent, then create/adopt the Job by identity.
+Repeated API idempotency keys return the original attempt, including terminal attempts. Do not use
+`LocalRunnerAdapter` across Pods: it is only for local commands sharing one filesystem/PID namespace.
 
-The runner's container entrypoint is the CLI, suitable for a later Job. Mount stable, writable
-artifact paths, including prepared input files referenced by `file://` URIs. Set paths before
-freezing; launch never rewrites its snapshot. SIGTERM requests cancellation and retains partial
-records. Give the Job termination grace enough time for its 10-second engine shutdown allowance
-and artifact finalization. Public preparation is a separate network-enabled step; execution
-itself doesn't download datasets. Benchmark preflight still requires verified infrastructure and
-serving pins. Stream A makes no infrastructure or provider calls.
+## Artifacts, credentials and resources
 
-Regenerate shared schemas with `scripts/export-contracts.py`; regenerate C's OpenAPI using
-`scripts/export-management.py`, then run `npm run generate` in the web package. These remain
-generated outputs of existing models/routes, not placeholder API definitions.
+Use the same `/artifacts` mount in preparation, management API/worker Pods and runner Jobs. Stage
+prepared files and the admission schedule there before freezing. Do not rewrite host paths at launch.
+Planning also writes `management-bundle.json`, an import envelope for C's prepared-runs endpoint.
+Derived bundles remain selectable from their original scenario through `source_scenario_ref`.
+
+Credential references in snapshots map customer IDs to environment variable names. C mounts
+allowlisted Secrets at `/run/secrets/runner/<secret>/<key>`. Append a server-configured argument:
+
+```text
+--credential-file INFERENCE_TOKEN=/run/secrets/runner/inference-access/token
+```
+
+A resolves it only during execution. Secret values stay out of arguments, snapshots and retained
+exports. Redaction never rewrites frozen inputs. Execution rejects credential values embedded in
+those inputs. Credentials in endpoint/import URLs are rejected.
+
+Configure `runner.resources` in Helm (or `MANAGEMENT_RUNNER_RESOURCES` outside Helm). CPU/memory
+requests must be positive and no greater than limits. C freezes these with its execution binding;
+changing settings only affects new bindings. Size them against B's CPU capacity and measured
+scheduling lag. The workload delivery policy remains strict; low resource reservations never justify
+silently relaxing it.
+
+## B: external capacity handoff
+
+First import a full measured inventory. Then submit the typed document to
+`POST /api/v1/imports/external-capacity`, using the same admin/CSRF/idempotency conventions as other
+imports. Its JSON shape is documented by `ExternalCapacityImport` in management OpenAPI:
+
+- Envelope: `source`, `provenance: measured`, `document`.
+- Document: immutable `id`, imported `inventory_id`, `worker_groups`, `deployments`.
+- Each group: runtime `id` and the shared non-fixture `WorkerGroup` containing its exact spec,
+  observed members, provider IDs, Kubernetes node identities and actual lease.
+- Each deployment: runtime `id`, `group_id`, pinned shared `profile`, `kubernetes_uid` and full
+  inference `endpoint`.
+
+GPU inventory nodes use `managed_by: external`. Existing foundation/management observations remain
+compatible. Imported profile/group revisions are immutable and appear in the catalogue; an existing
+working draft or conflicting revision blocks the import. New observations use a new handoff ID.
+Replaying an existing handoff does not roll resources back.
+
+These resources have `mode: real`, `ownership: external`. C lists/selects them, but rejects renewal,
+deletion, simulation faults and serving lifecycle changes. Expiry blocks new launches without
+claiming that B's instances terminated. B refreshes inventory and reimports observations when needed.
+
+Readiness separately requires fresh inventory/live cluster observations, matching member/node UIDs,
+allocatable GPUs, remaining lease and a ready deployment at its current generation. Deployment
+metadata must include:
+
+```text
+klip.dev/deployment-id: <runtime deployment ID>                  # label
+klip.dev/serving-profile: <exact profile ID>@<revision>           # annotation
+klip.dev/serving-profile-sha256: <normalized profile digest>      # annotation
+```
+
+The profile digest is SHA-256 of `json.dumps(profile.model_dump(mode="json"), sort_keys=True,
+default=str).encode()`, after validating with the current shared `ServingProfile`. The deployment's
+image must exactly match the pinned profile image, and its UID must match the handoff. Direct-vLLM
+runs must also match the handoff endpoint. Declarations alone never make a run executable.
+
+## Workspace and generated interfaces
+
+Use `uv sync --locked --all-packages --all-extras` for development/integration. The management
+production container still installs only management dependencies while staging all workspace members.
+The runner image includes pinned AIPerf 0.13.0. Shared schema version stays `0.1`, with compatible
+defaults for serving stack, chat-template settings and observation metadata.
+
+Regenerate with `scripts/export-contracts.py`, `scripts/export-management.py` and the web package's
+`npm run generate`. Merge these source/interface changes into B/C before producing new handoffs or
+releasing the matching API and runner images. Existing bindings retain their original configuration.
+
+See [live validation](../runbooks/live-inference-validation.md) for the gated GPU procedure and
+[workload recovery](../runbooks/workload-recovery.md) for local attempts.

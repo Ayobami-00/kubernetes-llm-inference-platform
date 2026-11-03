@@ -23,6 +23,7 @@ Milliseconds = Annotated[float, Field(strict=True, ge=0, allow_inf_nan=False)]
 
 class ExecutionTarget(ContractModel):
     mode: Literal["local-stub", "benchmark"]
+    serving_stack: Literal["direct-vllm", "llm-d-vllm"] = "llm-d-vllm"
     endpoint: HttpUrl
     credential_env: dict[
         Slug, Annotated[str, StringConstraints(pattern=r"^[A-Za-z_][A-Za-z0-9_]*$")]
@@ -99,6 +100,7 @@ class PreparationManifest(ContractModel):
     adaptations: dict[NonEmpty, Count] = Field(default_factory=dict)
     license_evidence: dict[str, NonEmpty] = Field(default_factory=dict)
     selection: dict[str, JsonValue] = Field(default_factory=dict)
+    chat_template_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_manifest(self) -> Self:

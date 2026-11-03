@@ -9,6 +9,7 @@ from platform_management.api.dependencies import Db, administrator
 from platform_management.api.import_schemas import (
     ArtifactView,
     DatasetImport,
+    ExternalCapacityImport,
     ImportAccepted,
     ImportView,
     IntegrationReport,
@@ -55,6 +56,16 @@ def accepted(db, response, key, kind, body):
 )
 def import_inventory(body: InventoryImport, db: Db, response: Response, key: Key):
     return accepted(db, response, key, "inventory", body)
+
+
+@router.post(
+    "/imports/external-capacity",
+    response_model=ImportAccepted,
+    status_code=202,
+    operation_id="importExternalCapacity",
+)
+def import_external_capacity(body: ExternalCapacityImport, db: Db, response: Response, key: Key):
+    return accepted(db, response, key, "external-capacity", body)
 
 
 @router.post(

@@ -69,7 +69,7 @@ class NodeObservation(ContractModel):
     id: Slug
     provider: Literal["aws", "lambda"]
     provider_instance_id: NonEmpty
-    managed_by: Literal["foundation", "management"]
+    managed_by: Literal["foundation", "management", "external"]
     role: Literal["control_plane", "gpu_worker"]
     public_ip: IPvAnyAddress
     wireguard_ip: IPvAnyAddress
@@ -90,7 +90,7 @@ class NodeObservation(ContractModel):
             if self.kubernetes and self.kubernetes.allocatable_gpu_count:
                 raise ValueError("CPU node cannot report allocatable GPUs")
         else:
-            if self.provider != "lambda" or self.managed_by != "management":
+            if self.provider != "lambda" or self.managed_by not in {"management", "external"}:
                 raise ValueError("GPU workers belong to Lambda management")
             if self.worker_group_ref is None or self.hardware is None:
                 raise ValueError("GPU worker requires hardware and worker-group identity")

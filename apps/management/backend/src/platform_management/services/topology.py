@@ -145,13 +145,38 @@ def topology(db, run_id=None, include_history=False):
                 f"{profile.topology.gpus_per_replica} GPU each"
             ),
             deployed.payload["status"] if deployed else "planned",
-            "simulation" if deployed else "configuration",
+            ("imported" if deployed.payload.get("ownership") == "external" else "simulation")
+            if deployed
+            else "configuration",
             profile.id,
             data,
         )
         edge("customer:" + binding.customer_ref, identity, "served by")
         edge(identity, "worker-group:" + binding.worker_group_ref, "placed on")
     if not historical:
+        from platform_contracts import ServingProfile
+
+        assigned = {b.deployment_id for b in bindings}
+        for row in runtime.values():
+            if row.kind != "deployment" or row.id in assigned:
+                continue
+            profile = ServingProfile.model_validate(row.payload["profile"])
+            data = configuration("serving-profile", profile)
+            data.update(deployment_id=row.id, runtime=row.payload)
+            identity = "deployment:" + row.id
+            add(
+                identity,
+                "serving-profile",
+                profile.model.repository.split("/")[-1],
+                "Observed deployment · " + row.id,
+                row.payload["status"],
+                "imported" if row.payload.get("ownership") == "external" else "simulation",
+                profile.id,
+                data,
+            )
+            if group := runtime.get(row.payload["group_id"]):
+                spec = group.payload["group"]["spec"]
+                edge(identity, f"worker-group:{spec['id']}@{spec['revision']}", "placed on")
         used_profiles = {b.serving_profile_ref for b in bindings}
         for ref, profile in profiles.items():
             if ref not in used_profiles:
@@ -180,7 +205,7 @@ def topology(db, run_id=None, include_history=False):
                 row.id,
                 f"{state['counts']['gpu_ready_nodes']} GPU-ready node(s)",
                 state["phase"],
-                "simulation",
+                "imported" if row.payload.get("ownership") == "external" else "simulation",
                 row.id,
                 row.payload,
             )
@@ -193,7 +218,7 @@ def topology(db, run_id=None, include_history=False):
                     member["provider_instance_id"][-15:],
                     group["spec"]["hardware"]["gpu_model"],
                     member["phase"],
-                    "simulation",
+                    "imported" if row.payload.get("ownership") == "external" else "simulation",
                     member["provider_instance_id"],
                     member,
                 )

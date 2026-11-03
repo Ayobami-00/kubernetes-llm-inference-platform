@@ -38,6 +38,12 @@ def resource(db, identity, kind):
         raise AppError(404, "Resource not found")
     if row.active_operation_id:
         raise AppError(409, "A lifecycle operation is already active", "resource_busy")
+    if row.payload.get("ownership") == "external":
+        raise AppError(
+            409,
+            "B owns this resource; management lifecycle changes are disabled",
+            "external_ownership",
+        )
     return row
 
 
@@ -228,6 +234,7 @@ def runs(db: Db):
     return [
         RunView(
             run=r.payload,
+            timeline_origin_at=r.context.get("timeline_origin_at"),
             mode=r.context["mode"],
             group_ids=r.context.get("group_ids", {}),
             source=r.context.get("source", "management"),
@@ -246,6 +253,7 @@ def get_run(identity: str, db: Db):
         raise AppError(404, "Run not found")
     return RunView(
         run=row.payload,
+        timeline_origin_at=row.context.get("timeline_origin_at"),
         mode=row.context["mode"],
         group_ids=row.context.get("group_ids", {}),
         source=row.context.get("source", "management"),
@@ -261,6 +269,10 @@ def start_run(body: RunLaunch, db: Db, response: Response, key: Idempotency):
 
     def mutate(op_id):
         snap = snapshot(db, body)
+        if body.mode == "real" and (snap.target is None or snap.target.mode != "benchmark"):
+            raise AppError(422, "Real launches require a benchmark execution target")
+        if body.mode == "simulation" and snap.target and snap.target.mode != "local-stub":
+            raise AppError(422, "Simulation cannot execute a live benchmark target")
         report = assess(db, body, snap)
         if body.mode == "real" and not report.executable:
             raise AppError(

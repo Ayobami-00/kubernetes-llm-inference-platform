@@ -131,11 +131,21 @@ examples. Open [localhost:5173](http://localhost:5173). See the
 [development guide](docs/development/management.md) and
 [recovery runbook](docs/runbooks/management-recovery.md) for workflows, secrets and verification.
 
-Lambda observations are read-only. Allocation, cluster and runner workflows use persisted simulation
-adapters until downstream integrations are supplied. Synthetic results are not measured performance.
+Lambda observations are read-only. Allocation and cluster lifecycle workflows retain their simulation
+adapters. Management can launch A's actual runner as a Kubernetes Job against the local stub, and can
+onboard B-managed GPU capacity for strictly gated live execution. Synthetic results are not live
+model performance measurements.
 
 Management integration handoffs, Kubernetes Jobs and immutable imports are described in the
 [integration guide](docs/development/management-integrations.md). Production images, C-owned charts,
 the isolated kind proof and explicit release workflow are in the
 [deployment guide](docs/development/management-deployment.md). Real cloud mutations and benchmark
 execution remain blocked until their downstream readiness requirements are satisfied.
+
+## Managed workload integration
+
+Run the CPU-only A↔C proof with `KLIP_WORKLOAD_INTEGRATION=1 ./dev/test-integration`. It exercises all
+seven workload scenarios through management, artifact downloads, recovery and cancellation. See the
+[A/B/C integration notes](docs/development/workload-integration.md) and
+[live validation runbook](docs/runbooks/live-inference-validation.md) for external capacity imports,
+the first pinned direct-vLLM WriterAssist run, subsequent profiles and 20-minute campaigns.

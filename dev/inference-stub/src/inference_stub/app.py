@@ -36,6 +36,7 @@ def create_app(settings: StubSettings | None = None) -> FastAPI:
     @app.get("/v1/models")
     def models():
         return {
+            "fixture": True,
             "object": "list",
             "data": [
                 {"id": name, "object": "model"}
@@ -139,7 +140,12 @@ def create_app(settings: StubSettings | None = None) -> FastAPI:
             "prompt_tokens_details": {"cached_tokens": 0},
         }
         usage["total_tokens"] = usage["prompt_tokens"] + usage["completion_tokens"]
-        base = {"id": request_id, "model": body.get("model", "platform"), "created": 0}
+        base = {
+            "id": request_id,
+            "model": body.get("model", "platform"),
+            "created": 0,
+            "fixture": True,
+        }
 
         if body.get("stream", False):
 

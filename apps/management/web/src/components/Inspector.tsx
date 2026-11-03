@@ -57,10 +57,12 @@ export function RunDetails({
   run,
   source = 'management',
   provenance = run.fixture ? 'synthetic' : 'unverified',
+  artifactRegistry = [],
 }: {
   run: Run;
   source?: string;
   provenance?: string;
+  artifactRegistry?: { id: string; uri: string; sha256?: string | null; status: string }[];
 }) {
   const result = run.result;
   return (
@@ -197,15 +199,29 @@ export function RunDetails({
             </div>
           ))}
           {result.artifacts &&
-            Object.entries(result.artifacts).map(([name, artifact]) => (
-              <div className="artifact" key={name}>
-                <FileJson size={15} />
-                <span>
-                  {name}
-                  <small>{String((artifact as { uri: string }).uri)}</small>
-                </span>
-              </div>
-            ))}
+            Object.entries(result.artifacts).map(([name, artifact]) => {
+              const reference = artifact as { uri: string; sha256?: string | null };
+              const registered = artifactRegistry.find(
+                (a) =>
+                  a.uri === reference.uri &&
+                  a.sha256 === reference.sha256 &&
+                  a.status === 'verified',
+              );
+              return (
+                <div className="artifact" key={name}>
+                  <FileJson size={15} />
+                  <span>
+                    {name}
+                    <small>{String((artifact as { uri: string }).uri)}</small>
+                  </span>
+                  {registered && (
+                    <a href={`/api/v1/artifacts/${registered.id}`} download>
+                      Download {name}
+                    </a>
+                  )}
+                </div>
+              );
+            })}
         </>
       )}
     </>
@@ -395,6 +411,11 @@ export default function Inspector({
         }),
       ),
   });
+  const artifacts = useQuery({
+    queryKey: ['artifacts'],
+    queryFn: () => unwrap(e.listArtifacts()),
+    enabled: node.kind === 'run',
+  });
   const selectedApi = specApi[node.kind as keyof typeof specApi];
   const base = saved || configuration;
   const data = (configuration.document || {}) as Doc;
@@ -487,6 +508,7 @@ export default function Inspector({
             {node.kind === 'run' ? (
               <>
                 <RunDetails
+                  artifactRegistry={artifacts.data}
                   run={node.document as unknown as Run}
                   source={(node.document._management as { source?: string })?.source}
                   provenance={(node.document._management as { provenance?: string })?.provenance}
@@ -647,7 +669,9 @@ export default function Inspector({
                 {node.kind === 'group' && (
                   <>
                     <div className="notice synthetic">
-                      Simulated GPU lifecycle. State persists across worker restarts.
+                      {node.document.ownership === 'external'
+                        ? 'B-managed GPU capacity. Lifecycle changes are handled by its owner.'
+                        : 'Simulated GPU lifecycle. State persists across worker restarts.'}
                     </div>
                     <div className="detail-card">
                       {Object.entries((node.document.group as Doc).status.counts).map(([k, v]) => (
@@ -677,7 +701,9 @@ export default function Inspector({
                     </label>
                     <button
                       className="secondary full"
-                      disabled={busy || node.status !== 'ready'}
+                      disabled={
+                        busy || node.status !== 'ready' || node.document.ownership === 'external'
+                      }
                       onClick={() =>
                         act(
                           () =>
@@ -696,7 +722,11 @@ export default function Inspector({
                     </button>
                     <button
                       className="danger full"
-                      disabled={busy || ['deleted', 'expired'].includes(node.status)}
+                      disabled={
+                        busy ||
+                        ['deleted', 'expired'].includes(node.status) ||
+                        node.document.ownership === 'external'
+                      }
                       onClick={() =>
                         act(
                           () =>
@@ -1076,6 +1106,7 @@ export function RunLauncher({
   const prepared = useQuery({
     queryKey: ['prepared-runs'],
     queryFn: () => unwrap(e.listPreparedRuns()),
+    refetchInterval: 1500,
   });
   const [report, setReport] = useState<Doc | null>(null);
   const assignments = useQuery({
@@ -1088,9 +1119,11 @@ export function RunLauncher({
     refetchInterval: 2000,
   });
   const [chosen, setChosen] = useState<Record<string, string>>({});
-  const relevant = (assignments.data || []).filter((a) =>
-    scenario.participants?.includes(a.customer_ref),
-  );
+  const selectedBundle = prepared.data?.find((p) => p.id === preparedId);
+  const activeScenario = selectedBundle?.snapshot.scenario || scenario;
+  const relevant =
+    selectedBundle?.snapshot.bindings ||
+    (assignments.data || []).filter((a) => activeScenario.participants?.includes(a.customer_ref));
   const refs = [...new Set(relevant.map((a) => a.worker_group_ref))];
   const selectedGroups = {
     ...Object.fromEntries(
@@ -1102,22 +1135,25 @@ export function RunLauncher({
     ...chosen,
   };
   const simulationReady =
-    relevant.length === (scenario.participants?.length || 0) &&
-    relevant.length > 0 &&
-    relevant.every(
-      (a) =>
-        deployments.data?.some(
-          (d) =>
-            d.id === a.deployment_id &&
-            d.status === 'ready' &&
-            d.group_id === selectedGroups[a.worker_group_ref],
-        ) &&
-        groups.some(
-          (g) => g.id === selectedGroups[a.worker_group_ref] && g.group.status.phase === 'ready',
-        ),
-    );
+    selectedBundle?.fixture && selectedBundle.snapshot.target?.mode === 'local-stub'
+      ? report?.simulation_available === true
+      : relevant.length === (activeScenario.participants?.length || 0) &&
+        relevant.length > 0 &&
+        relevant.every(
+          (a) =>
+            deployments.data?.some(
+              (d) =>
+                d.id === a.deployment_id &&
+                d.status === 'ready' &&
+                d.group_id === selectedGroups[a.worker_group_ref],
+            ) &&
+            groups.some(
+              (g) =>
+                g.id === selectedGroups[a.worker_group_ref] && g.group.status.phase === 'ready',
+            ),
+        );
   const body = {
-    scenario_ref: `${scenario.id}@${scenario.revision}`,
+    scenario_ref: `${activeScenario.id}@${activeScenario.revision}`,
     prepared_run_id: preparedId || null,
     mode: 'simulation' as const,
     outcome: outcome as 'passing',
@@ -1127,8 +1163,7 @@ export function RunLauncher({
     <>
       <h4>Run this scenario</h4>
       <div className="notice synthetic">
-        Simulation uses compressed timing and labelled fixture results. Real execution remains
-        subject to preflight.
+        Local runs use fixture-labelled responses. Real execution remains subject to preflight.
       </div>
       <label>
         Prepared run bundle
@@ -1143,8 +1178,10 @@ export function RunLauncher({
           {prepared.data
             ?.filter(
               (p) =>
-                p.snapshot.scenario.id === scenario.id &&
-                p.snapshot.scenario.revision === scenario.revision,
+                (p.snapshot.scenario.id === scenario.id &&
+                  p.snapshot.scenario.revision === scenario.revision) ||
+                p.snapshot.derivation?.source_scenario_ref ===
+                  `${scenario.id}@${scenario.revision}`,
             )
             .map((p) => (
               <option key={p.id} value={p.id}>
@@ -1178,16 +1215,18 @@ export function RunLauncher({
           </select>
         </label>
       ))}
-      <label>
-        Result preset
-        <select value={outcome} onChange={(v) => setOutcome(v.target.value)}>
-          {['passing', 'violating', 'insufficient_data', 'invalid', 'failed'].map((o) => (
-            <option key={o} value={o}>
-              {o.replaceAll('_', ' ')}
-            </option>
-          ))}
-        </select>
-      </label>
+      {!selectedBundle?.snapshot.target && (
+        <label>
+          Result preset
+          <select value={outcome} onChange={(v) => setOutcome(v.target.value)}>
+            {['passing', 'violating', 'insufficient_data', 'invalid', 'failed'].map((o) => (
+              <option key={o} value={o}>
+                {o.replaceAll('_', ' ')}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
       <div className="button-row">
         <button
           className="secondary"
@@ -1207,7 +1246,9 @@ export function RunLauncher({
           }
         >
           <Play size={14} />
-          Simulate run
+          {selectedBundle?.snapshot.target?.mode === 'local-stub'
+            ? 'Run local workload'
+            : 'Simulate run'}
         </button>
       </div>
       <button

@@ -10,11 +10,12 @@ from platform_contracts.common import Artifact
 
 from workload_runner.artifacts import atomic_json, canonical, digest, write_jsonl
 
-TRANSFORM_VERSION = "0.4.1"
+TRANSFORM_VERSION = "0.5.0"
 
 
 class TokenCounter:
-    def __init__(self, repository=None, revision=None):
+    def __init__(self, repository=None, revision=None, chat_template_kwargs=None):
+        self.chat_template_kwargs = dict(chat_template_kwargs or {})
         self.tokenizer = None
         self.id = "fixture-regex-v1"
         self.revision = "fixture-regex-v1"
@@ -30,7 +31,7 @@ class TokenCounter:
 
     def count(self, messages, tools=()) -> int:
         if self.tokenizer:
-            kwargs = {"tools": list(tools)} if tools else {}
+            kwargs = {**self.chat_template_kwargs, **({"tools": list(tools)} if tools else {})}
             return len(
                 self.tokenizer.apply_chat_template(
                     list(messages),
@@ -155,6 +156,8 @@ def prepare_customer(
     byte_limit=1024**3,
     tokenizer=None,
     max_turns=None,
+    serving_profile_ref=None,
+    tokenizer_revision=None,
 ):
     customer = catalog.get("customer", customer_ref)
     limit = (
@@ -167,16 +170,30 @@ def prepare_customer(
     )
     if turn_bound is not None and turn_bound < 1:
         raise ValueError("max_turns must be positive")
+    profile = catalog.get("serving-profile", serving_profile_ref) if serving_profile_ref else None
+    if profile and profile.model.alias != customer.model_alias:
+        raise ValueError("preparation profile does not match customer model alias")
+    template_kwargs = profile.engine.chat_template_kwargs if profile else {}
     if isinstance(tokenizer, str):
-        tokenizer = TokenCounter(tokenizer)
+        tokenizer = TokenCounter(tokenizer, tokenizer_revision, template_kwargs)
     if tokenizer is None and source == "public":
-        profile = next(
+        profiles = [
             p
             for p in catalog.records["serving-profile"].values()
             if p.model.alias == customer.model_alias
+        ]
+        if profile is None and len(profiles) != 1:
+            raise ValueError("ambiguous preparation profile; supply --serving-profile")
+        profile = profile or profiles[0]
+        template_kwargs = profile.engine.chat_template_kwargs
+        tokenizer = TokenCounter(
+            profile.model.repository,
+            tokenizer_revision or profile.model.tokenizer_revision,
+            template_kwargs,
         )
-        tokenizer = TokenCounter(profile.model.repository, profile.model.tokenizer_revision)
     counter = tokenizer or TokenCounter()
+    if isinstance(counter, TokenCounter):
+        counter.chat_template_kwargs = dict(template_kwargs)
     source_ref = customer.workload.dataset_ref
     source_manifest = catalog.get("dataset-manifest", source_ref)
     metadata = {"revisions": {}, "urls": {}, "licenses": {}, "bytes": 0}
@@ -233,6 +250,13 @@ def prepare_customer(
                     entry_changes.append("contiguous_context_prefix")
                 break
             effective = dict(controls)
+            if template_kwargs:
+                recorded = effective.get("chat_template_kwargs", {})
+                if any(k in recorded and recorded[k] != v for k, v in template_kwargs.items()):
+                    raise ValueError(
+                        "recorded chat-template controls conflict with serving profile"
+                    )
+                effective["chat_template_kwargs"] = {**recorded, **template_kwargs}
             turn_changes = list(row.get("call_adaptations", [()] * len(row["turns"]))[index])
             maximum = effective.pop(
                 "max_completion_tokens",
@@ -303,6 +327,7 @@ def prepare_customer(
                 "license_evidence": metadata.get("license_evidence", {}),
                 "tokenizer": [counter.id, counter.revision],
                 "transform": TRANSFORM_VERSION,
+                "chat_template_kwargs": template_kwargs,
             }
         )
     )
@@ -339,6 +364,7 @@ def prepare_customer(
             "max_characters_before_tokenization": customer.limits.max_rendered_input_tokens * 16,
             "maximum_contiguous_turns": turn_bound,
         },
+        chat_template_kwargs=template_kwargs,
     )
     atomic_json(directory / "manifest.json", manifest)
     atomic_json(output / source / customer.id / "latest.json", manifest)
