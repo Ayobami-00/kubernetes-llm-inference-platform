@@ -28,7 +28,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Node exporter reads host CPU/memory/filesystems. Its Pod-network counters are disabled. WireGuard, Cilium/Hubble, authenticated etcd and private scheduler/controller metrics are pending; no network or etcd health is inferred from absent data."
+        "content": "Node exporter reads host CPU/memory/filesystems. Its Pod-network counters are disabled. WireGuard has a separate view. Cilium/Hubble, authenticated etcd and private scheduler/controller metrics are pending; no network or etcd health is inferred from absent data."
       }
     },
     {

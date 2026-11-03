@@ -12,6 +12,30 @@ from observability_release import backend_values
 from telemetry_budget import quantity, requests
 
 
+def test_cnpg_omitted_false_privileges_do_not_change_owned_role_semantics():
+    import yaml
+    from common import ROOT
+
+    role = next(
+        yaml.safe_load_all((ROOT / "deploy/observability/grafana-database.yaml").read_text())
+    )
+    actual = copy.deepcopy(role)
+    privileges = ("superuser", "createdb", "createrole", "replication", "bypassrls")
+    for field in privileges:
+        del actual["spec"][field]
+    assert grafana_storage.owned_spec_matches(role, actual)
+    for field in privileges:
+        changed = copy.deepcopy(actual)
+        changed["spec"][field] = True
+        assert not grafana_storage.owned_spec_matches(role, changed)
+    for field, value in (("ensure", "absent"), ("connectionLimit", 100)):
+        changed = copy.deepcopy(actual)
+        changed["spec"][field] = value
+        assert not grafana_storage.owned_spec_matches(role, changed)
+    actual["metadata"]["labels"].clear()
+    assert not grafana_storage.owned_spec_matches(role, actual)
+
+
 def test_grafana_uses_shared_postgres_and_retained_encryption_key_without_api_access():
     v = backend_values("grafana")
     assert v["replicas"] == 2 and not v["persistence"]["enabled"]
@@ -26,7 +50,7 @@ def test_grafana_uses_shared_postgres_and_retained_encryption_key_without_api_ac
     import yaml
 
     dashboards = yaml.safe_load(v["extraObjects"][0])
-    assert dashboards["kind"] == "ConfigMap" and len(dashboards["data"]) == 4
+    assert dashboards["kind"] == "ConfigMap" and len(dashboards["data"]) == 5
     assert v["dashboardsConfigMaps"] == {"klip": "klip-grafana-dashboards"}
     assert not v.get("dashboards")  # The chart otherwise launches a download container.
 

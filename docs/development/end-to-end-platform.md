@@ -13,7 +13,7 @@ rendering or a successful stub run does not satisfy a live gate.
 | GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
 | WriterAssist | Real JFLEG canonical run, valid delivery, GLEU and reconciled SLO verdict | Pending |
-| Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | External monitor/storage live and SNS receipt confirmed; in-cluster stack/views pending |
+| Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | Private metrics/logs/traces live, synthetic persisted trace queried; full views, application instrumentation, public dashboard and failure tests pending |
 | Resilience | Stable run identity through management/database faults and sustained runs | API/database faults verified; running-job, CPU/serving loss and sustained tests pending |
 | Rebuild | Actual retained-state teardown, restore, fresh UI-provisioned A10 and repeated run | Pending |
 | Expansion | Sequential A100 profiles, separate mixed capacity, all scenarios and failure campaign | Pending |
@@ -481,3 +481,19 @@ That upload has not occurred. The safer private rollout uses a verified local
 age-encrypted recovery copy and leaves remote credential backup pending explicit
 approval. The local path has a real-age test covering recovery and forbidding
 cloud calls. Operator-disk loss is not covered by this copy.
+
+At 23:32 UTC both Prometheus replicas reported all 59 targets healthy, including
+the three PostgreSQL instances. The read-only WireGuard observer ran on all six
+hosts; queries at 23:37 found six healthy observers and thirty directed peer
+records. That same verification retrieved the synthetic span using Tempo's
+`mode=blocks` query, independently of its in-memory ingester. Loki and Tempo
+object uploads were observed; Prometheus block uploads had not occurred yet.
+These observations do not establish retention or failure recovery.
+
+The first dashboard update stopped before Helm because CNPG serializes false
+role privileges as absent. The ownership check now recognizes only those five
+false privilege defaults and still rejects elevated roles, changed ownership,
+connection limits or `ensure: absent`. The failed validation is retained, not
+replayed. Five CPU diagnostic views are defined, with explicit missing-source
+limitations; their live provisioning is a subsequent check. Updating dashboard
+content preserves the original private-runtime risk-review expiry and findings.

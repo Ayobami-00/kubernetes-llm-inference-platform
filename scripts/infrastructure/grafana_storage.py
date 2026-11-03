@@ -109,6 +109,17 @@ def ensure_secret(name, namespace, values, *, kind="Opaque", labels=None):
     return {"name": name, "namespace": namespace}
 
 
+def owned_spec_matches(document, actual):
+    """CNPG serializes false role privileges as absent; never tolerate true privileges."""
+    if actual["metadata"].get("labels", {}).get("klip.dev/managed-by") != "klip-observability":
+        return False
+    observed = dict(actual["spec"])
+    if document["kind"] == "DatabaseRole":
+        for field in ("superuser", "createdb", "createrole", "replication", "bypassrls"):
+            observed.setdefault(field, False)
+    return all(observed.get(k) == v for k, v in document["spec"].items())
+
+
 def initialize():
     from cluster import Host, load_hosts
     from database import verify
@@ -187,11 +198,7 @@ def initialize():
     ):
         actual = get(doc["kind"], doc["metadata"]["name"], doc["metadata"]["namespace"])
         if actual:
-            if actual["metadata"].get("labels", {}).get(
-                "klip.dev/managed-by"
-            ) != "klip-observability" or any(
-                actual["spec"].get(k) != v for k, v in doc["spec"].items()
-            ):
+            if not owned_spec_matches(doc, actual):
                 raise ValueError("Refuse to adopt or alter another database/role")
         else:
             cp.run(

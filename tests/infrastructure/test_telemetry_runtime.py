@@ -74,3 +74,25 @@ def test_failed_first_install_requires_observed_complete_rollback(monkeypatch, t
         result = runtime.reconcile("synthetic")
         assert result["status"] == "failed" and result["rollback_observed"]
         assert (tmp_path / "synthetic.result.json").exists()
+
+
+@pytest.mark.parametrize("helm_started", [False, True])
+def test_validation_failure_retires_only_before_helm_started(monkeypatch, tmp_path, helm_started):
+    active = {
+        "approval_sha256": "synthetic",
+        "status": "interrupted",
+        "interrupted_stage": "validating",
+    }
+    if helm_started:
+        active["helm_started_at"] = "synthetic-start"
+    (tmp_path / "active.json").write_text(json.dumps(active))
+    monkeypatch.setattr(runtime, "folder", lambda: tmp_path)
+    if helm_started:
+        with pytest.raises(ValueError, match="separately observed"):
+            runtime.reconcile("synthetic")
+        assert json.loads((tmp_path / "active.json").read_text()) == active
+    else:
+        result = runtime.reconcile("synthetic")
+        assert result["status"] == "failed"
+        assert result["helm_not_started"] and result["prerequisite_resources_retained"]
+        assert runtime.reconcile("synthetic") == result

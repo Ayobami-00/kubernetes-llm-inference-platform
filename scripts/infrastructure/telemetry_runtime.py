@@ -77,13 +77,27 @@ def archive_current():
 
 
 def reconcile(approval):
-    """Retire only an observed, fully rolled-back first install; never replay it."""
+    """Retire a pre-Helm validation failure or observed first-install rollback."""
     from cluster import kubectl
 
     current = json.loads((folder() / "active.json").read_text())
     if current["approval_sha256"] != approval:
         raise ValueError("Select the original interrupted telemetry operation")
     if current["status"] == "failed":
+        return current
+    if (
+        current["status"] == "interrupted"
+        and current.get("interrupted_stage") == "validating"
+        and not current.get("helm_started_at")
+    ):
+        current.update(
+            status="failed",
+            reconciled_at=utc_now(),
+            helm_not_started=True,
+            prerequisite_resources_retained=True,
+        )
+        write_private(folder() / (approval + ".result.json"), current)
+        write_private(folder() / "active.json", current)
         return current
     if current["status"] != "interrupted" or current.get("interrupted_stage") != "installing":
         raise ValueError("Only a separately observed atomic install rollback can be retired")

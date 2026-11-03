@@ -8,6 +8,7 @@ metadata:
 spec:
   cluster: {name: klip-db}
   name: grafana
+  ensure: present
   login: true
   superuser: false
   createdb: false
@@ -29,6 +30,7 @@ metadata:
 spec:
   cluster: {name: klip-db}
   name: grafana
+  ensure: present
   owner: grafana
   databaseReclaimPolicy: retain
 ---

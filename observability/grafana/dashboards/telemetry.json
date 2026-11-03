@@ -28,7 +28,7 @@
       },
       "options": {
         "mode": "markdown",
-        "content": "Thanos deduplicates Prometheus replicas; partial query responses are disabled. Missing series remain No data. Queue units and actual Collector metric names must be checked against the installed binary before telemetry delivery acceptance. This view is not proof of object retention or lossless delivery."
+        "content": "Thanos deduplicates Prometheus replicas; partial query responses are disabled. Missing series remain No data. Collector queues count export requests, not bytes or spans; names match the installed 0.163.2 metrics. This view is not proof of object retention or lossless delivery."
       }
     },
     {

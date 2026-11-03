@@ -256,7 +256,11 @@ def backend_values(component):
             p.name: json.dumps(json.loads(p.read_text()), separators=(",", ":"))
             for p in sorted(directory.glob("*.json"))
         }
-        if len(dashboards) != 4 or sum(len(v.encode()) for v in dashboards.values()) > 750000:
+        if (
+            set(dashboards)
+            != {"platform.json", "cluster.json", "storage.json", "network.json", "telemetry.json"}
+            or sum(len(v.encode()) for v in dashboards.values()) > 750000
+        ):
             raise ValueError("Unexpected provisioned dashboard set or ConfigMap size")
         # extraObjects is evaluated by Helm tpl. A quoted Go string emits
         # each JSON document literally, preserving Grafana {{label}} templates.

@@ -79,7 +79,8 @@ VIEWS = {
         ],
         (
             "Node exporter reads host CPU/memory/filesystems. Its Pod-network "
-            "counters are disabled. WireGuard, Cilium/Hubble, authenticated etcd "
+            "counters are disabled. WireGuard has a separate view. Cilium/Hubble, "
+            "authenticated etcd "
             "and private scheduler/controller metrics are pending; no network or "
             "etcd health is inferred from absent data."
         ),
@@ -120,13 +121,71 @@ VIEWS = {
                 ),
                 "short",
             ),
+            ("PostgreSQL collector health", "cnpg_collector_up", "short"),
+            ("Database size", "cnpg_pg_database_size_bytes", "bytes"),
+            (
+                "Replication replay lag",
+                "cnpg_pg_stat_replication_replay_lag_seconds",
+                "s",
+            ),
+            (
+                "Time since successful WAL archive",
+                "cnpg_pg_stat_archiver_seconds_since_last_archival",
+                "s",
+            ),
+            (
+                "Base backup age",
+                "time()-cnpg_collector_last_available_backup_timestamp",
+                "s",
+            ),
+            (
+                "Database transactions",
+                "sum by(datname)(rate(cnpg_pg_stat_database_xact_commit[5m]))",
+                "ops",
+            ),
         ],
         (
-            "Storage metrics are host/device or kubelet observations. PostgreSQL "
-            "replication, SQL latency and backup/archive freshness require the "
-            "CNPG metrics integration; Pod readiness does not establish those "
-            "properties. Independent backup/restore evidence remains in the "
-            "operator ledger."
+            "CNPG exposes all three instances. Replication lag is reported by the "
+            "primary for its replicas; an absent lag series is not zero. SQL "
+            "request latency needs application instrumentation. Backup/WAL age "
+            "does not establish recoverability; independent restore evidence "
+            "remains in the operator ledger."
+        ),
+    ),
+    "network": (
+        "Host mesh and network diagnostics",
+        [
+            ("WireGuard observation success", "klip_wireguard_observation_success", "short"),
+            (
+                "Host observation age",
+                "time()-klip_wireguard_observed_at_seconds",
+                "s",
+            ),
+            ("Expected WireGuard peer present", "klip_wireguard_peer_present", "short"),
+            (
+                "Peer handshake age",
+                "time()-klip_wireguard_last_handshake_seconds",
+                "s",
+            ),
+            (
+                "WireGuard received throughput",
+                "rate(klip_wireguard_received_bytes_total[5m])",
+                "Bps",
+            ),
+            (
+                "WireGuard sent throughput",
+                "rate(klip_wireguard_sent_bytes_total[5m])",
+                "Bps",
+            ),
+            ("Unexpected peers", "klip_wireguard_unknown_peers", "short"),
+        ],
+        (
+            "Read-only host observations use logical peer identities, never keys. "
+            "The six-host full mesh currently has thirty directed peer records. "
+            "A handshake timestamp of zero means no handshake; old handshakes on "
+            "idle links are not sufficient evidence of an outage. Observer failure "
+            "or missing series is not a healthy mesh. Cilium/Hubble flow, drop, "
+            "DNS and path-MTU measurements remain pending."
         ),
     ),
     "telemetry": (
@@ -154,9 +213,9 @@ VIEWS = {
         ],
         (
             "Thanos deduplicates Prometheus replicas; partial query responses are"
-            " disabled. Missing series remain No data. Queue units and actual "
-            "Collector metric names must be checked against the installed binary "
-            "before telemetry delivery acceptance. This view is not proof of "
+            " disabled. Missing series remain No data. Collector queues count "
+            "export requests, not bytes or spans; names match the installed "
+            "0.163.2 metrics. This view is not proof of "
             "object retention or lossless delivery."
         ),
     ),
