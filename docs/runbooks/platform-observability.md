@@ -323,3 +323,25 @@ sources. Prompts, responses and credentials must not enter ordinary telemetry.
 A separate headless `klip-thanos-stores` Service discovers both store replicas
 individually without renaming their StatefulSet or replacing retained claims.
 It is owned by the boundary chart; the upstream Service remains unchanged.
+
+## Host observations and provisioned foundation views
+
+`make telemetry-hosts` installs a hardened, read-only WireGuard observer on the
+six identity-checked CPU hosts, one at a time. It runs `wg show wg0
+latest-handshakes` and `transfer`, never `dump` or a private-key read. Only bounded
+peer names, presence, timestamps and byte counters reach the public textfile.
+A missing peer has presence zero with unavailable timing/counters omitted.
+Unknown kernel peers and exporter failures are explicit. The service has no IP
+network access, only local Netlink, and writes `/var/lib/node_exporter/klip`.
+This public directory is separate from private `/var/lib/klip`; its permissions
+are not relaxed. Node exporter reads it through its existing read-only host mount.
+Source, units and setup are also included in future Ansible host preparation.
+
+The monitoring update adds a private PodMonitor for the actual CNPG `metrics`
+port (9187). Grafana's release provisions the initial platform, cluster, storage
+and telemetry views from versioned JSON, using a mounted ConfigMap and file
+provider. No download container, API token, sidecar or external plugin is needed.
+Dashboard JSON remains literal through Helm even when Grafana legend templates
+contain braces. Source hashes include these definitions and host programs, while
+excluding Python bytecode caches. Missing application/GPU/serving sources remain
+explicitly unavailable; the other eight agreed views follow their instrumentation.

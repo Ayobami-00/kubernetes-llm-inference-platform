@@ -1,6 +1,3 @@
-# First release values, rendered and checked before live installation. Private
-# network policies, workload federation, CRDs, resource/failure headroom and
-# image-security checks must be applied/verified by the release procedure first.
 fullnameOverride: klip-monitoring
 grafana:
   enabled: false
@@ -28,12 +25,17 @@ defaultRules:
 prometheusOperator:
   namespaces:
     releaseNamespace: true
-    additional: [observability-node-agents]
+    additional:
+    - observability-node-agents
   nodeSelector:
     klip.dev.node-restriction.kubernetes.io/platform: 'true'
   resources:
-    requests: {cpu: 100m, memory: 128Mi}
-    limits: {cpu: '1', memory: 512Mi}
+    requests:
+      cpu: 100m
+      memory: 128Mi
+    limits:
+      cpu: '1'
+      memory: 512Mi
   admissionWebhooks:
     failurePolicy: IgnoreOnInstallOnly
     certManager:
@@ -41,8 +43,12 @@ prometheusOperator:
   prometheusConfigReloader:
     enableProbe: true
     resources:
-      requests: {cpu: 10m, memory: 32Mi}
-      limits: {cpu: 200m, memory: 64Mi}
+      requests:
+        cpu: 10m
+        memory: 32Mi
+      limits:
+        cpu: 200m
+        memory: 64Mi
 prometheus:
   serviceAccount:
     name: klip-prometheus
@@ -60,12 +66,15 @@ prometheus:
     replicas: 2
     shards: 1
     replicaExternalLabelName: prometheus_replica
-    externalLabels: {cluster: klip, environment: lab}
+    externalLabels:
+      cluster: klip
+      environment: lab
     retention: 6h
     retentionSize: 15GB
     disableCompaction: true
     enableAdminAPI: false
-    arbitraryFSAccessThroughSMs: {deny: true}
+    arbitraryFSAccessThroughSMs:
+      deny: true
     overrideHonorLabels: true
     enforcedSampleLimit: 50000
     enforcedTargetLimit: 500
@@ -77,28 +86,57 @@ prometheus:
     evaluationInterval: 30s
     logFormat: json
     containers:
-      - name: prometheus
-        env: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
-      - name: thanos-sidecar
-        env: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
+    - name: prometheus
+      env:
+      - name: AWS_EC2_METADATA_DISABLED
+        value: 'true'
+    - name: thanos-sidecar
+      env:
+      - name: AWS_EC2_METADATA_DISABLED
+        value: 'true'
     nodeSelector:
       klip.dev.node-restriction.kubernetes.io/platform: 'true'
     podAntiAffinity: hard
     podAntiAffinityTopologyKey: kubernetes.io/hostname
     resources:
-      requests: {cpu: 500m, memory: 2Gi}
-      limits: {cpu: '2', memory: 4Gi}
+      requests:
+        cpu: 500m
+        memory: 2Gi
+      limits:
+        cpu: '2'
+        memory: 4Gi
     storageSpec:
       volumeClaimTemplate:
         spec:
           storageClassName: klip-gp3
-          accessModes: [ReadWriteOnce]
+          accessModes:
+          - ReadWriteOnce
           resources:
-            requests: {storage: 20Gi}
+            requests:
+              storage: 20Gi
     thanos:
       resources:
-        requests: {cpu: 100m, memory: 256Mi}
-        limits: {cpu: '1', memory: 512Mi}
+        requests:
+          cpu: 100m
+          memory: 256Mi
+        limits:
+          cpu: '1'
+          memory: 512Mi
+  additionalPodMonitors:
+  - name: klip-postgresql
+    namespaceSelector:
+      matchNames:
+      - platform-data
+    selector:
+      matchLabels:
+        cnpg.io/cluster: klip-db
+        cnpg.io/podRole: instance
+    podMetricsEndpoints:
+    - port: metrics
+      path: /metrics
+      interval: 30s
+      scrapeTimeout: 10s
+      scheme: http
 alertmanager:
   serviceAccount:
     name: klip-alertmanager
@@ -112,74 +150,101 @@ alertmanager:
     automountServiceAccountToken: false
     logFormat: json
     containers:
-      - name: alertmanager
-        env: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
+    - name: alertmanager
+      env:
+      - name: AWS_EC2_METADATA_DISABLED
+        value: 'true'
     nodeSelector:
       klip.dev.node-restriction.kubernetes.io/platform: 'true'
     podAntiAffinity: hard
     podAntiAffinityTopologyKey: kubernetes.io/hostname
     resources:
-      requests: {cpu: 50m, memory: 128Mi}
-      limits: {cpu: 300m, memory: 256Mi}
+      requests:
+        cpu: 50m
+        memory: 128Mi
+      limits:
+        cpu: 300m
+        memory: 256Mi
     storage:
       volumeClaimTemplate:
         spec:
           storageClassName: klip-gp3
-          accessModes: [ReadWriteOnce]
+          accessModes:
+          - ReadWriteOnce
           resources:
-            requests: {storage: 1Gi}
+            requests:
+              storage: 1Gi
   config:
     global:
       resolve_timeout: 5m
     route:
       receiver: platform-email
-      group_by: [cluster, namespace, alertname]
+      group_by:
+      - cluster
+      - namespace
+      - alertname
       group_wait: 30s
       group_interval: 5m
       repeat_interval: 4h
       routes:
-        - receiver: 'null'
-          matchers: ['alertname = "Watchdog"']
+      - receiver: 'null'
+        matchers:
+        - alertname = "Watchdog"
     receivers:
-      - name: 'null'
-      - name: platform-email
+    - name: 'null'
+    - name: platform-email
     inhibit_rules:
-      - source_matchers: ['severity = "critical"']
-        target_matchers: ['severity =~ "warning|info"']
-        equal: [cluster, namespace, alertname]
+    - source_matchers:
+      - severity = "critical"
+      target_matchers:
+      - severity =~ "warning|info"
+      equal:
+      - cluster
+      - namespace
+      - alertname
 kube-state-metrics:
-  # Single recoverable exporter; no experimental auto-sharding or duplicated
-  # Kubernetes object series. Two Prometheus instances scrape this same source.
   replicas: 1
-  collectorsExclude: [secrets, configmaps]
+  collectorsExclude:
+  - secrets
+  - configmaps
   nodeSelector:
     klip.dev.node-restriction.kubernetes.io/platform: 'true'
   resources:
-    requests: {cpu: 50m, memory: 128Mi}
-    limits: {cpu: 500m, memory: 256Mi}
+    requests:
+      cpu: 50m
+      memory: 128Mi
+    limits:
+      cpu: 500m
+      memory: 256Mi
 prometheus-node-exporter:
   namespaceOverride: observability-node-agents
   hostNetwork: false
   hostPID: false
   hostIPC: false
-  # Network namespace collectors would describe the Pod rather than the host.
-  # Host network/WireGuard metrics require the separate host instrumentation.
   extraArgs:
-    - --no-collector.netdev
-    - --no-collector.netstat
-    - --no-collector.sockstat
-    - --no-collector.conntrack
-    - --no-collector.ipvs
-    - --no-collector.arp
-    - --no-collector.netclass
-    - --no-collector.wifi
-    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
-    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+  - --no-collector.netdev
+  - --no-collector.netstat
+  - --no-collector.sockstat
+  - --no-collector.conntrack
+  - --no-collector.ipvs
+  - --no-collector.arp
+  - --no-collector.netclass
+  - --no-collector.wifi
+  - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+  - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
+  - --collector.textfile.directory=/host/root/var/lib/node_exporter/klip
   containerSecurityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true
-    capabilities: {drop: [ALL]}
-    seccompProfile: {type: RuntimeDefault}
+    capabilities:
+      drop:
+      - ALL
+    seccompProfile:
+      type: RuntimeDefault
   resources:
-    requests: {cpu: 25m, memory: 64Mi}
-    limits: {cpu: 200m, memory: 128Mi}
+    requests:
+      cpu: 25m
+      memory: 64Mi
+    limits:
+      cpu: 200m
+      memory: 128Mi

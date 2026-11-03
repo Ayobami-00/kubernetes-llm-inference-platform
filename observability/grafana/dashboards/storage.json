@@ -1,0 +1,264 @@
+{
+  "uid": "klip-storage",
+  "title": "KLIP / PostgreSQL and persistent storage",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "utc",
+  "tags": [
+    "klip",
+    "provisioned",
+    "cpu-foundation"
+  ],
+  "refresh": "30s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Scope and interpretation",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 4
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Storage metrics are host/device or kubelet observations. PostgreSQL replication, SQL latency and backup/archive freshness require the CNPG metrics integration; Pod readiness does not establish those properties. Independent backup/restore evidence remains in the operator ledger."
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Database Pod readiness",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "kube_pod_status_ready{namespace=\"platform-data\",pod=~\"klip-db-[0-9]+\",condition=\"true\"}",
+          "legendFormat": "{{instance}} {{namespace}} {{pod}} {{job}} {{exporter}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "PVC available capacity",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 4,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "kubelet_volume_stats_available_bytes{namespace=~\"platform-data|observability\"}",
+          "legendFormat": "{{instance}} {{namespace}} {{pod}} {{job}} {{exporter}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "bytes",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "PVC utilization",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "1-kubelet_volume_stats_available_bytes{namespace=~\"platform-data|observability\"}/kubelet_volume_stats_capacity_bytes{namespace=~\"platform-data|observability\"}",
+          "legendFormat": "{{instance}} {{namespace}} {{pod}} {{job}} {{exporter}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Host disk read latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 12,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(node_disk_read_time_seconds_total[5m])/rate(node_disk_reads_completed_total[5m])",
+          "legendFormat": "{{instance}} {{namespace}} {{pod}} {{job}} {{exporter}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Host disk write latency",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "rate(node_disk_write_time_seconds_total[5m])/rate(node_disk_writes_completed_total[5m])",
+          "legendFormat": "{{instance}} {{namespace}} {{pod}} {{job}} {{exporter}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Database container restarts",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 20,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum by(pod)(increase(kube_pod_container_status_restarts_total{namespace=\"platform-data\"}[15m]))",
+          "legendFormat": "{{instance}} {{namespace}} {{pod}} {{job}} {{exporter}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ],
+  "links": []
+}

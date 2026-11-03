@@ -452,3 +452,32 @@ the store/compactor Pods because upstream component defaults override the global
 seccomp setting. This is a failed acceptance, not a usable retained-metrics path.
 The installation must roll back before a corrected, separately identified plan.
 No GPU is rented while this prerequisite work proceeds.
+
+Thanos subsequently installed at 22:48:15 UTC. The discovery update
+`08af4354d254d5be1b44d9b21dee558c80a1eb2f4e8640abbb0afba5ef6a8d3f`
+completed at 22:59:01 UTC without replacing the store StatefulSet or claims.
+Live queries discovered both hot sidecars and both store gateways with no errors;
+API-server series count was three with deduplication and six without it. Object
+upload and retained-history query remain separate acceptance checks.
+
+The remaining upstream configurations passed native image validation without
+network/credentials in CI `41735004751`. Loki's three monolithic replicas became
+Ready at 23:07:55 UTC; singleton Tempo at 23:11:01 UTC; both Grafana replicas at
+23:16:36 UTC; both persistent-queue Collectors at 23:18:50 UTC. These installation
+observations do not establish telemetry HA or retention by themselves.
+
+Grafana proof `b4e8f209c36d` verified two hosts, database health, the three shared
+datasource identities and deduplicated queries through each replica. A synthetic
+annotation written through one replica was visible through the other and then
+removed. Ingestion proof `ae7c4382f950` sent one explicitly synthetic log/trace
+from a management Pod; both returned HTTP 200 and were retrieved through Grafana.
+No customer content, prompts or credentials were emitted by the probes. Actual
+application SDK instrumentation, host/GPU sources, full diagnostic views, public
+HTTPS and controlled telemetry failures remain pending.
+
+Automatic approval review rejected uploading newly generated Grafana credentials
+to the private project recovery bucket, even after ownership/encryption checks.
+That upload has not occurred. The safer private rollout uses a verified local
+age-encrypted recovery copy and leaves remote credential backup pending explicit
+approval. The local path has a real-age test covering recovery and forbidding
+cloud calls. Operator-disk loss is not covered by this copy.

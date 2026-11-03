@@ -6,7 +6,7 @@
   "scan_workflow_run": 41731963265,
   "configuration": {
     "grafana": {
-      "values_sha256": "b196a8843b2c5191aeb648adc5b97742751b881aafd6801398f5c8f6a1f572db",
+      "values_sha256": "18431c043902650e6c5f88b8fdadad3df198353d891512a7790ad50551eb6b2c",
       "boundary_sha256": "942f2fe39d03f2e260c4f27ed8fc0434c419d1c2faabcca0439b1da499f3dbaa"
     },
     "loki": {

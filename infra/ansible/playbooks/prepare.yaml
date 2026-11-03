@@ -8,3 +8,4 @@
     - role: klip_storage
       when: klip_node.role == 'control_plane'
     - klip_runtime
+    - klip_telemetry

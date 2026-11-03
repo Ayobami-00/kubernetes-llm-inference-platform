@@ -251,6 +251,39 @@ def backend_values(component):
     repository, tag = reference.rsplit(":", 1)
     registry, repository = repository.split("/", 1)
     if component == "grafana":
+        directory = ROOT / "observability/grafana/dashboards"
+        dashboards = {
+            p.name: json.dumps(json.loads(p.read_text()), separators=(",", ":"))
+            for p in sorted(directory.glob("*.json"))
+        }
+        if len(dashboards) != 4 or sum(len(v.encode()) for v in dashboards.values()) > 750000:
+            raise ValueError("Unexpected provisioned dashboard set or ConfigMap size")
+        # extraObjects is evaluated by Helm tpl. A quoted Go string emits
+        # each JSON document literally, preserving Grafana {{label}} templates.
+        manifest = (
+            "apiVersion: v1\nkind: ConfigMap\nmetadata:\n  name: klip-grafana-dashboards\ndata:\n"
+        )
+        for filename, content in dashboards.items():
+            manifest += "  " + filename + ": |-\n    {{ " + json.dumps(content) + " }}\n"
+        values["extraObjects"] = [manifest]
+        values["dashboardsConfigMaps"] = {"klip": "klip-grafana-dashboards"}
+        values["dashboardProviders"] = {
+            "dashboardproviders.yaml": {
+                "apiVersion": 1,
+                "providers": [
+                    {
+                        "name": "klip",
+                        "orgId": 1,
+                        "folder": "KLIP",
+                        "type": "file",
+                        "disableDeletion": True,
+                        "allowUiUpdates": False,
+                        "updateIntervalSeconds": 30,
+                        "options": {"path": "/var/lib/grafana/dashboards/klip"},
+                    }
+                ],
+            }
+        }
         values["image"] = {
             "registry": registry,
             "repository": repository,

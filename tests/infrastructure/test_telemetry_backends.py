@@ -23,6 +23,12 @@ def test_grafana_uses_shared_postgres_and_retained_encryption_key_without_api_ac
     assert not v["grafana.ini"]["unified_alerting"]["enabled"]
     assert "cloudwatch" in v["grafana.ini"]["plugins"]["disable_plugins"]
     assert len(v["datasources"]["datasources.yaml"]["datasources"]) == 3
+    import yaml
+
+    dashboards = yaml.safe_load(v["extraObjects"][0])
+    assert dashboards["kind"] == "ConfigMap" and len(dashboards["data"]) == 4
+    assert v["dashboardsConfigMaps"] == {"klip": "klip-grafana-dashboards"}
+    assert not v.get("dashboards")  # The chart otherwise launches a download container.
 
 
 def test_loki_is_monolithic_and_collector_queues_survive_pod_replacement():

@@ -410,3 +410,7 @@ cluster-verify-storage:
 .PHONY: cluster-verify-ebs
 cluster-verify-ebs:
 	$(PYTHON) scripts/infrastructure/cluster.py verify-ebs
+
+.PHONY: telemetry-hosts
+telemetry-hosts:
+	$(PYTHON) scripts/infrastructure/host_telemetry.py

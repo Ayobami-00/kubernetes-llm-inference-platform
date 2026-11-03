@@ -1,0 +1,7 @@
+---
+- name: Install local public host telemetry without changing networking
+  hosts: all
+  serial: 1
+  become: true
+  gather_facts: false
+  roles: [klip_telemetry]
