@@ -146,6 +146,13 @@ observability-test-notification:
 	@test -n "$(OPERATION)" || (echo 'Set a unique 12-hex OPERATION for this notification'; exit 1)
 	$(PYTHON) scripts/infrastructure/observability.py test-notification --operation "$(OPERATION)"
 
+.PHONY: observability-charts observability-render
+observability-charts:
+	$(PYTHON) scripts/infrastructure/observability_release.py fetch
+
+observability-render:
+	$(PYTHON) scripts/infrastructure/observability_release.py render
+
 .PHONY: management-verify-renewal
 management-verify-renewal:
 	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)

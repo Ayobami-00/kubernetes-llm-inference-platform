@@ -362,3 +362,29 @@ clean formatting/lint. External alerts and the telemetry stack are next, before
 CPU-host loss, so subsequent debugging retains logs beyond Pod deletion. Management
 worker ownership during a real runner Job, GPU lifecycle/inference and the complete
 retained-state rebuild still remain required. No GPU has been allocated.
+
+The retained telemetry foundation is now applied (2026-11-03). Its reviewed
+41-create plan partially succeeded, but SNS rejected wildcard actions in a topic
+resource policy. The original plan/error were retained; explicit supported SNS
+actions were tested and a reviewed three-create repair plan completed. The live
+metrics/logs/traces buckets are encrypted, versioned and public-access blocked.
+Six exact-subject workload roles and an independently hosted management-readiness
+alarm are allocated. The external alarm has accumulated healthy samples and is OK.
+The fixed estimate is $2.60/month plus storage/usage, excluding Kubernetes telemetry
+volumes. Notification confirmation/delivery must be verified separately; no email
+receipt or actual outage detection is claimed by allocation evidence.
+
+Seven upstream chart archives and the initial monitoring images are checksum/digest
+locked. The first monitoring configuration renders 72 objects and validates against
+the pinned Prometheus Operator schemas, using projected API credentials rather
+than the chart's non-expiring token default. It is not installed. Image-security
+review, scoped federation, network policies, query deduplication, remaining
+telemetry backends/views and failure headroom still precede live acceptance.
+
+The combined local infrastructure procedure passes: Terraform validation/mock
+tests/lint, Ansible production-profile lint, static Helm checks, monitoring schema
+validation, 632 Python tests (17 optional skips), Ruff and all 19 current schemas.
+The user reported email confirmation, but the fresh AWS query still reports
+`PendingConfirmation`; the delivery-test command correctly stopped before
+publishing. The unsent test identity is `6ab3c19d8f20`. It may be retried only
+after AWS confirms the destination; no receipt or alert-delivery pass is recorded.

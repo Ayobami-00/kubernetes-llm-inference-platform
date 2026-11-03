@@ -100,6 +100,32 @@ the pricing references before applying. It is an estimate, not a spending cap.
 
 ## Remaining release and acceptance work
 
+`make observability-charts` fetches the seven checksum-locked upstream archives.
+`make observability-render` re-verifies/re-extracts them and renders the monitoring
+release using immutable Linux AMD64 images. It validates monitoring custom
+resources against the schemas from that exact chart and rejects non-expiring API
+tokens, mutable auxiliary images, host networking and missing placement/spreading.
+These checks also run in the infrastructure CI workflow.
+
+The first monitoring values reserve two Prometheus instances (500m/2 GiB each,
+plus 100m/256 MiB sidecars), three Alertmanager instances (50m/128 MiB each),
+one recoverable operator and one recoverable kube-state-metrics exporter. Each
+Linux host gets a 25m/64 MiB node exporter on Pod networking, with read-only host
+mounts and no host PID namespace. These agents require their own narrowly
+privileged namespace for host mounts; do not relax the main observability namespace.
+The values request 43 GiB of retained gp3 storage. These are rendered requirements,
+not allocated volumes or a complete one-host-loss capacity proof.
+
+Prometheus keeps six hours locally and uploads blocks through Thanos sidecars.
+The later Thanos Query release must deduplicate on `prometheus_replica` and the
+compactor must enforce the declared 14-day metric retention. Scraping replicas
+alone do not establish a deduplicated query path. The initial render disables
+private etcd, controller-manager, scheduler and kube-proxy scraping until their
+authenticated endpoints are explicitly configured; do not present those views as
+healthy in the meantime. Image digests are resolved, but vulnerability review,
+network policies, Pod federation, CRD ownership, headroom and server-side checks
+remain mandatory before installation. The render command performs no deployment.
+
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and
 buffered collectors. Tempo 3 distributed mode requires Kafka; the initial small

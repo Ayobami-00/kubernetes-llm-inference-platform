@@ -136,6 +136,9 @@ def main() -> None:
                 raise ValueError("Metadata guard must deny IMDS without isolating all Pod egress")
     (ROOT / "artifacts/helm-rendered.yaml").write_text(rendered.stdout)
     print(f"Rendered and checked {len(documents)} static release resources")
+    from observability_release import render
+
+    render()
 
 
 if __name__ == "__main__":

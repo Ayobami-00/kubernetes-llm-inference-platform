@@ -1,0 +1,148 @@
+# First release values, rendered and checked before live installation. Private
+# network policies, workload federation, CRDs, resource/failure headroom and
+# image-security checks must be applied/verified by the release procedure first.
+fullnameOverride: klip-monitoring
+grafana:
+  enabled: false
+nodeExporter:
+  enabled: true
+kubeEtcd:
+  enabled: false
+kubeControllerManager:
+  enabled: false
+kubeScheduler:
+  enabled: false
+kubeProxy:
+  enabled: false
+defaultRules:
+  rules:
+    etcd: false
+    kubeControllerManager: false
+    kubeSchedulerAlerting: false
+    kubeSchedulerRecording: false
+    kubeProxy: false
+prometheusOperator:
+  nodeSelector:
+    klip.dev.node-restriction.kubernetes.io/platform: 'true'
+  resources:
+    requests: {cpu: 100m, memory: 128Mi}
+    limits: {cpu: '1', memory: 512Mi}
+  admissionWebhooks:
+    certManager:
+      enabled: true
+  prometheusConfigReloader:
+    enableProbe: true
+    resources:
+      requests: {cpu: 10m, memory: 32Mi}
+      limits: {cpu: 200m, memory: 64Mi}
+prometheus:
+  serviceAccount:
+    name: klip-prometheus
+    createTokenSecret: false
+  controlPlaneScrapeClass:
+    enabled: true
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 1
+  thanosService:
+    enabled: true
+  thanosServiceMonitor:
+    enabled: true
+  prometheusSpec:
+    replicas: 2
+    shards: 1
+    replicaExternalLabelName: prometheus_replica
+    externalLabels: {cluster: klip, environment: lab}
+    retention: 6h
+    retentionSize: 15GB
+    disableCompaction: true
+    enableAdminAPI: false
+    scrapeInterval: 30s
+    scrapeTimeout: 10s
+    evaluationInterval: 30s
+    logFormat: json
+    nodeSelector:
+      klip.dev.node-restriction.kubernetes.io/platform: 'true'
+    podAntiAffinity: hard
+    podAntiAffinityTopologyKey: kubernetes.io/hostname
+    resources:
+      requests: {cpu: 500m, memory: 2Gi}
+      limits: {cpu: '2', memory: 4Gi}
+    storageSpec:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: klip-gp3
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests: {storage: 20Gi}
+    thanos:
+      resources:
+        requests: {cpu: 100m, memory: 256Mi}
+        limits: {cpu: '1', memory: 512Mi}
+alertmanager:
+  serviceAccount:
+    name: klip-alertmanager
+    automountServiceAccountToken: false
+  podDisruptionBudget:
+    enabled: true
+    minAvailable: 2
+  alertmanagerSpec:
+    replicas: 3
+    retention: 120h
+    automountServiceAccountToken: false
+    logFormat: json
+    nodeSelector:
+      klip.dev.node-restriction.kubernetes.io/platform: 'true'
+    podAntiAffinity: hard
+    podAntiAffinityTopologyKey: kubernetes.io/hostname
+    resources:
+      requests: {cpu: 50m, memory: 128Mi}
+      limits: {cpu: 300m, memory: 256Mi}
+    storage:
+      volumeClaimTemplate:
+        spec:
+          storageClassName: klip-gp3
+          accessModes: [ReadWriteOnce]
+          resources:
+            requests: {storage: 1Gi}
+  config:
+    global:
+      resolve_timeout: 5m
+    route:
+      receiver: platform-email
+      group_by: [cluster, namespace, alertname]
+      group_wait: 30s
+      group_interval: 5m
+      repeat_interval: 4h
+      routes:
+        - receiver: 'null'
+          matchers: ['alertname = "Watchdog"']
+    receivers:
+      - name: 'null'
+      - name: platform-email
+    inhibit_rules:
+      - source_matchers: ['severity = "critical"']
+        target_matchers: ['severity =~ "warning|info"']
+        equal: [cluster, namespace, alertname]
+kube-state-metrics:
+  # Single recoverable exporter; no experimental auto-sharding or duplicated
+  # Kubernetes object series. Two Prometheus instances scrape this same source.
+  replicas: 1
+  nodeSelector:
+    klip.dev.node-restriction.kubernetes.io/platform: 'true'
+  resources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: 500m, memory: 256Mi}
+prometheus-node-exporter:
+  namespaceOverride: observability-node-agents
+  hostNetwork: false
+  hostPID: false
+  hostIPC: false
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    capabilities: {drop: [ALL]}
+    seccompProfile: {type: RuntimeDefault}
+  resources:
+    requests: {cpu: 25m, memory: 64Mi}
+    limits: {cpu: 200m, memory: 128Mi}
