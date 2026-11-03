@@ -63,6 +63,7 @@ def test_management_spreads_replicas_and_preserves_service_during_disruption():
         if item["kind"] == "PodDisruptionBudget"
     }
     assert set(budgets) == {"api", "worker", "web"}
+
     deployments = [item for item in resources if item["kind"] == "Deployment"]
     for deployment in deployments:
         spec = deployment["spec"]
@@ -77,6 +78,24 @@ def test_management_spreads_replicas_and_preserves_service_during_disruption():
         assert pod["topologySpreadConstraints"][0]["whenUnsatisfiable"] == "DoNotSchedule"
         role = spec["selector"]["matchLabels"]["app.kubernetes.io/component"]
         assert budgets[role]["spec"]["minAvailable"] == 1
+
+
+def test_private_pulls_use_explicit_accounts_and_prepare_migration_account_before_its_job():
+    role = "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-images-pull"
+    docs = render("klip", ["imagePullRoleArn=" + role])
+    accounts = {x["metadata"]["name"]: x for x in docs if x["kind"] == "ServiceAccount"}
+    assert set(accounts) == {"klip-api", "klip-worker", "klip-web", "klip-runner", "klip-migrate"}
+    for account in accounts.values():
+        assert account["metadata"]["annotations"]["eks.amazonaws.com/ecr-role-arn"] == role
+        assert "eks.amazonaws.com/role-arn" not in account["metadata"]["annotations"]
+    migration = accounts["klip-migrate"]["metadata"]["annotations"]
+    assert "pre-install" in migration["helm.sh/hook"]
+    assert int(migration["helm.sh/hook-weight"]) < 0
+    assert "hook-succeeded" not in migration["helm.sh/hook-delete-policy"]
+    for doc in docs:
+        if doc["kind"] in {"Deployment", "Job"}:
+            pod = doc["spec"]["template"]["spec"]
+            assert pod["serviceAccountName"] in accounts
 
 
 @pytest.mark.parametrize(

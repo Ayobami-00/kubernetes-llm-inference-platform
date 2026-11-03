@@ -1,4 +1,9 @@
 {{- define "klip.name" -}}{{ .Release.Name }}{{- end -}}
+{{- define "klip.ecrRoleAnnotation" -}}
+{{- if .Values.imagePullRoleArn }}
+eks.amazonaws.com/ecr-role-arn: {{ .Values.imagePullRoleArn | quote }}
+{{- end }}
+{{- end -}}
 {{- define "klip.artifacts" -}}{{ default (printf "%s-artifacts" .Release.Name) .Values.artifacts.existingClaim }}{{- end -}}
 {{- define "klip.env" -}}
 - name: MANAGEMENT_DATABASE_URL

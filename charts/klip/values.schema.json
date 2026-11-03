@@ -21,6 +21,7 @@
       "required": ["enabled", "minAvailable", "spreadAcrossZones"]
     },
     "terminationGracePeriodSeconds": {"type": "integer", "minimum": 30},
+    "imagePullRoleArn": {"type": "string", "pattern": "^$|^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$"},
     "database": {
       "type": "object",
       "properties": {

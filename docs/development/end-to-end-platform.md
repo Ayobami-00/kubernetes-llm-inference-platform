@@ -216,3 +216,14 @@ Alembic revision 0002 then ran using the real application connector over verifie
 TLS 1.3 as a non-superuser; original row content remained intact. The original local
 database/volume are retained. Application deployment and failover tests remain
 pending; this migration alone does not pass the management HA gate.
+
+Fresh EBS operations also passed beyond the unchanged controller's original
+one-hour maximum credential lifetime. The leader and container remained unchanged,
+all temporary disks were deleted, and a successful scoped STS event was observed.
+This proves continued storage operations after credential renewal for that tested
+controller; other SDK paths and broader availability still need their own evidence.
+
+A retained private image registry is now applied and its live policies verified.
+The pinned upstream ECR helper passed its own tests/build on an existing bounded
+CPU Job, with verified export and cleanup. [Private image delivery](../runbooks/private-images.md)
+still needs host rollout, actual pulls and published management/runner images.

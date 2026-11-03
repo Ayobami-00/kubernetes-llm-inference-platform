@@ -76,6 +76,21 @@ database-migration-verify:
 database-migration-upgrade:
 	$(MANAGEMENT_PYTHON) scripts/infrastructure/database_migration.py upgrade
 
+.PHONY: infra-registry-plan infra-registry-apply registry-verify image-tools-build
+infra-registry-plan:
+	$(OPERATOR) plan --root registry
+
+infra-registry-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the exact reviewed private registry plan'; exit 1)
+	$(OPERATOR) apply --root registry --approve-plan "$(PLAN_SHA)"
+
+registry-verify:
+	$(PYTHON) scripts/infrastructure/platform_registry.py
+
+image-tools-build:
+	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
+	$(PYTHON) scripts/infrastructure/image_tools.py --operation "$(OPERATION)"
+
 .PHONY: identity-collect identity-plan identity-apply identity-verify-public identity-activate identity-verify-federation
 identity-collect:
 	$(PYTHON) scripts/infrastructure/workload_identity.py collect

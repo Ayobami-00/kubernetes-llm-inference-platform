@@ -41,6 +41,7 @@ runner:
   secretRefs: []
   servingNamespace: llm-d
 imagePullSecrets: []
+imagePullRoleArn: ""
 nodeSelector:
   node-role.kubernetes.io/control-plane: ""
 tolerations:

@@ -1,0 +1,29 @@
+{{- if ne .Release.Namespace "klip" }}
+{{- fail "Project image pulls are scoped to the klip namespace" }}
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: klip-image-pull-probe
+  annotations:
+    eks.amazonaws.com/ecr-role-arn: {{ required "roleArn is required" .Values.roleArn | quote }}
+automountServiceAccountToken: false
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata:
+  name: {{ .Release.Name }}-audience
+rules:
+  - apiGroups: [""]
+    # NodeRestriction checks the audience as the resource and SA as its name.
+    resources: [sts.amazonaws.com]
+    resourceNames: [klip-api, klip-worker, klip-web, klip-migrate, klip-runner, klip-image-pull-probe]
+    verbs: [request-serviceaccounts-token-audience]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata:
+  name: {{ .Release.Name }}-audience
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ .Release.Name }}-audience}
+subjects:
+  - {apiGroup: rbac.authorization.k8s.io, kind: Group, name: "system:nodes"}

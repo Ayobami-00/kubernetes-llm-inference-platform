@@ -78,6 +78,7 @@ spec:
       labels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
     spec:
       automountServiceAccountToken: false
+      serviceAccountName: {{ .Release.Name }}-web
       terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
       {{- include "klip.availability" (dict "root" . "role" "web") | nindent 6 }}
       securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, fsGroup: 101}

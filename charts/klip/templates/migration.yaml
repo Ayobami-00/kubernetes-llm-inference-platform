@@ -15,6 +15,7 @@ spec:
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
+      serviceAccountName: {{ .Release.Name }}-migrate
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}

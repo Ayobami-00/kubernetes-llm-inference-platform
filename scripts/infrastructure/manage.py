@@ -101,7 +101,7 @@ def create_plan(
 ) -> dict:
     if root == "bootstrap" and preview:
         raise ValueError("Bootstrap's local first-use plan is real; omit --preview")
-    if root in {"identity", "storage", "storage-access"} and preview:
+    if root in {"identity", "storage", "storage-access", "registry"} and preview:
         raise ValueError(
             "Retained identity/storage uses a real administrator-owned saved plan; omit --preview"
         )
