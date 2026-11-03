@@ -15,6 +15,7 @@ override_data {
   values = { outputs = { platform_manifest = {
     account_id = "127811062476", region = "eu-west-2", project = "kubernetes-llm-inference-platform", cluster_id = "klip",
     network    = { vpc_id = "vpc-00000000000000001", security_group_id = "sg-00000000000000002" }
+    nodes      = { platform-01 = { instance_id = "i-00000000000000001" }, platform-02 = { instance_id = "i-00000000000000002" }, platform-03 = { instance_id = "i-00000000000000003" } }
   } } }
 }
 override_data {
@@ -49,4 +50,24 @@ run "reject_foreign_storage" {
     } } }
   }
   expect_failures = [terraform_data.ownership_guard]
+}
+
+run "ebs_identity_is_bounded_to_the_platform" {
+  command = plan
+  assert {
+    condition     = jsondecode(aws_iam_role.ebs.assume_role_policy).Statement[0].Condition.StringEquals["oidc.klip-lab.click:sub"] == "system:serviceaccount:kube-system:ebs-csi-controller-sa"
+    error_message = "EBS credentials belong only to the exact controller account."
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role_policy.ebs.policy).Statement[1].Condition.Bool["ec2:Encrypted"] == "true" && jsondecode(aws_iam_role_policy.ebs.policy).Statement[1].Condition.StringEquals["ec2:VolumeType"] == "gp3" && jsondecode(aws_iam_role_policy.ebs.policy).Statement[1].Condition.NumericLessThanEquals["ec2:VolumeSize"] == "200"
+    error_message = "Initial CSI creation must be encrypted gp3 and size bounded."
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role_policy.ebs.policy).Statement[3].Condition.StringEquals["ec2:ResourceTag/ebs.csi.aws.com/cluster"] == "true" && jsondecode(aws_iam_role_policy.ebs.policy).Statement[3].Condition.StringEquals["ec2:ResourceTag/klip.dev/cluster"] == "klip"
+    error_message = "CSI cannot operate on untagged or foreign/control-plane disks."
+  }
+  assert {
+    condition     = length(jsondecode(aws_iam_role_policy.ebs.policy).Statement[4].Resource) == 3 && alltrue([for arn in jsondecode(aws_iam_role_policy.ebs.policy).Statement[4].Resource : startswith(arn, "arn:aws:ec2:eu-west-2:127811062476:instance/i-0000000000000000")]) && jsondecode(aws_iam_role_policy.ebs.policy).Statement[2].Condition.StringEquals["ec2:CreateAction"] == "CreateVolume"
+    error_message = "Only current platform instances and creation-time tagging are permitted."
+  }
 }

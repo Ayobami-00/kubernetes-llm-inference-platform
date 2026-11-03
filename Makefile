@@ -166,3 +166,7 @@ identity-verify-injection:
 
 cluster-verify-storage:
 	$(PYTHON) scripts/infrastructure/cluster.py verify-storage
+
+.PHONY: cluster-verify-ebs
+cluster-verify-ebs:
+	$(PYTHON) scripts/infrastructure/cluster.py verify-ebs

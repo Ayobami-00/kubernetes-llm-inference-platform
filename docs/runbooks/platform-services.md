@@ -11,6 +11,7 @@ release names. A Helm success is recorded separately from live acceptance eviden
 make platform-services-fetch
 make platform-service-deploy SERVICE=cert-manager
 make platform-service-deploy SERVICE=klip-workload-identity
+make platform-service-deploy SERVICE=aws-ebs-csi-driver
 make platform-service-deploy SERVICE=aws-efs-csi-driver
 make platform-service-deploy SERVICE=klip-storage
 make identity-verify-injection
@@ -88,3 +89,8 @@ UID/GID 10001 on all three workers, checks all nine cross-worker reads from new 
 then removes exactly those canary files. It never deletes the claim or real artifacts.
 Failed checks preserve partial evidence/data. Job cleanup uses API-side UID preconditions;
 name-reuse conflicts are errors, not permission to delete a replacement resource.
+
+
+The [EBS deployment/acceptance runbook](ebs-storage.md) covers the separate controller
+role, Kubernetes metadata source and encrypted topology-aware class. Its optional
+static-key Secret fallback is disabled. EBS node plugins have no AWS role.

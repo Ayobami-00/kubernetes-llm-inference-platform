@@ -354,7 +354,11 @@ def join_platform() -> dict:
                 raise ValueError("Worker kubelet reservations differ from the platform policy")
             if not all(host.agent("route")["healthy"].values()):
                 raise ValueError("Worker cannot reach every configured API gateway")
-            patch = placement_patch(identity, observed, node["labels"])
+            patch = placement_patch(
+                identity,
+                observed,
+                {**node["labels"], **cloud_metadata_labels(allocation, instances)},
+            )
             cluster.kubectl("patch", "node", name, "--type=json", "-p", json.dumps(patch))
             observations[name] = {
                 "instance_id": node["instance_id"],
@@ -408,6 +412,28 @@ def verify_restricted_kubelet(host, name: str) -> None:
     raise ValueError("Kubelet could assign a protected node label")
 
 
+def cloud_metadata_labels(allocation: dict, instances: list) -> dict:
+    """Supply the metadata required by EBS from authenticated AWS observations."""
+    indexed = {item["InstanceId"]: item for item in instances}
+    if set(indexed) != {node["instance_id"] for node in allocation["nodes"].values()}:
+        raise ValueError("Platform metadata must describe exactly the reviewed CPU identities")
+    for name, node in allocation["nodes"].items():
+        actual = indexed[node["instance_id"]]
+        tags = {t["Key"]: t["Value"] for t in actual.get("Tags", [])}
+        if (
+            actual.get("InstanceType") != allocation["instance_type"]
+            or actual.get("State", {}).get("Name") != "running"
+            or actual.get("Placement", {}).get("AvailabilityZone") != node["availability_zone"]
+            or tags.get("Project") != CONFIG["project"]
+            or tags.get("Node") != name
+        ):
+            raise ValueError("Live platform metadata differs from its reviewed allocation")
+    return {
+        "node.kubernetes.io/instance-type": allocation["instance_type"],
+        "topology.kubernetes.io/region": CONFIG["region"],
+    }
+
+
 def protect_platform() -> dict:
     """Label only previously verified CPU identities, under the operator lock."""
     from cluster import FOLDER, Host, kubectl, load_hosts
@@ -416,6 +442,18 @@ def protect_platform() -> dict:
     allocation = validate_allocation(
         json.loads(tf("platform", "output", "-json", "platform_manifest"))
     )
+    aws = Aws(PROFILES["foundation"])
+    instances = [
+        item
+        for group in aws.call(
+            "ec2",
+            "describe-instances",
+            "--instance-ids",
+            *[node["instance_id"] for node in allocation["nodes"].values()],
+        )["Reservations"]
+        for item in group["Instances"]
+    ]
+    metadata = cloud_metadata_labels(allocation, instances)
     observations = json.loads((FOLDER / "platform-workers.json").read_text())["nodes"]
     hosts = load_hosts()
     for name in CONFIG["nodes"]:
@@ -468,7 +506,7 @@ def protect_platform() -> dict:
         )
         observed = json.loads(kubectl("get", "node", name, "-o", "json"))
         verify_restricted_kubelet(Host(hosts[name]), name)
-        patch = placement_patch(request, observed, node["labels"])
+        patch = placement_patch(request, observed, {**node["labels"], **metadata})
         # Live UID/provider-ID tests prevent a stale observation labelling a replacement.
         kubectl("patch", "node", name, "--type=json", "-p", json.dumps(patch))
         actual = json.loads(kubectl("get", "node", name, "-o", "json"))

@@ -179,3 +179,14 @@ The add-on/mount checkpoint passes 494 root Python tests (17 optional skips), al
 Infrastructure CI fetches checksum-locked service charts before renderer tests, without
 cloud credentials. Source fingerprints now include local Helm templates as well as
 Terraform, Ansible, deployment configuration and operator code.
+
+
+EBS CSI 1.67.2 is now deployed with two spread controllers and three CPU node plugins.
+The exact projected-token role was applied in a two-create plan, with no host privilege
+expansion. Kubernetes metadata labels were reconciled from authenticated AWS identities;
+IMDS restrictions remain enabled. Real tests provisioned one encrypted 1-GiB volume in
+each AZ, passed three writes and three reads after complete detach, verified Retain
+following claim deletion, then confirmed deletion of only the synthetic volumes through
+CSI. The owned namespace/PVs and all three AWS volumes are gone; cleanup is complete.
+See the [EBS runbook](../runbooks/ebs-storage.md). Database deployment/restore and
+management HA remain pending. No GPU has been rented.

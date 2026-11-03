@@ -80,9 +80,10 @@ resource "aws_efs_mount_target" "artifacts" {
 output "storage_access_manifest" {
   description = "Rebuildable VPC connectivity; retained EFS and archives live in a separate state."
   value = {
-    schema_version = "klip-platform-storage-access.v1",
-    account_id     = local.config.account_id, region = local.config.region, project = local.config.project, cluster_id = local.config.cluster_id,
-    vpc_id         = local.foundation.network.vpc_id, security_group_id = aws_security_group.mount_targets.id,
-    mount_targets  = { for name, target in aws_efs_mount_target.artifacts : name => { id = target.id, ip_address = target.ip_address, availability_zone = local.platform.nodes[name].availability_zone } }
+    schema_version          = "klip-platform-storage-access.v1",
+    account_id              = local.config.account_id, region = local.config.region, project = local.config.project, cluster_id = local.config.cluster_id,
+    vpc_id                  = local.foundation.network.vpc_id, security_group_id = aws_security_group.mount_targets.id,
+    ebs_controller_role_arn = aws_iam_role.ebs.arn
+    mount_targets           = { for name, target in aws_efs_mount_target.artifacts : name => { id = target.id, ip_address = target.ip_address, availability_zone = local.platform.nodes[name].availability_zone } }
   }
 }

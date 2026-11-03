@@ -838,6 +838,7 @@ def main() -> None:
             "verify-federation",
             "verify-injection",
             "verify-storage",
+            "verify-ebs",
         ],
     )
     parser.add_argument("--registry", type=Path)
@@ -909,6 +910,10 @@ def main() -> None:
         from issuer_transition import activate
 
         result = activate()
+    elif args.command == "verify-ebs":
+        from ebs_acceptance import verify as verify_ebs
+
+        result = verify_ebs()
     elif args.command == "verify-storage":
         from storage_acceptance import verify as verify_storage
 

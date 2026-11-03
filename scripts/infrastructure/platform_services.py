@@ -25,6 +25,7 @@ RELEASES = {
     "cert-manager": "cert-manager",
     "klip-workload-identity": "identity-system",
     "aws-efs-csi-driver": "kube-system",
+    "aws-ebs-csi-driver": "kube-system",
     "klip-storage": "klip",
 }
 PLACEMENT = {"klip.dev.node-restriction.kubernetes.io/platform": "true"}
@@ -46,9 +47,11 @@ def fetch() -> None:
                     [tool("helm"), "pull", item["oci"], "--destination", str(CACHE)], check=True
                 )
             else:
-                if not item["url"].startswith(
-                    "https://github.com/kubernetes-sigs/aws-efs-csi-driver/releases/download/helm-chart-"
-                ):
+                sources = {
+                    "aws-efs-csi-driver": "https://github.com/kubernetes-sigs/aws-efs-csi-driver/releases/download/helm-chart-",
+                    "aws-ebs-csi-driver": "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-",
+                }
+                if name not in sources or not item["url"].startswith(sources[name]):
                     raise ValueError("Unexpected chart source")
                 with urllib.request.urlopen(item["url"], timeout=60) as response:
                     body = response.read(8 * 1024 * 1024 + 1)
@@ -87,6 +90,10 @@ def digest(image: str) -> str:
 def values_for(release: str, *, storage: dict | None = None) -> dict:
     if release not in RELEASES:
         raise ValueError("Unreviewed service release")
+    if release == "aws-ebs-csi-driver":
+        from ebs_services import values_for_ebs
+
+        return values_for_ebs(storage, digest)
     if release == "klip-workload-identity":
         image = "public.ecr.aws/eks/amazon-eks-pod-identity-webhook"
         return {"image": image + "@" + digest(image + ":v0.6.19")}
@@ -274,10 +281,14 @@ def deploy(release: str) -> dict:
     if len(expected) != 3:
         raise ValueError("Three independently protected platform hosts are required")
     storage = None
-    if release in {"aws-efs-csi-driver", "klip-storage"}:
+    if release in {"aws-efs-csi-driver", "aws-ebs-csi-driver", "klip-storage"}:
         from platform_storage import verify_storage
 
         storage = verify_storage()["allocation"]
+        if release == "aws-ebs-csi-driver":
+            from ebs_services import verify_ebs_identity
+
+            storage = verify_ebs_identity()
         pods = json.loads(
             kubectl(
                 "-n", "identity-system", "get", "deployment", "klip-workload-identity", "-o", "json"
@@ -358,4 +369,8 @@ if __name__ == "__main__":
                 if args.release in {"aws-efs-csi-driver", "klip-storage"}
                 else None
             )
+            if args.release == "aws-ebs-csi-driver":
+                storage = json.loads(
+                    tf("storage-access", "output", "-json", "storage_access_manifest")
+                )
             print(render(args.release, values_for(args.release, storage=storage)))

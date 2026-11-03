@@ -497,3 +497,16 @@ def test_protected_label_probe_rejects_network_errors_and_permitted_self_labels(
     else:
         with pytest.raises((ValueError, RuntimeError)):
             workers.verify_restricted_kubelet(host, "platform-01")
+
+
+def test_cloud_metadata_requires_real_reviewed_instances(platform_allocation, live_resources):
+    labels = workers.cloud_metadata_labels(platform_allocation, live_resources[0])
+    assert labels == {
+        "node.kubernetes.io/instance-type": "m7i.xlarge",
+        "topology.kubernetes.io/region": "eu-west-2",
+    }
+    live_resources[0][0]["InstanceType"] = "m7i.large"
+    with pytest.raises(ValueError, match="differs"):
+        workers.cloud_metadata_labels(platform_allocation, live_resources[0])
+    with pytest.raises(ValueError, match="exactly"):
+        workers.cloud_metadata_labels(platform_allocation, [])

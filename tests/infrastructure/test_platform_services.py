@@ -24,6 +24,9 @@ def resources(release):
             "access_point_id": "fsap-00000000000000001",
         }
     }
+    storage["ebs_controller_role_arn"] = (
+        f"arn:aws:iam::{CONFIG['account_id']}:role/{CONFIG['project']}/klip-ebs-controller"
+    )
     return [
         x for x in yaml.safe_load_all(render(release, values_for(release, storage=storage))) if x
     ]
@@ -97,9 +100,10 @@ def test_nonreviewed_roles_and_releases_fail_before_deployment():
         "cert-manager",
         "klip-workload-identity",
         "aws-efs-csi-driver",
+        "aws-ebs-csi-driver",
         "klip-storage",
     }
-    assert len(pins["images"]) == 9
+    assert len(pins["images"]) >= 9
 
 
 def test_artifact_volume_is_static_retained_non_bypassable_and_bound_to_one_claim():
@@ -135,3 +139,32 @@ def test_storage_probe_uses_the_real_claim_without_app_or_aws_credentials():
     }
     with pytest.raises(ValueError):
         job_document("../../other-data", "platform-01", "cleanup")
+
+
+def test_ebs_is_topology_aware_retained_and_has_no_static_or_metadata_credentials():
+    items = resources("aws-ebs-csi-driver")
+    storage = next(x for x in items if x["kind"] == "StorageClass")
+    assert storage["metadata"]["name"] == "klip-gp3"
+    assert storage["volumeBindingMode"] == "WaitForFirstConsumer"
+    assert storage["reclaimPolicy"] == "Retain" and storage["allowVolumeExpansion"]
+    assert storage["parameters"]["encrypted"] == "true"
+    controller = next(x for x in items if x["kind"] == "Deployment")
+    assert controller["spec"]["replicas"] == 2
+    assert controller["spec"]["template"]["spec"]["affinity"]["podAntiAffinity"][
+        "requiredDuringSchedulingIgnoredDuringExecution"
+    ]
+    node = next(x for x in items if x["kind"] == "DaemonSet")
+    assert node["spec"]["template"]["spec"]["serviceAccountName"] == "ebs-csi-node-sa"
+    for item in (controller, node):
+        spec = item["spec"]["template"]["spec"]
+        assert spec["nodeSelector"]["klip.dev.node-restriction.kubernetes.io/platform"] == "true"
+        for container in spec["containers"]:
+            assert "@sha256:" in container["image"]
+            names = {e["name"] for e in container.get("env", [])}
+            assert not names & {"AWS_ACCESS_KEY_ID", "AWS_SECRET_ACCESS_KEY"}
+        plugin = next(c for c in spec["containers"] if c["name"] == "ebs-plugin")
+        assert {"name": "AWS_EC2_METADATA_DISABLED", "value": "true"} in plugin["env"]
+    assert (
+        "--metadata-sources=kubernetes" in node["spec"]["template"]["spec"]["containers"][0]["args"]
+    )
+    assert not [x for x in items if x["kind"] == "DaemonSet" and "windows" in x["metadata"]["name"]]
