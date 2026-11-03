@@ -87,7 +87,7 @@ infra-registry-apply:
 registry-verify:
 	$(PYTHON) scripts/infrastructure/platform_registry.py
 
-.PHONY: management-init-admin management-stage management-plan management-deploy management-verify
+.PHONY: management-init-admin management-stage management-plan management-deploy management-verify management-evidence
 management-init-admin:
 	$(PYTHON) scripts/infrastructure/management_release.py init-admin
 
@@ -104,6 +104,9 @@ management-deploy:
 
 management-verify:
 	$(PYTHON) scripts/infrastructure/management_acceptance.py
+
+management-evidence:
+	$(PYTHON) scripts/infrastructure/management_acceptance.py bundle
 
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:

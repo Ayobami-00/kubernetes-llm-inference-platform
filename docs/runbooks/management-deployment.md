@@ -15,6 +15,7 @@ make management-stage
 make management-plan RECEIPTS=<downloaded-private-image-receipt-directory>
 make management-deploy PLAN_SHA=<reviewed-release-plan-digest>
 make management-verify
+make management-evidence
 ```
 
 Initialization creates a strong credential only when no local admin file or live
@@ -104,3 +105,20 @@ Then test API/worker loss and PostgreSQL failover using the objectives in
 execution timelines and partial artifacts. The external frontend, real Lambda
 lifecycle, inference stack, telemetry and retained-state rebuild remain separate
 required gates; this release procedure does not establish them.
+
+## First live deployment evidence
+
+The reviewed release completed on 2026-11-03 at 19:03:42 UTC. Live verification
+`6a5d3214f09c` passed at 19:04:09 UTC: two Ready replicas per role, with each role
+spread across two CPU hosts; both API connectors used TLS 1.3 as the non-superuser
+management role; authenticated HTTPS returned the topology and all 21 retained run
+records; all four API/worker Pods read a shared synthetic canary. Cleanup is
+confirmed. These are deployment/connectivity results, not failure-recovery results.
+
+`management-evidence` copies an explicit allowlist of plans, rendered values,
+reference-only credential metadata, image scan receipts, public CA and verification
+records. It verifies image receipt checksums and checks against the actual private
+credential values before copying. No cookie, CSRF token, signing key or password
+belongs in this bundle. Retain the generated manifest and its per-file SHA256
+checksums outside Git. An external frontend/public DNS, certificate renewal,
+application failover and remaining platform gates are still outstanding.

@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import argparse
 import base64
 import hashlib
 import http.client
@@ -13,9 +14,10 @@ import subprocess
 import urllib.request
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 from urllib.parse import urlparse
 
-from common import PROFILES, ROOT, environment, tool, utc_now, write_private
+from common import PROFILES, ROOT, environment, state_home, tool, utc_now, write_private
 from image_release import guard_workloads
 from management_release import ORIGIN, folder
 from smoke import wait_until
@@ -318,5 +320,75 @@ except Exception:
     return report
 
 
+def bundle() -> dict:
+    from cluster import FOLDER
+    from management_release import read_secrets
+
+    plan = json.loads((folder() / "plan.json").read_text())
+    result = json.loads((FOLDER / "management-verification.json").read_text())
+    if (
+        result["status"] != "passed"
+        or result["cleanup_pending"]
+        or result["release_approval"] != plan["approval_sha256"]
+    ):
+        raise ValueError("A completed matching application verification is required")
+    credentials = read_secrets()
+    sensitive = [v.encode() for values in credentials.values() for v in values.values()]
+    database_credential = state_home() / "credentials/management-postgresql.json"
+    sensitive.append(json.loads(database_credential.read_text())["password"].encode())
+    files = {
+        "release-plan.json": folder() / "plan.json",
+        "values.yaml": folder() / "values.yaml",
+        "rendered.yaml": folder() / "rendered.yaml",
+        "credential-references.json": folder() / "credentials.json",
+        "deployment.json": folder() / (plan["approval_sha256"] + ".json"),
+        "verification.json": FOLDER / "management-verification.json",
+        "public-management-ca.crt": folder()
+        / "verification"
+        / result["operation"]
+        / "management-ca.crt",
+        "runtime-image-review.json": ROOT / "deploy/image-risk-review.json",
+    }
+    for component, assessment in plan["image_assessment"]["images"].items():
+        paths = list(Path(plan["receipts"]).rglob(component + ".json"))
+        if (
+            len(paths) != 1
+            or hashlib.sha256(paths[0].read_bytes()).hexdigest() != assessment["receipt_sha256"]
+        ):
+            raise ValueError("An image receipt changed after deployment")
+        files["image-" + component + ".json"] = paths[0]
+    output = ROOT / "artifacts/platform/management-verification" / result["operation"]
+    entries = []
+    for name, source in files.items():
+        if source.is_symlink() or source.stat().st_size > 16 * 1024 * 1024:
+            raise ValueError("Unexpected verification evidence file")
+        data = source.read_bytes()
+        if any(value in data for value in sensitive) or b"-----BEGIN PRIVATE KEY" in data:
+            raise ValueError("Credential material found in verification evidence; output withheld")
+        write_private(output / name, data.decode())
+        entries.append(
+            {"file": name, "bytes": len(data), "sha256": hashlib.sha256(data).hexdigest()}
+        )
+    manifest = {
+        "schema_version": "klip-management-verification-bundle.v1",
+        "operation": result["operation"],
+        "created_at": utc_now(),
+        "source_commit": subprocess.check_output(
+            ["git", "rev-parse", "HEAD"], cwd=ROOT, text=True
+        ).strip(),
+        "image_source_commit": result["image_source_commit"],
+        "files": entries,
+        "limitations": result["limitations"],
+    }
+    write_private(output / "manifest.json", manifest)
+    return {
+        "manifest": str(output / "manifest.json"),
+        "files": len(entries),
+        "secret_scan": "passed",
+    }
+
+
 if __name__ == "__main__":
-    print(json.dumps(verify(), indent=2))
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("action", nargs="?", choices=["verify", "bundle"], default="verify")
+    print(json.dumps(bundle() if parser.parse_args().action == "bundle" else verify(), indent=2))

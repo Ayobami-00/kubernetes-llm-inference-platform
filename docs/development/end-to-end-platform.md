@@ -297,3 +297,15 @@ Local verification passes 560 root tests (17 optional skips), 71 backend tests i
 a disposable database and 17 frontend tests/build/format checks, with current
 schemas/OpenAPI. Live application deployment, TLS/renewal and HA failure acceptance
 still require their own evidence.
+
+The reviewed release has now been applied (2026-11-03 19:03:42 UTC). Live check
+`6a5d3214f09c` passed: six Ready application Pods, required per-role host spreading,
+actual TLS 1.3 PostgreSQL connections from both API Pods as the non-superuser role,
+authenticated internal HTTPS with Secure cookies, 21 retained run records matching
+the database, and shared artifact reads from all four backend Pods. The canary is
+removed. Matching image scans and management CI passed at source `f39cc4f`.
+An encoded allowlisted evidence bundle retains hashes and excludes actual secrets.
+Local checks now include 562 passing root tests (17 optional skips). The private
+deployment is not an external-frontend or failure-recovery proof. Certificate
+rotation, PostgreSQL/application failover, monitoring, live GPU lifecycle and
+destroy/rebuild acceptance remain required. No Lambda GPU has been allocated.
