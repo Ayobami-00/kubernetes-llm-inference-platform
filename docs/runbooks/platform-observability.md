@@ -195,6 +195,15 @@ an unchanged Helm upgrade and requires both monitoring admission configurations
 to use `Fail` with an injected CA. Original release plans, values, logs and terminal
 observations are archived with hashes before the next release is prepared.
 
+Server dry-run uses merge-patch validation to match Helm's ownership semantics;
+it does not claim server-side-apply ownership or force live field adoption. If
+this validation fails before Helm is invoked, inspect the original trace and
+`make monitoring-observe`. With the existing release Ready and no pending Helm
+transition, `make monitoring-reconcile PLAN_SHA=<original-sha>` archives that
+failed pre-Helm attempt without changing workloads. Prepare a new corrected plan.
+An interrupted Helm install/upgrade remains ambiguous and this command refuses
+to retire it or replay the transition automatically.
+
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and
 buffered collectors. Tempo 3 distributed mode requires Kafka; the initial small

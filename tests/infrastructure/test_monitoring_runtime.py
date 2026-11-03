@@ -4,6 +4,7 @@ import copy
 import json
 from unittest.mock import Mock
 
+import cluster
 import monitoring_runtime as runtime
 import platform_resize
 import pytest
@@ -103,3 +104,24 @@ def test_operator_admission_needs_fail_policy_ca_and_exact_service(monkeypatch):
     document["webhooks"][0]["failurePolicy"] = "Fail"
     document["webhooks"][0]["clientConfig"]["caBundle"] = ""
     assert not runtime.admission_fail_closed()
+
+
+def test_only_proven_pre_helm_failures_can_be_retired(monkeypatch, tmp_path):
+    monkeypatch.setattr(runtime, "folder", lambda: tmp_path)
+    monkeypatch.setattr(runtime, "archive_current", Mock())
+    monkeypatch.setattr(runtime, "observe", lambda: {"ready": True})
+    monkeypatch.setattr(cluster, "kubectl", Mock(return_value=""))
+    current = {"approval_sha256": "original", "status": "interrupted"}
+    path = tmp_path / "active.json"
+    path.write_text(json.dumps(current))
+    result = runtime.reconcile("original")
+    assert result["status"] == "failed" and result["failed_before_helm"]
+    current["interrupted_stage"] = "installing"
+    path.write_text(json.dumps(current))
+    with pytest.raises(ValueError, match="ambiguous Helm"):
+        runtime.reconcile("original")
+    current["interrupted_stage"] = "installing-crds"
+    path.write_text(json.dumps(current))
+    monkeypatch.setattr(cluster, "kubectl", Mock(return_value="secret/pending-upgrade"))
+    with pytest.raises(ValueError, match="not stable"):
+        runtime.reconcile("original")

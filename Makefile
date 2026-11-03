@@ -153,7 +153,7 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
-.PHONY: monitoring-prepare monitoring-apply monitoring-observe monitoring-firewall
+.PHONY: monitoring-prepare monitoring-apply monitoring-observe monitoring-firewall monitoring-reconcile
 monitoring-firewall:
 	$(PYTHON) scripts/infrastructure/telemetry_firewall.py
 
@@ -167,6 +167,10 @@ monitoring-apply:
 
 monitoring-observe:
 	$(PYTHON) scripts/infrastructure/monitoring_runtime.py observe
+
+monitoring-reconcile:
+	@test -n "$(PLAN_SHA)" || (echo 'Set the exact interrupted monitoring PLAN_SHA'; exit 1)
+	$(PYTHON) scripts/infrastructure/monitoring_runtime.py reconcile --approve-plan "$(PLAN_SHA)"
 
 .PHONY: platform-resize-prepare platform-resize-apply platform-resize-observe platform-resize-verify
 platform-resize-prepare:

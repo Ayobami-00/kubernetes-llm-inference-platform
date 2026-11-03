@@ -148,7 +148,12 @@ def archive_current():
     original = folder() / (current["approval_sha256"] + ".json")
     plan = json.loads(original.read_text())
     values = folder() / "values.yaml"
-    if values.exists() and sha(yaml.safe_load(values.read_text())) != plan["values_sha256"]:
+    applied = current["status"] == "installed"
+    if (
+        applied
+        and values.exists()
+        and sha(yaml.safe_load(values.read_text())) != plan["values_sha256"]
+    ):
         raise ValueError("Previous release values changed before archival")
     private_dir(destination)
     for name in (
@@ -158,6 +163,8 @@ def archive_current():
         "helm-admission.log",
         "observation.json",
     ):
+        if not applied and name != "active.json":
+            continue  # These files belong to the last successful release, not a rejected plan.
         source = folder() / name
         if source.exists():
             if (destination / name).exists() and (
@@ -179,6 +186,47 @@ def archive_current():
             },
         },
     )
+
+
+def reconcile(approval):
+    """Retire a proven pre-Helm failure; never replay or resolve an ambiguous upgrade."""
+    from cluster import kubectl
+
+    path = folder() / "active.json"
+    current = json.loads(path.read_text())
+    if current["approval_sha256"] != approval:
+        raise ValueError("Reconciliation must identify the original monitoring attempt")
+    if current["status"] == "failed":
+        return current
+    stage = current.get("interrupted_stage")
+    if stage is None and "schemas_established_at" not in current:
+        # Compatibility with the initial installer, which saved this timestamp
+        # only after successful dry-run and before invoking Helm.
+        stage = "installing-crds"
+    if current["status"] != "interrupted" or stage != "installing-crds":
+        raise ValueError("An ambiguous Helm transition requires separate operator recovery")
+    pending = kubectl(
+        "-n",
+        NAMESPACE,
+        "get",
+        "secret",
+        "-l",
+        "owner=helm,name=klip-monitoring,"
+        "status in (pending-install,pending-upgrade,pending-rollback)",
+        "-o",
+        "name",
+    ).strip()
+    if pending or not observe()["ready"]:
+        raise ValueError("Existing monitoring release is not stable for pre-Helm reconciliation")
+    current.update(
+        status="failed",
+        reconciled_at=utc_now(),
+        failed_before_helm=True,
+        reason="Read-only validation failed before Helm; existing release retained",
+    )
+    write_private(path, current)
+    archive_current()
+    return current
 
 
 def admission_fail_closed():
@@ -347,11 +395,12 @@ def apply(approval):
             *[d["metadata"]["name"] for d in definitions],
         )
         rendered = (CACHE / "monitoring-rendered.yaml").read_text()
+        # Validate a merge patch, as Helm uses, without claiming server-side
+        # apply ownership of its existing fields. This remains a server dry-run.
         host.run(
             [
                 *prefix,
                 "apply",
-                "--server-side",
                 "--dry-run=server",
                 "--field-manager=klip-monitoring-review",
                 "-f",
@@ -413,7 +462,10 @@ def apply(approval):
         return active
     except Exception as error:
         active.update(
-            status="interrupted", interrupted_at=utc_now(), error_type=type(error).__name__
+            interrupted_stage=active["status"],
+            status="interrupted",
+            interrupted_at=utc_now(),
+            error_type=type(error).__name__,
         )
         write_private(active_path, active)
         raise
@@ -421,7 +473,7 @@ def apply(approval):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["prepare", "apply", "observe"])
+    parser.add_argument("command", choices=["prepare", "apply", "observe", "reconcile"])
     parser.add_argument("--security-directory", type=Path)
     parser.add_argument("--approve-plan")
     args = parser.parse_args()
@@ -433,6 +485,8 @@ def main():
             result = prepare(args.security_directory)
         elif args.command == "apply":
             result = apply(args.approve_plan)
+        elif args.command == "reconcile":
+            result = reconcile(args.approve_plan)
         else:
             result = observe()
         print(json.dumps(result, indent=2))
