@@ -2,11 +2,19 @@
 
 import base64
 import copy
+import hashlib
 import json
+from types import SimpleNamespace
 
 import pytest
 from cluster_config import kubeadm_documents
-from issuer_transition import bootstrap_extra_args, settings, token_claims, transition_command
+from issuer_transition import (
+    bootstrap_extra_args,
+    restore_owned_manifest,
+    settings,
+    token_claims,
+    transition_command,
+)
 from workload_identity import configuration
 
 LEGACY = configuration()["legacy_issuer"]
@@ -65,6 +73,25 @@ def test_a_signing_key_path_change_is_not_hidden_in_the_transition(original):
     command = [item.replace("/pki/sa.key", "/pki/other.key") for item in original]
     with pytest.raises(ValueError, match="signing-key"):
         transition_command(command, "accept")
+
+
+@pytest.mark.parametrize(
+    "actual,attempted,expected",
+    [
+        ("ours", True, "restored"),
+        ("original", True, "unchanged"),
+        ("other-operator-change", True, "blocked_by_drift"),
+        ("ours", False, "not_attempted"),
+    ],
+)
+def test_rollback_restores_only_our_attempted_write(actual, attempted, expected):
+    writes = []
+    host = SimpleNamespace(
+        run=lambda *args: hashlib.sha256(actual.encode()).hexdigest() + " file",
+        put=lambda *args: writes.append(args),
+    )
+    assert restore_owned_manifest(host, "original", "ours", attempted) == expected
+    assert bool(writes) is (expected == "restored")
 
 
 def test_bootstrap_preserves_repeated_v1beta4_args_and_encryption(allocation):

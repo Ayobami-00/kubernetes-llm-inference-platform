@@ -20,7 +20,7 @@ platform-check:
 platform-schema-fetch:
 	$(PYTHON) scripts/infrastructure/platform_checks.py --fetch-schemas
 
-.PHONY: identity-collect identity-plan identity-apply identity-verify-public identity-activate
+.PHONY: identity-collect identity-plan identity-apply identity-verify-public identity-activate identity-verify-federation
 identity-collect:
 	$(PYTHON) scripts/infrastructure/workload_identity.py collect
 
@@ -36,6 +36,9 @@ identity-verify-public:
 
 identity-activate:
 	$(PYTHON) scripts/infrastructure/cluster.py activate-identity
+
+identity-verify-federation:
+	$(PYTHON) scripts/infrastructure/cluster.py verify-federation
 
 .PHONY: infra-platform-preview infra-platform-plan infra-platform-apply cluster-platform-join cluster-verify-platform
 infra-platform-preview:

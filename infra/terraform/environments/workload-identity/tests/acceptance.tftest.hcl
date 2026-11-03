@@ -7,6 +7,9 @@ mock_provider "aws" {
   mock_resource "aws_cloudfront_distribution" { defaults = {
     arn = "arn:aws:cloudfront::127811062476:distribution/EEXAMPLE", domain_name = "example.cloudfront.net", hosted_zone_id = "Z2FDTNDATAQYW2"
   } }
+  mock_resource "aws_iam_openid_connect_provider" { defaults = {
+    arn = "arn:aws:iam::127811062476:oidc-provider/oidc.klip-lab.click"
+  } }
 }
 mock_provider "aws" {
   alias           = "certificate"
@@ -44,6 +47,14 @@ run "public_metadata_private_origin" {
   assert {
     condition     = length(jsondecode(aws_s3_bucket_policy.issuer.policy).Statement[1].Resource) == 2 && jsondecode(aws_s3_bucket_policy.issuer.policy).Statement[1].Condition.StringEquals["AWS:SourceArn"] == aws_cloudfront_distribution.issuer.arn
     error_message = "Only this distribution may read the two public signing documents."
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role.probe.assume_role_policy).Statement[0].Condition.StringEquals["oidc.klip-lab.click:sub"] == "system:serviceaccount:platform-identity-tests:identity-probe" && jsondecode(aws_iam_role.probe.assume_role_policy).Statement[0].Condition.StringEquals["oidc.klip-lab.click:aud"] == "sts.amazonaws.com"
+    error_message = "The verification role must bind an exact namespace/service account and audience."
+  }
+  assert {
+    condition     = length(jsondecode(aws_iam_role_policy.probe.policy).Statement[0].Action) == 1 && contains(jsondecode(aws_iam_role_policy.probe.policy).Statement[0].Action, "s3:GetObject") && length(jsondecode(aws_iam_role_policy.probe.policy).Statement[0].Resource) == 2
+    error_message = "The probe can only read the two public signing documents; no mutations or application data."
   }
 }
 

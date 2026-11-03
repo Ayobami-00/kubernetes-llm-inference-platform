@@ -8,12 +8,24 @@ import time
 import uuid
 
 import yaml
-from common import CONFIG, source_digest, utc_now, write_private
+from common import CONFIG, PROFILES, Aws, source_digest, utc_now, write_private
 from smoke import wait_until
 from workload_identity import configuration, decoded, verify_public
 
 OWNED_FLAGS = {"service-account-issuer", "service-account-jwks-uri", "api-audiences"}
 MANIFEST = "/etc/kubernetes/manifests/kube-apiserver.yaml"
+
+
+def restore_owned_manifest(host, original: str, candidate: str, attempted: bool) -> str:
+    if not attempted:
+        return "not_attempted"
+    actual = host.run(["sudo", "sha256sum", MANIFEST]).split()[0]
+    if actual == hashlib.sha256(candidate.encode()).hexdigest():
+        host.put(MANIFEST, original)
+        return "restored"
+    if actual == hashlib.sha256(original.encode()).hexdigest():
+        return "unchanged"
+    return "blocked_by_drift"
 
 
 def settings(primary: str) -> list[dict]:
@@ -94,6 +106,7 @@ def activate() -> dict:
     import cluster
     from cluster import FOLDER, Host, load_hosts
 
+    Aws(PROFILES["foundation"]).preflight("foundation")
     verified = verify_public()
     config = configuration()
     public, legacy = "https://" + config["issuer_hostname"], config["legacy_issuer"]
@@ -178,6 +191,21 @@ def activate() -> dict:
     cluster.OPERATION_DEADLINE = time.time() + 1800
     try:
         healthy()
+        initial_config = json.loads(
+            api(
+                name_list[0],
+                "-n",
+                "kube-system",
+                "get",
+                "configmap",
+                "kubeadm-config",
+                "-o",
+                "json",
+            )
+        )
+        initial_bootstrap = yaml.safe_load(initial_config["data"]["ClusterConfiguration"])
+        bootstrap_extra_args(initial_bootstrap.get("apiServer", {}).get("extraArgs", []))
+        write_private(folder / "kubeadm-config-before.json", initial_config)
         documents = {}
         for name in name_list:
             content = Host(hosts[name]).run(["sudo", "cat", MANIFEST])
@@ -220,7 +248,12 @@ def activate() -> dict:
                 before = document["spec"]["containers"][0]["command"]
                 desired = transition_command(before, phase)
                 changed = desired != before
+                document["spec"]["containers"][0]["command"] = desired
+                desired_content = yaml.safe_dump(document)
                 write_private(folder / f"{phase}-{name}-before.yaml", original)
+                report["current_step"] = {"phase": phase, "node": name}
+                save()
+                attempted = False
                 try:
                     if changed:
                         if (
@@ -228,8 +261,8 @@ def activate() -> dict:
                             != hashlib.sha256(original.encode()).hexdigest()
                         ):
                             raise ValueError("Static API manifest changed during issuer planning")
-                        document["spec"]["containers"][0]["command"] = desired
-                        host.put(MANIFEST, yaml.safe_dump(document))
+                        attempted = True
+                        host.put(MANIFEST, desired_content)
                     observer = next(other for other in name_list if other != name)
 
                     def ready(observer=observer, name=name, desired=desired):
@@ -269,8 +302,13 @@ def activate() -> dict:
                     save()
                 except Exception:
                     if changed:
-                        host.put(MANIFEST, original)
-                        report["rollback_requested"] = {"node": name, "phase": phase}
+                        report["rollback"] = {
+                            "node": name,
+                            "phase": phase,
+                            "status": restore_owned_manifest(
+                                host, original, desired_content, attempted
+                            ),
+                        }
                     raise
         for name in name_list:
             token = mint(name, legacy)
@@ -327,8 +365,8 @@ def activate() -> dict:
             api_token_canaries_verified=True,
             sts_audience_isolated=True,
         )
-    except Exception:
-        report.update(status="failed", failed_at=utc_now())
+    except Exception as error:
+        report.update(status="failed", failed_at=utc_now(), error_code=type(error).__name__)
         raise
     finally:
         cluster.OPERATION_DEADLINE = prior_deadline

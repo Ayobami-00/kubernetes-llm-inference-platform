@@ -206,14 +206,43 @@ resource "aws_iam_openid_connect_provider" "cluster" {
   lifecycle { prevent_destroy = true }
 }
 
+# Verification-only identity: no infrastructure or application-data privileges.
+resource "aws_iam_role" "probe" {
+  name                 = "klip-identity-probe"
+  path                 = "/${local.config.project}/"
+  description          = "Exact service-account federation canary; public signing metadata read only"
+  max_session_duration = 3600
+  assume_role_policy = jsonencode({
+    Version = "2012-10-17"
+    Statement = [{
+      Effect    = "Allow", Action = "sts:AssumeRoleWithWebIdentity"
+      Principal = { Federated = aws_iam_openid_connect_provider.cluster.arn }
+      Condition = { StringEquals = {
+        "${local.identity.issuer_hostname}:sub" = "system:serviceaccount:platform-identity-tests:identity-probe"
+        "${local.identity.issuer_hostname}:aud" = local.identity.audience
+      } }
+    }]
+  })
+  tags = local.tags
+}
+resource "aws_iam_role_policy" "probe" {
+  name = "public-signing-metadata-only"
+  role = aws_iam_role.probe.id
+  policy = jsonencode({ Version = "2012-10-17", Statement = [{
+    Effect   = "Allow", Action = ["s3:GetObject"],
+    Resource = [for key in keys(local.documents) : "${aws_s3_bucket.issuer.arn}/${key}"]
+  }] })
+}
+
 output "identity_manifest" {
-  description = "Retained public issuer foundation. Does not grant permissions to any workload."
+  description = "Retained public issuer foundation and a metadata-only verification role."
   value = {
     schema_version   = "klip-workload-identity-allocation.v1"
     account_id       = local.config.account_id, region = local.config.region,
     project          = local.config.project, cluster_id = local.config.cluster_id,
     issuer           = local.issuer, audience = local.identity.audience,
     provider_arn     = aws_iam_openid_connect_provider.cluster.arn,
+    probe_role_arn   = aws_iam_role.probe.arn,
     bucket           = aws_s3_bucket.issuer.id, distribution_id = aws_cloudfront_distribution.issuer.id,
     key_ids          = [for key in var.signing_jwks.keys : key.kid]
     documents_sha256 = { for key, value in local.documents : key => sha256(value) }

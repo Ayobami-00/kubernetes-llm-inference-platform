@@ -790,6 +790,7 @@ def main() -> None:
             "sync-release",
             "verify-platform",
             "activate-identity",
+            "verify-federation",
         ],
     )
     parser.add_argument("--registry", type=Path)
@@ -857,6 +858,10 @@ def main() -> None:
         from issuer_transition import activate
 
         result = activate()
+    elif args.command == "verify-federation":
+        from federation_probe import verify_federation
+
+        result = verify_federation()
     else:
         from cluster_workers import operate_worker
 

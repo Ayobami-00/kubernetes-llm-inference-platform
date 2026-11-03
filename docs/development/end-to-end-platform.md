@@ -114,9 +114,22 @@ all three control planes, and the IAM provider is restricted to the STS audience
 Its origin bucket remains private and contains only two public metadata objects.
 No workload permissions are granted by this publication alone.
 
-The key-preserving, two-phase API issuer transition is implemented with token canaries,
-per-node recovery copies and kubeadm configuration updates; live activation remains
-pending. Exact workload roles, token projection, CSI, durable storage and database
-rollout remain subsequent steps. Local verification passed 460 Python tests (17 optional
-skips), the identity root's two provider-mock cases, Terraform validation, TFLint and
-Ruff/formatting. The workspace declares the public-key verification dependency explicitly.
+After explicit user approval and browser-session renewal, the key-preserving API issuer
+transition completed on all three control planes. Both phases checked API readiness,
+three healthy etcd members and legacy-token compatibility. New-issuer tokens validated
+on every API server; an STS-audience token could not authenticate to the API audience.
+Kubeadm's stored configuration and repository bootstrap settings agree. Canary cleanup
+was confirmed, and private per-node recovery copies remain retained.
+
+The metadata-only IAM canary role was applied through a separate two-create plan.
+Six real projected-token/AWS SDK cases passed: success and scoped S3 reads on every
+platform worker, bucket-list denial, and wrong service-account/namespace/audience
+rejection. The actual role policies were checked before credentials were projected.
+The pinned AWS CLI image ran non-root with a read-only root filesystem and no static
+or metadata-fallback credentials. Probe namespaces were deleted and cleanup confirmed.
+
+CSI/backup roles, supported token injection, durable storage, sustained credential
+renewal and database rollout remain subsequent steps. Local verification passed
+473 Python tests (17 optional skips), the identity root's two provider-mock cases,
+Terraform validation, TFLint, all 19 generated schemas and Ruff/formatting.
+The workspace declares the public-key verification dependency explicitly.
