@@ -162,6 +162,7 @@ def delete_owned_resource(path: str, uid: str) -> None:
     """Delete an allowlisted test resource with an API-side UID precondition."""
     if not re.fullmatch(
         r"/(?:api/v1/namespaces/[a-z0-9-]+|apis/batch/v1/namespaces/[a-z0-9-]+/jobs/[a-z0-9-]+"
+        r"|api/v1/namespaces/klip/pods/klip-api-[a-z0-9]+-[a-z0-9]+"
         r"|apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db-restore)",
         path,
     ) or not re.fullmatch(r"[a-f0-9-]{36}", uid):

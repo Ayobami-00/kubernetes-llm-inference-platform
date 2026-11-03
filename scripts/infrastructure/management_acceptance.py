@@ -96,7 +96,7 @@ def forwarding(log, *, target="service/klip-web"):
 
 def https_probe(port: int | None, ca_file=None, *, handler=None) -> dict:
     jar = http.cookiejar.CookieJar()
-    context = ssl.create_default_context(cafile=str(ca_file))
+    context = ssl.create_default_context(cafile=str(ca_file) if ca_file else None)
     opener = urllib.request.build_opener(
         urllib.request.ProxyHandler({}),
         urllib.request.HTTPCookieProcessor(jar),
@@ -311,7 +311,7 @@ except Exception:
         limitations=[
             "External frontend and public DNS are not tested by a private tunnel",
             "Replica/connection checks do not prove failure recovery",
-            "Certificate rotation and sustained credentials still need live tests",
+            "Certificate rotation and sustained credential renewal are outside this check",
             "No GPU or real inference run is established by this check",
         ],
     )
@@ -357,6 +357,28 @@ def bundle() -> dict:
         ):
             raise ValueError("An image receipt changed after deployment")
         files["image-" + component + ".json"] = paths[0]
+    # These explicitly scoped records contain references/public certificates only.
+    # Never collect the observability receiver or credential directories wholesale.
+    extras = {
+        "frontend-cost.json": FOLDER / "frontend/cost.json",
+        "frontend-activation.json": FOLDER / "frontend/activation.json",
+        "frontend-verification.json": FOLDER / "frontend/verification.json",
+        "frontend-allocation.json": ROOT / "artifacts/platform/management-frontend-allocation.json",
+        "public-ui-verification.json": ROOT
+        / "artifacts/platform/public-management-ui/verification.json",
+    }
+    for category, pattern, name in (
+        ("renewal", "*/verification.json", "renewal"),
+        ("failures", "*/api.json", "api-failure"),
+    ):
+        for path in (folder() / category).glob(pattern):
+            if len(path.parent.name) == 12 and all(
+                c in "0123456789abcdef" for c in path.parent.name
+            ):
+                extras[name + "-" + path.parent.name + ".json"] = path
+    for path in (ROOT / "artifacts/platform/public-management-ui").glob("api-failure-*.json"):
+        extras["public-" + path.name] = path
+    files.update({name: path for name, path in extras.items() if path.is_file()})
     output = ROOT / "artifacts/platform/management-verification" / result["operation"]
     entries = []
     for name, source in files.items():

@@ -133,6 +133,14 @@ management-verify-renewal:
 	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
 	$(PYTHON) scripts/infrastructure/management_renewal.py --operation "$(OPERATION)"
 
+.PHONY: management-public-ui-verify management-verify-api-recovery
+management-public-ui-verify:
+	node scripts/management/public_read_smoke.mjs
+
+management-verify-api-recovery:
+	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
+	node scripts/management/public_read_smoke.mjs --restart-api "$(OPERATION)"
+
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
 	$(PYTHON) scripts/infrastructure/image_credentials.py prepare

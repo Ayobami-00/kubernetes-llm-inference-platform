@@ -133,6 +133,30 @@ LCU: ALB $0.02646/hour, LCU $0.0084/hour, three public IPv4 addresses
 extra LCU/IP usage, data transfer, DNS queries and tax are additional. No new VM or
 GPU is included. Keep the generated cost receipt with the saved infrastructure plan.
 
+After publication, `make management-public-ui-verify` checks real browser
+authentication, the topology/inspector and retained run history through the public
+certificate. It takes only post-login screenshots and exports no trace, video,
+HAR, cookies or browser storage. Its default operation makes no resource mutations.
+
+`make management-verify-api-recovery OPERATION=<stable-12-hex-id>` additionally
+restarts one exact API Pod while independently probing authenticated session reads
+through the public frontend. It verifies the active namespace/release, deployment
+and ReplicaSet ownership, two spread Ready replicas and healthy PostgreSQL before
+submitting a UID-conditional deletion. It waits for two spread replacement replicas.
+An interrupted operation observes its original target rather than deleting another
+Pod. Recorded probes use a one-second interval and two-second timeout; an outage
+shorter than the sampling interval can go unobserved. The recovery upper bound
+starts before preflight and must fit the 60-second API objective. Pod replacement
+time is recorded separately from endpoint availability.
+
+This is a graceful single API Pod loss test. It does not prove abrupt process/host
+failure, worker ownership during a run, PostgreSQL failover or inference resilience.
+Those remain separate required procedures. Partial fault/probe records survive an
+unsuccessful test. Both commands need the workspace dependencies and the pinned
+Playwright browser installed; they read the existing password file in memory and
+log out their own session. Never run the mutating regression suite against the
+live namespace as a substitute for this scoped test.
+
 ## Image review
 
 The first old image pins had critical findings and were held back. Python 3.12.16
@@ -183,6 +207,16 @@ spread across two CPU hosts; both API connectors used TLS 1.3 as the non-superus
 management role; authenticated HTTPS returned the topology and all 21 retained run
 records; all four API/worker Pods read a shared synthetic canary. Cleanup is
 confirmed. These are deployment/connectivity results, not failure-recovery results.
+
+The frontend release completed at 19:28:41 UTC with reviewed digest-addressed
+images from source `e347fc0`. Check `965990a269cb` reconfirmed six spread Ready
+application Pods, verified database TLS and shared artifacts. The three-zone ALB
+then passed exact-target health and authenticated public-certificate HTTPS checks,
+with its two-rule WAF attached. DNS was published by a saved one-alias-create plan.
+The public browser test passed at 19:32:17 UTC, exposing the topology/inspector and
+all 21 retained runs with Secure/HttpOnly cookies and zero browser errors.
+All historical displayed results remain explicitly synthetic. No GPU or live
+inference result is established by these checks.
 
 `management-evidence` copies an explicit allowlist of plans, rendered values,
 reference-only credential metadata, image scan receipts, public CA and verification
