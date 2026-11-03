@@ -26,6 +26,8 @@ from common import (
 from configuration import validate_platform_configuration
 from smoke import ssm_command, wait_until
 
+PROTECTED_LABEL = "klip.dev.node-restriction.kubernetes.io/platform"
+
 
 def validate_allocation(document: dict) -> dict:
     """Allocation is an input, never evidence of live host/Kubernetes readiness."""
@@ -215,7 +217,7 @@ def placement_patch(request: WorkerRequest, node: dict, labels: dict) -> list:
         {"op": "test", "path": "/metadata/uid", "value": request.node_uid},
         {"op": "test", "path": "/spec/providerID", "value": node["spec"]["providerID"]},
     ]
-    for key, value in labels.items():
+    for key, value in {**labels, PROTECTED_LABEL: "true"}.items():
         patch.append(
             {"op": "add", "path": "/metadata/labels/" + key.replace("/", "~1"), "value": value}
         )
@@ -374,3 +376,109 @@ def join_platform() -> dict:
         finally:
             cluster.OPERATION_DEADLINE = prior_deadline
     return {"schema_version": "klip-platform-observation.v1", "nodes": observations}
+
+
+def verify_restricted_kubelet(host, name: str) -> None:
+    """Dry-run a forbidden self-label, using the host's actual kubelet identity."""
+    try:
+        host.run(
+            [
+                "sudo",
+                "kubectl",
+                "--kubeconfig=/etc/kubernetes/kubelet.conf",
+                "patch",
+                "node",
+                name,
+                "--type=merge",
+                "-p",
+                json.dumps(
+                    {
+                        "metadata": {
+                            "labels": {"klip.dev.node-restriction.kubernetes.io/canary": "true"}
+                        }
+                    }
+                ),
+                "--dry-run=server",
+            ]
+        )
+    except RuntimeError as error:
+        if "Forbidden" in str(error) and "not allowed to modify labels" in str(error):
+            return
+        raise
+    raise ValueError("Kubelet could assign a protected node label")
+
+
+def protect_platform() -> dict:
+    """Label only previously verified CPU identities, under the operator lock."""
+    from cluster import FOLDER, Host, kubectl, load_hosts
+
+    Aws(PROFILES["foundation"]).preflight("foundation")
+    allocation = validate_allocation(
+        json.loads(tf("platform", "output", "-json", "platform_manifest"))
+    )
+    observations = json.loads((FOLDER / "platform-workers.json").read_text())["nodes"]
+    hosts = load_hosts()
+    for name in CONFIG["nodes"]:
+        manifest = yaml.safe_load(
+            Host(hosts[name]).run(["sudo", "cat", "/etc/kubernetes/manifests/kube-apiserver.yaml"])
+        )
+        command = manifest["spec"]["containers"][0]["command"]
+        enabled = [
+            arg.split("=", 1)[1].split(",")
+            for arg in command
+            if arg.startswith("--enable-admission-plugins=")
+        ]
+        authorization = [
+            arg.split("=", 1)[1].split(",")
+            for arg in command
+            if arg.startswith("--authorization-mode=")
+        ]
+        disabled = [
+            arg.split("=", 1)[1].split(",")
+            for arg in command
+            if arg.startswith("--disable-admission-plugins=")
+        ]
+        if (
+            not enabled
+            or "NodeRestriction" not in enabled[0]
+            or not authorization
+            or "Node" not in authorization[0]
+            or any("NodeRestriction" in flags for flags in disabled)
+        ):
+            raise ValueError(
+                "Protected placement requires live NodeRestriction and Node authorization "
+                "on every API"
+            )
+    result = {"captured_at": utc_now(), "protected_label": PROTECTED_LABEL, "nodes": {}}
+    for name, node in sorted(allocation["nodes"].items()):
+        previous = observations[name]
+        if previous["instance_id"] != node["instance_id"] or not previous["node_uid"]:
+            raise ValueError("Platform allocation differs from the trusted joined observation")
+        request = WorkerRequest(
+            operation_id="protect-" + uuid.uuid4().hex[:12],
+            deadline=datetime.now(UTC) + timedelta(minutes=5),
+            provider="aws",
+            provider_instance_id=node["instance_id"],
+            node_name=name,
+            node_uid=previous["node_uid"],
+            availability_zone=node["availability_zone"],
+            **{key: node[key] for key in ("public_ip", "private_ip", "wireguard_ip")},
+            access_ref="credential://klip/" + name + "-ssh",
+            registry_revision=json.loads((FOLDER / "peers.json").read_text())["revision"],
+        )
+        observed = json.loads(kubectl("get", "node", name, "-o", "json"))
+        verify_restricted_kubelet(Host(hosts[name]), name)
+        patch = placement_patch(request, observed, node["labels"])
+        # Live UID/provider-ID tests prevent a stale observation labelling a replacement.
+        kubectl("patch", "node", name, "--type=json", "-p", json.dumps(patch))
+        actual = json.loads(kubectl("get", "node", name, "-o", "json"))
+        assert_node_identity(request, actual)
+        if actual["metadata"]["labels"].get(PROTECTED_LABEL) != "true":
+            raise ValueError("Protected platform label did not persist")
+        result["nodes"][name] = {
+            "uid": request.node_uid,
+            "protected": True,
+            "kubelet_self_labelling_denied": True,
+        }
+    write_private(FOLDER / "platform-placement.json", result)
+    return result

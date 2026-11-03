@@ -219,6 +219,11 @@ def test_placement_is_uid_guarded_and_preserves_other_taints(platform_allocation
     }
     patch = workers.placement_patch(candidate, node, allocated["labels"])
     assert patch[0] == {"op": "test", "path": "/metadata/uid", "value": "uid-1"}
+    assert {
+        "op": "add",
+        "path": "/metadata/labels/klip.dev.node-restriction.kubernetes.io~1platform",
+        "value": "true",
+    } in patch
     assert patch[-1]["value"] == [{"key": "other", "effect": "NoSchedule"}]
     node["metadata"]["uid"] = "replacement"
     with pytest.raises(ValueError, match="UID"):
@@ -468,3 +473,27 @@ def test_cilium_uses_the_current_validated_private_api_endpoint(
     write_private(tmp_path / "reports/foundation.json", observation)
     with pytest.raises(ValueError, match="private foundation"):
         cluster.release_arguments("cilium")
+
+
+@pytest.mark.parametrize(
+    "error,accepted",
+    [
+        ("Forbidden: node is not allowed to modify labels", True),
+        ("Forbidden: pods/exec denied", False),
+        ("connection reset", False),
+        (None, False),
+    ],
+)
+def test_protected_label_probe_rejects_network_errors_and_permitted_self_labels(error, accepted):
+    def run(arguments):
+        assert "--kubeconfig=/etc/kubernetes/kubelet.conf" in arguments
+        assert "--dry-run=server" in arguments
+        if error:
+            raise RuntimeError(error)
+
+    host = SimpleNamespace(run=run)
+    if accepted:
+        workers.verify_restricted_kubelet(host, "platform-01")
+    else:
+        with pytest.raises((ValueError, RuntimeError)):
+            workers.verify_restricted_kubelet(host, "platform-01")

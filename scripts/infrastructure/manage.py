@@ -101,9 +101,9 @@ def create_plan(
 ) -> dict:
     if root == "bootstrap" and preview:
         raise ValueError("Bootstrap's local first-use plan is real; omit --preview")
-    if root == "identity" and preview:
+    if root in {"identity", "storage", "storage-access"} and preview:
         raise ValueError(
-            "Retained identity uses a real administrator-owned saved plan; omit --preview"
+            "Retained identity/storage uses a real administrator-owned saved plan; omit --preview"
         )
     if allow_origin_removal and root != "dns":
         raise ValueError("Origin removal applies only to the DNS root")

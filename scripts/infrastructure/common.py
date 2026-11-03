@@ -23,6 +23,8 @@ ROOTS = {
     "probe": TERRAFORM / "environments/network-probe",
     "platform": TERRAFORM / "environments/platform-workers",
     "identity": TERRAFORM / "environments/workload-identity",
+    "storage": TERRAFORM / "environments/platform-storage",
+    "storage-access": TERRAFORM / "environments/platform-storage-access",
 }
 STATE_KEYS = {
     "bootstrap": "state-bootstrap/terraform.tfstate",
@@ -32,6 +34,8 @@ STATE_KEYS = {
     "probe": "network-probe/terraform.tfstate",
     "platform": "platform-workers/terraform.tfstate",
     "identity": "workload-identity/terraform.tfstate",
+    "storage": "platform-storage/terraform.tfstate",
+    "storage-access": "platform-storage-access/terraform.tfstate",
 }
 PROFILES = {
     "bootstrap": "kubernetes-llm-bootstrap",
@@ -41,6 +45,8 @@ PROFILES = {
     "probe": "kubernetes-llm-foundation",
     "platform": "kubernetes-llm-foundation",
     "identity": "kubernetes-llm-bootstrap",
+    "storage": "kubernetes-llm-bootstrap",
+    "storage-access": "kubernetes-llm-bootstrap",
 }
 
 
@@ -163,7 +169,7 @@ class Aws:
         identity = self.call("sts", "get-caller-identity")
         if identity["Account"] != CONFIG["account_id"]:
             raise ValueError("Wrong AWS account; refusing to proceed")
-        if root in {"bootstrap", "identity"}:
+        if root in {"bootstrap", "identity", "storage", "storage-access"}:
             expected = f"arn:aws:iam::{CONFIG['account_id']}:user/{CONFIG['source_user']}"
             valid = identity["Arn"] == expected
         else:

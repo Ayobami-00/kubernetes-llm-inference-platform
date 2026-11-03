@@ -13,16 +13,21 @@ and PostgreSQL image still require digest verification before installation.
 
 ## Prerequisites
 
-- Three persistent worker hosts labelled `klip.dev/node-role=platform`, with observed
+- Three persistent worker hosts labelled `klip.dev.node-restriction.kubernetes.io/platform=true`, with observed
   `topology.kubernetes.io/zone` labels and enough resources after one host loss.
 - Retained, encrypted, topology-aware RWO storage for independent data and WAL claims.
 - Compatible CloudNativePG and Barman operators, including their certificate prerequisites.
 - An existing application Secret of type `kubernetes.io/basic-auth`, with `username`
   matching `owner` and a `password`. Never put its values in Helm arguments or Git.
-- A dedicated archive prefix and scoped AWS identity. The current Secret binding expects
-  `access-key-id`, `secret-access-key`, `session-token` and `region`. Production identity
-  renewal must be integrated and tested before relying on scheduled backups; a one-time
-  expiring credential is insufficient.
+- A dedicated archive prefix and scoped AWS identity. Production uses
+  `backup.authentication=webIdentity`, `backup.roleArn` and an empty credentialsSecret,
+  with verified projected-token injection and SDK renewal. The chart sets the exact
+  service-account role annotation and `inheritFromIAMRole` for Barman. The compatible
+  Secret mode expects `access-key-id`, `secret-access-key`, `session-token` and `region`;
+  a one-time expiring credential is insufficient for production.
+- An isolated database namespace (`platform-data` for the live environment). Set
+  `networkPolicy.managementNamespace=klip`; its namespace and Pod selectors are combined.
+  See the [retained storage runbook](../../docs/runbooks/platform-storage.md).
 - The live application connects to `<release>-rw.<namespace>.svc`, verifies TLS against
   `<release>-ca`, and uses the matching database role. The management HA overlay mounts
   that CA for migrations, API and workers.

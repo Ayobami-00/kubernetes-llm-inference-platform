@@ -51,6 +51,9 @@ infra-platform-apply:
 	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed platform plan digest'; exit 1)
 	$(OPERATOR) apply --root platform --approve-plan "$(PLAN_SHA)"
 
+cluster-platform-protect:
+	$(PYTHON) scripts/infrastructure/cluster.py platform-protect
+
 cluster-platform-join:
 	$(PYTHON) scripts/infrastructure/cluster.py platform-join
 
@@ -130,3 +133,21 @@ cluster-backup:
 	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py backup
 cluster-acceptance:
 	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py acceptance
+
+.PHONY: storage-plan storage-apply storage-access-plan storage-access-apply storage-verify cluster-platform-protect
+storage-plan:
+	$(OPERATOR) plan --root storage
+
+storage-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed retained-storage plan digest'; exit 1)
+	$(OPERATOR) apply --root storage --approve-plan "$(PLAN_SHA)"
+
+storage-access-plan:
+	$(OPERATOR) plan --root storage-access
+
+storage-access-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed storage-access plan digest'; exit 1)
+	$(OPERATOR) apply --root storage-access --approve-plan "$(PLAN_SHA)"
+
+storage-verify:
+	$(PYTHON) scripts/infrastructure/platform_storage.py

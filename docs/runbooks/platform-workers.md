@@ -123,3 +123,16 @@ implement and verify that procedure before destructive acceptance.
 The final workflow must drain workloads, verify backup/restore material, remove
 Kubernetes/mesh identities by UID, disable protection through a reviewed plan and
 then destroy this allocation. Retained data and bootstrap state are separate owners.
+
+
+## Protected placement
+
+`make cluster-platform-protect` rechecks Node authorization and NodeRestriction on
+all three API servers and applies `klip.dev.node-restriction.kubernetes.io/platform=true`
+only to the recorded CPU instance/node UIDs. Each actual kubelet must fail a server-side
+dry-run self-label attempt. Other errors fail the verification. Normal platform joins
+also add this administrator-owned label after readiness checks. Management, runner and
+PostgreSQL placements use it; the older `klip.dev/node-role` label is descriptive.
+This prevents an ephemeral kubelet from self-selecting platform credentials/workloads.
+The command does not join, reboot or replace hosts. Results are retained in
+`cluster/platform-placement.json` in operator state.

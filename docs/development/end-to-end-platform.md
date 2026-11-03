@@ -133,3 +133,23 @@ renewal and database rollout remain subsequent steps. Local verification passed
 473 Python tests (17 optional skips), the identity root's two provider-mock cases,
 Terraform validation, TFLint, all 19 generated schemas and Ruff/formatting.
 The workspace declares the public-key verification dependency explicitly.
+
+
+The committed-code identity repeat passed all six SDK cases; live manifests and
+kubeadm configuration agree and an issuer replay would make no changes. Protected
+platform placement is enabled on the three recorded CPU UIDs. Each kubelet's real
+identity was denied a dry-run attempt to self-assign a protected label. The protected
+selector is now used by the HA application/database overlays and identity probes.
+
+
+Retained storage and its separate connectivity state were applied from create-only
+saved plans. Live read-back verified regional EFS encryption, non-root access-point
+ownership, TLS/path/root denials, S3 versioning/encryption/recovery retention and exact
+workload role policies. All three workers reached their local-AZ mount target over
+TCP 2049. No GPU or new compute was allocated. CSI mounts, successful backup recovery
+points, database archiving/restoration and sustained identity renewal are still unproven.
+The example storage budget is documented in the [storage runbook](../runbooks/platform-storage.md).
+Database initialization/recovery templates validate against the pinned CRDs in both
+Secret and projected-token modes. Local verification passed 479 Python tests (17
+optional skips), four new Terraform mock cases, both storage lint checks, all 19
+schemas and Ruff/formatting. Application/database rollout remains pending.

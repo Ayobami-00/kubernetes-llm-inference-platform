@@ -4,7 +4,7 @@ replicas: {api: 2, worker: 2, web: 2}
 nodeSelector:
   # Helm merges maps: explicitly remove the chart's historical control-plane key.
   node-role.kubernetes.io/control-plane: null
-  klip.dev/node-role: platform
+  klip.dev.node-restriction.kubernetes.io/platform: "true"
 tolerations: []
 availability:
   enabled: true
@@ -17,7 +17,7 @@ database:
 runner:
   nodeSelector:
     node-role.kubernetes.io/control-plane: null
-    klip.dev/node-role: platform
+    klip.dev.node-restriction.kubernetes.io/platform: "true"
   tolerations: []
   resources:
     requests: {cpu: "1", memory: 512Mi}

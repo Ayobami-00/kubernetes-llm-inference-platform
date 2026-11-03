@@ -787,6 +787,7 @@ def main() -> None:
             "probe-register",
             "probe-cleanup",
             "platform-join",
+            "platform-protect",
             "sync-release",
             "verify-platform",
             "activate-identity",
@@ -848,6 +849,10 @@ def main() -> None:
         from platform_workers import join_platform
 
         result = join_platform()
+    elif args.command == "platform-protect":
+        from platform_workers import protect_platform
+
+        result = protect_platform()
     elif args.command == "sync-release":
         result = sync_release(args.release)
     elif args.command == "verify-platform":

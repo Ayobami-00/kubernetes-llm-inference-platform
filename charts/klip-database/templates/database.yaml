@@ -14,6 +14,11 @@
 {{- if and (eq .Values.bootstrap.mode "recovery") (eq $destination .Values.bootstrap.recovery.destinationPath) (eq .Release.Name .Values.bootstrap.recovery.serverName) }}
 {{- fail "Recovery must use a new cluster identity or archive prefix to preserve the source archive" }}
 {{- end }}
+{{- if eq .Values.backup.authentication "webIdentity" }}
+{{- if or (not (regexMatch "^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$" .Values.backup.roleArn)) .Values.backup.credentialsSecret }}
+{{- fail "webIdentity requires an exact backup.roleArn and no backup.credentialsSecret" }}
+{{- end }}
+{{- end }}
 apiVersion: postgresql.cnpg.io/v1
 kind: Cluster
 metadata:
@@ -22,6 +27,14 @@ metadata:
 spec:
   instances: 3
   imageName: {{ .Values.imageName | quote }}
+  {{- if eq .Values.backup.authentication "webIdentity" }}
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        eks.amazonaws.com/role-arn: {{ .Values.backup.roleArn | quote }}
+        eks.amazonaws.com/sts-regional-endpoints: "true"
+        eks.amazonaws.com/token-expiration: "3600"
+  {{- end }}
   enableSuperuserAccess: false
   enablePDB: true
   failoverDelay: 30
@@ -122,6 +135,9 @@ spec:
     name: barman-cloud.cloudnative-pg.io
 {{- define "klip-database.credentials" }}
 s3Credentials:
+  {{- if eq .Values.backup.authentication "webIdentity" }}
+  inheritFromIAMRole: true
+  {{- else }}
   region:
     name: {{ .Values.backup.credentialsSecret }}
     key: region
@@ -134,4 +150,5 @@ s3Credentials:
   sessionToken:
     name: {{ .Values.backup.credentialsSecret }}
     key: session-token
+  {{- end }}
 {{- end }}

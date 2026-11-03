@@ -1,0 +1,6 @@
+{
+  "schema_version": "klip-platform-storage.v1",
+  "artifacts": {"uid": 10001, "gid": 10001, "path": "/artifacts", "permissions": "0770", "throughput_mode": "elastic"},
+  "database": {"namespace": "platform-data", "service_accounts": ["klip-db", "klip-db-restore"], "archive_prefix": "postgresql", "recovery_window_days": 30, "noncurrent_retention_days": 45},
+  "efs_node_service_account": "system:serviceaccount:kube-system:efs-csi-node-sa"
+}

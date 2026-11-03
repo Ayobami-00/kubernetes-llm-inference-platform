@@ -69,7 +69,7 @@ def test_management_spreads_replicas_and_preserves_service_during_disruption():
         assert spec["replicas"] == 2
         assert spec["strategy"]["rollingUpdate"] == {"maxSurge": 0, "maxUnavailable": 1}
         pod = spec["template"]["spec"]
-        assert pod["nodeSelector"] == {"klip.dev/node-role": "platform"}
+        assert pod["nodeSelector"] == {"klip.dev.node-restriction.kubernetes.io/platform": "true"}
         assert not pod["tolerations"]
         anti = pod["affinity"]["podAntiAffinity"]["requiredDuringSchedulingIgnoredDuringExecution"]
         assert anti[0]["topologyKey"] == "kubernetes.io/hostname"
@@ -109,7 +109,7 @@ def test_database_tls_applies_to_migration_api_and_worker():
         assert env["MANAGEMENT_DATABASE_CA_FILE"] == "/run/secrets/database/ca.crt"
         if resource["kind"] == "Deployment":
             assert json.loads(env["MANAGEMENT_RUNNER_NODE_SELECTOR"]) == {
-                "klip.dev/node-role": "platform"
+                "klip.dev.node-restriction.kubernetes.io/platform": "true"
             }
             assert json.loads(env["MANAGEMENT_RUNNER_TOLERATIONS"]) == []
         volume = next(item for item in pod["volumes"] if item["name"] == "database-ca")
@@ -240,3 +240,39 @@ def test_unknown_custom_resource_fields_cannot_be_silently_pruned():
     validator.validate({"policy": {"durable": True}, "labels": {"arbitrary": "value"}})
     with pytest.raises(jsonschema.ValidationError):
         validator.validate({"policy": {"misspelledDurability": True}})
+
+
+def test_database_web_identity_has_no_static_credentials_and_is_namespace_scoped():
+    resources = render(
+        "klip-database",
+        [
+            "backup.authentication=webIdentity",
+            "backup.credentialsSecret=",
+            "backup.roleArn=arn:aws:iam::127811062476:role/fixture-backup",
+            "networkPolicy.managementNamespace=management-fixture",
+        ],
+    )
+    db = next(x for x in resources if x["kind"] == "Cluster")
+    assert (
+        db["spec"]["serviceAccountTemplate"]["metadata"]["annotations"][
+            "eks.amazonaws.com/role-arn"
+        ]
+        == "arn:aws:iam::127811062476:role/fixture-backup"
+    )
+    store = next(x for x in resources if x["kind"] == "ObjectStore")
+    assert store["spec"]["configuration"]["s3Credentials"] == {"inheritFromIAMRole": True}
+    policy = next(x for x in resources if x["kind"] == "NetworkPolicy")
+    clients = policy["spec"]["ingress"][1]["from"]
+    assert len(clients) == 1
+    assert clients[0]["namespaceSelector"]["matchLabels"] == {
+        "kubernetes.io/metadata.name": "management-fixture"
+    }
+    assert "podSelector" in clients[0]  # AND, not an unrestricted namespace OR.
+    assert "webIdentity requires" in render(
+        "klip-database",
+        [
+            "backup.authentication=webIdentity",
+            "backup.roleArn=arn:aws:iam::127811062476:role/fixture-backup",
+        ],
+        success=False,
+    )

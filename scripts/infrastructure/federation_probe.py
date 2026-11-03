@@ -114,7 +114,7 @@ def job_document(
         raise ValueError("Only the metadata-only canary role may be tested")
     if bucket != f"klip-identity-{CONFIG['account_id']}-{CONFIG['region']}":
         raise ValueError("Only the public-metadata origin bucket may be tested")
-    selector = {"klip.dev/node-role": "platform"}
+    selector = {"klip.dev.node-restriction.kubernetes.io/platform": "true"}
     if node:
         selector["kubernetes.io/hostname"] = node
     environment = {

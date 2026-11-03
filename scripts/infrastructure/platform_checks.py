@@ -88,7 +88,7 @@ def validate_custom_resources(resources, schemas):
     return checked
 
 
-def render_database(*, recovery=False):
+def render_database(*, recovery=False, web_identity=False):
     helm = ROOT / "artifacts/tools/bin/helm"
     executable = str(helm) if helm.is_file() else shutil.which("helm")
     if not executable:
@@ -102,6 +102,15 @@ def render_database(*, recovery=False):
         "backup.destinationPath": "s3://fixture-backups/new",
         "backup.credentialsSecret": "fixture-aws",
     }
+    if web_identity:
+        values.update(
+            {
+                "backup.authentication": "webIdentity",
+                "backup.credentialsSecret": "",
+                "backup.roleArn": "arn:aws:iam::127811062476:role/fixture-backup",
+                "networkPolicy.managementNamespace": "klip",
+            }
+        )
     if recovery:
         values.update(
             {
@@ -131,8 +140,8 @@ def main():
     parser.add_argument("--fetch-schemas", action="store_true")
     args = parser.parse_args()
     schemas = load_schemas(fetch=args.fetch_schemas)
-    for recovery in (False, True):
-        resources = render_database(recovery=recovery)
+    for recovery, web_identity in ((False, False), (True, False), (False, True), (True, True)):
+        resources = render_database(recovery=recovery, web_identity=web_identity)
         count = validate_custom_resources(resources, schemas)
         # Confirm the strict schema catches misspelled options rather than silently
         # pruning a durability policy. This is a schema check, never a live probe.

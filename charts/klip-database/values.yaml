@@ -9,7 +9,7 @@ walStorage:
   storageClass: ""
   size: 20Gi
 nodeSelector:
-  klip.dev/node-role: platform
+  klip.dev.node-restriction.kubernetes.io/platform: "true"
 resources:
   requests: {cpu: 500m, memory: 1Gi}
   limits: {cpu: "2", memory: 2Gi}
@@ -23,7 +23,9 @@ bootstrap:
     serverName: ""
 backup:
   destinationPath: ""
+  authentication: secret
   credentialsSecret: ""
+  roleArn: ""
   retentionPolicy: 30d
   schedule: "0 0 2 * * *"
 monitoring:
@@ -31,5 +33,7 @@ monitoring:
 networkPolicy:
   enabled: true
   managementRelease: klip
+  # Empty preserves same-namespace deployments. Live HA uses klip / platform-data.
+  managementNamespace: ""
   operatorNamespace: cnpg-system
   monitoringNamespace: observability

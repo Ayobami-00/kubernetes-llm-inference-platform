@@ -13,7 +13,10 @@ spec:
             matchLabels: {cnpg.io/cluster: {{ .Release.Name }}}
       ports: [{protocol: TCP, port: 5432}, {protocol: TCP, port: 8000}]
     - from:
-        - podSelector:
+        - namespaceSelector:
+            matchLabels:
+              kubernetes.io/metadata.name: {{ default .Release.Namespace .Values.networkPolicy.managementNamespace }}
+          podSelector:
             matchLabels:
               app.kubernetes.io/name: {{ .Values.networkPolicy.managementRelease }}
             matchExpressions:
