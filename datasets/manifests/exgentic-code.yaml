@@ -1,0 +1,25 @@
+schema_version: '0.1'
+id: exgentic-code
+revision: 1
+notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+source:
+  url: https://huggingface.co/datasets/Exgentic/agent-llm-traces-v2
+  revision: 4b8ad4ab198438e5a170f9171c19c6a2cf7c1814
+  subset: SWE-bench coding sessions
+  license: null
+  filters:
+    benchmark: swebench
+format: exgentic_snapshot
+interaction: session
+references: not_available
+timing_provenance: recorded_trace
+preparation:
+- Confirm the pinned source revision matches the selected AIPerf release before preparation.
+- Select bounded sessions; preserve recorded messages, tool schemas, call controls and residual delays.
+- Filter unsupported rendered contexts and report exclusion counts; never silently truncate.
+- Preserve session identities and response-dependent ordering without executing tools.
+limitations:
+- The source revision is the documented AIPerf v0.13.0 default; preparation has not run.
+- No tools execute and live responses do not change later recorded contexts.
+- Replay cannot measure SWE-bench resolution rate or complete agent quality.
+prepared: null

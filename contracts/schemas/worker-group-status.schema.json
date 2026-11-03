@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "ErrorInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorInfo",
+      "type": "object"
+    },
+    "WorkerCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "allocated_instances": {
+          "minimum": 0,
+          "title": "Allocated Instances",
+          "type": "integer"
+        },
+        "desired_instances": {
+          "minimum": 0,
+          "title": "Desired Instances",
+          "type": "integer"
+        },
+        "gpu_ready_nodes": {
+          "minimum": 0,
+          "title": "Gpu Ready Nodes",
+          "type": "integer"
+        },
+        "joined_nodes": {
+          "minimum": 0,
+          "title": "Joined Nodes",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "desired_instances",
+        "allocated_instances",
+        "joined_nodes",
+        "gpu_ready_nodes"
+      ],
+      "title": "WorkerCounts",
+      "type": "object"
+    },
+    "WorkerMember": {
+      "additionalProperties": false,
+      "properties": {
+        "error": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/ErrorInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "node_name": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Name"
+        },
+        "node_uid": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Node Uid"
+        },
+        "phase": {
+          "enum": [
+            "allocated",
+            "configuring",
+            "joining",
+            "gpu_ready",
+            "failed",
+            "terminated"
+          ],
+          "title": "Phase",
+          "type": "string"
+        },
+        "provider_instance_id": {
+          "minLength": 1,
+          "title": "Provider Instance Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "provider_instance_id",
+        "phase"
+      ],
+      "title": "WorkerMember",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/worker-group-status.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "active_operation_id": {
+      "anyOf": [
+        {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Active Operation Id"
+    },
+    "allocated_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Allocated At"
+    },
+    "counts": {
+      "$ref": "#/$defs/WorkerCounts"
+    },
+    "expires_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Expires At"
+    },
+    "members": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/WorkerMember"
+      },
+      "title": "Members",
+      "type": "array"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "phase": {
+      "enum": [
+        "allocating",
+        "joining",
+        "ready",
+        "partial_failure",
+        "draining",
+        "expired",
+        "failed"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "worker_group_ref": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+      "title": "Worker Group Ref",
+      "type": "string"
+    }
+  },
+  "required": [
+    "worker_group_ref",
+    "phase",
+    "counts",
+    "observed_at"
+  ],
+  "title": "WorkerGroupStatus",
+  "type": "object"
+}

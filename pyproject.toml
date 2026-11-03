@@ -1,0 +1,24 @@
+[project]
+name = "kubernetes-llm-inference-platform"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = []
+
+[tool.uv]
+package = false
+
+[tool.uv.workspace]
+members = ["packages/platform-contracts"]
+
+[dependency-groups]
+dev = ["pytest>=8,<10", "ruff>=0.9,<1", "jsonschema>=4,<5"]
+
+[tool.pytest.ini_options]
+testpaths = ["packages/platform-contracts/tests"]
+
+[tool.ruff]
+target-version = "py312"
+line-length = 100
+
+[tool.ruff.lint]
+select = ["E", "F", "I", "UP", "B"]

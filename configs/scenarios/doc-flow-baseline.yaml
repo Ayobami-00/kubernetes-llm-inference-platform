@@ -1,0 +1,37 @@
+schema_version: '0.1'
+id: doc-flow-baseline
+revision: 1
+notes: DRAFT deterministic experiment configuration; arrival rates are assumptions, not customer telemetry.
+seed: 42
+participants:
+- doc-flow@1
+warmup:
+  duration_s: 60
+  datasets: {}
+phases:
+- id: steady
+  duration_s: 180
+  arrivals:
+    doc-flow:
+      pattern: poisson
+      unit: request
+      rate: 0.25
+      per: second
+- id: burst
+  duration_s: 60
+  arrivals:
+    doc-flow:
+      pattern: poisson
+      unit: request
+      rate: 0.75
+      per: second
+- id: recovery
+  duration_s: 360
+  arrivals:
+    doc-flow:
+      pattern: poisson
+      unit: request
+      rate: 0.25
+      per: second
+faults: []
+drain_timeout_s: 120

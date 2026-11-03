@@ -27,3 +27,81 @@ flowchart TB
     P -.-> B
     P -.-> S
 ```
+
+## Shared contracts
+
+The first implemented layer is an offline Python contract package. It defines customer requirements,
+traffic scenarios, frozen run inputs and results, Lambda worker groups, serving profiles, operation
+progress, and infrastructure inventory. It includes all five customer examples:
+
+| Customer | Workload | Dataset basis | Serving candidate |
+| --- | --- | --- | --- |
+| WriterAssist | Sentence correction | JFLEG | Dedicated Qwen3-4B |
+| CodeAgent | Recorded coding-call replay | Exgentic v2 / SWE-bench | Dedicated Qwen3-235B-A22B |
+| TutorChat | Multi-turn tutoring | MathDial | Provisioned share of Qwen3-8B |
+| DocFlow | Document-text extraction | CUAD | Best-effort Qwen3-14B |
+| ResearchAgent | Prepared research QA steps | HotpotQA | Provisioned share of the same Qwen3-14B |
+
+All traffic, SLO and hardware settings are experimental defaults. The source manifests are not
+prepared datasets, and the runtime fixtures contain synthetic measurements. No cloud resources,
+inference services, dataset preparation, or benchmark execution are implemented by this layer.
+
+### Install and verify
+
+Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the
+repository root. uv uses the Python 3.12 version selected by `.python-version`.
+
+```bash
+uv sync --locked --all-packages
+uv run --locked --package platform-contracts pytest
+uv run --locked --package platform-contracts ruff check .
+uv run --locked --package platform-contracts ruff format --check .
+bash scripts/check-generated.sh
+```
+
+The package can load and resolve the examples without network access after installation:
+
+```bash
+uv run --locked --package platform-contracts python - <<'PY'
+from pathlib import Path
+from platform_contracts import ServingBinding, build_run_snapshot, load_catalog
+
+catalog = load_catalog(Path.cwd())
+snapshot = build_run_snapshot(
+    catalog,
+    "writer-assist-baseline@1",
+    (
+        ServingBinding(
+            customer_ref="writer-assist@1",
+            serving_profile_ref="gec-baseline@1",
+            worker_group_ref="latency-workers@1",
+            deployment_id="gec",
+        ),
+    ),
+)
+print(snapshot.scenario.ref)
+print(snapshot.scenario.measurement_duration_s)
+PY
+```
+
+This constructs a draft snapshot. `validate_for_execution(snapshot)` deliberately rejects it until
+dataset artifacts, provider selections, version pins, an inventory snapshot, and an admission
+schedule have been supplied. That preflight checks offline completeness, not live capacity or
+deployment readiness.
+
+### Files and generation
+
+- [Python contracts and interface notes](packages/platform-contracts/README.md)
+- [Customer defaults and scenario mappings](configs/customers/README.md)
+- [Dataset provenance and preparation boundaries](datasets/README.md)
+- [Runtime fixtures and schema conventions](contracts/README.md)
+
+Author configurations under `configs/` and source manifests under `datasets/manifests/`. Generate
+JSON Schemas from the Python models; do not edit the exported schemas by hand:
+
+```bash
+uv run --locked --package platform-contracts python scripts/export-contracts.py
+```
+
+CI runs the same checks and rejects schema drift. Management OpenAPI and a generated TypeScript
+client will be added when the management API routes exist.

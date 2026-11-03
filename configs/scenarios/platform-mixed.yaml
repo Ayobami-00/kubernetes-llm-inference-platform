@@ -1,0 +1,102 @@
+schema_version: '0.1'
+id: platform-mixed
+revision: 1
+notes: DRAFT deterministic experiment configuration; arrival rates are assumptions, not customer telemetry.
+seed: 42
+participants:
+- writer-assist@1
+- code-agent@1
+- tutor-chat@1
+- doc-flow@1
+- research-agent@1
+warmup:
+  duration_s: 60
+  datasets:
+    writer-assist: jfleg-dev@1
+phases:
+- id: steady
+  duration_s: 180
+  arrivals:
+    writer-assist:
+      pattern: poisson
+      unit: request
+      rate: 0.5
+      per: second
+    code-agent:
+      pattern: poisson
+      unit: session
+      rate: 1.0
+      per: minute
+    tutor-chat:
+      pattern: poisson
+      unit: session
+      rate: 6.0
+      per: minute
+    doc-flow:
+      pattern: poisson
+      unit: request
+      rate: 0.25
+      per: second
+    research-agent:
+      pattern: poisson
+      unit: session
+      rate: 2.0
+      per: minute
+- id: burst
+  duration_s: 60
+  arrivals:
+    writer-assist:
+      pattern: poisson
+      unit: request
+      rate: 1.5
+      per: second
+    code-agent:
+      pattern: poisson
+      unit: session
+      rate: 3.0
+      per: minute
+    tutor-chat:
+      pattern: poisson
+      unit: session
+      rate: 18.0
+      per: minute
+    doc-flow:
+      pattern: poisson
+      unit: request
+      rate: 0.75
+      per: second
+    research-agent:
+      pattern: poisson
+      unit: session
+      rate: 6.0
+      per: minute
+- id: recovery
+  duration_s: 360
+  arrivals:
+    writer-assist:
+      pattern: poisson
+      unit: request
+      rate: 0.5
+      per: second
+    code-agent:
+      pattern: poisson
+      unit: session
+      rate: 1.0
+      per: minute
+    tutor-chat:
+      pattern: poisson
+      unit: session
+      rate: 6.0
+      per: minute
+    doc-flow:
+      pattern: poisson
+      unit: request
+      rate: 0.25
+      per: second
+    research-agent:
+      pattern: poisson
+      unit: session
+      rate: 2.0
+      per: minute
+faults: []
+drain_timeout_s: 120

@@ -1,0 +1,42 @@
+schema_version: '0.1'
+id: research-agent
+revision: 1
+name: ResearchAgent
+notes: DRAFT experimental settings, not measured production behavior. Parallel-inspired research substeps;
+  HotpotQA is an independent content proxy.
+model_alias: general-medium
+tier: provisioned
+reserved_concurrency: 1
+workload:
+  task: research
+  dataset_ref: hotpotqa@1
+  interaction: session
+  preserve_recorded_context: false
+  prompt_template:
+    system: Answer using the supplied evidence and identify supporting facts.
+    user: 'Question: {question}
+
+      Evidence: {context}'
+generation:
+  max_output_tokens: 1024
+  temperature: 0.2
+  streaming: true
+limits:
+  max_rendered_input_tokens: 8192
+  max_inflight_requests: 8
+  request_timeout_ms: 120000
+traffic_allowance:
+  unit: session
+  sustained_per_second: 0.06666666666666667
+  burst_per_second: 0.13333333333333333
+  max_burst_duration_s: 60
+slo:
+  window_s: 300
+  minimum_eligible_requests: 20
+  targets:
+  - metric: ttft_ms
+    threshold_ms: 2000.0
+    minimum_attainment_fraction: 0.95
+quality:
+  evaluator: hotpotqa_em_f1
+  notes: Answer and supporting-fact evaluation for prepared QA steps, not complete web-agent success.

@@ -1,0 +1,44 @@
+schema_version: '0.1'
+id: doc-flow
+revision: 1
+name: DocFlow
+notes: DRAFT experimental settings, not measured production behavior. LlamaIndex-inspired document
+  workflow; prepared text extraction, not OCR.
+model_alias: general-medium
+tier: best_effort
+reserved_concurrency: 0
+workload:
+  task: extraction
+  dataset_ref: cuad@1
+  interaction: independent_requests
+  preserve_recorded_context: false
+  prompt_template:
+    system: Extract the requested clause from the supplied document. Return JSON with the clause and
+      evidence.
+    user: 'Document: {context}
+
+      Clause type: {clause_type}'
+generation:
+  max_output_tokens: 1024
+  temperature: 0.0
+  streaming: false
+limits:
+  max_rendered_input_tokens: 8192
+  max_inflight_requests: 16
+  request_timeout_ms: 60000
+traffic_allowance:
+  unit: request
+  sustained_per_second: 0.5
+  burst_per_second: 1.0
+  max_burst_duration_s: 60
+slo:
+  window_s: 300
+  minimum_eligible_requests: 20
+  targets:
+  - metric: completion_latency_ms
+    threshold_ms: 30000.0
+    minimum_attainment_fraction: 0.95
+quality:
+  evaluator: extraction_f1
+  notes: Evaluate adapted clause extraction with retained evidence; not an official CUAD benchmark
+    score.

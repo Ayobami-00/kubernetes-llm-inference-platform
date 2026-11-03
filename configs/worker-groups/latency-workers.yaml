@@ -1,0 +1,17 @@
+schema_version: '0.1'
+id: latency-workers
+revision: 1
+notes: DRAFT hardware description. Resolve actual Lambda SKU, region and availability before allocation.
+provider: lambda
+instance_type: null
+region: null
+desired_instances: 1
+hardware:
+  vendor: nvidia
+  gpu_model: A10
+  gpu_count: 1
+  vram_gib_per_gpu: 24.0
+worker_class: latency
+host_profile: lambda-gpu-worker-v1
+ttl_minutes: 90
+drain_timeout_s: 120

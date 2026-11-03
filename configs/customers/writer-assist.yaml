@@ -1,0 +1,40 @@
+schema_version: '0.1'
+id: writer-assist
+revision: 1
+name: WriterAssist
+notes: DRAFT experimental settings, not measured production behavior. Grammarly-like proactive sentence
+  correction; public task proxy, not customer logs.
+model_alias: gec-small
+tier: dedicated
+reserved_concurrency: 0
+workload:
+  task: sentence_correction
+  dataset_ref: jfleg-test@1
+  interaction: independent_requests
+  preserve_recorded_context: false
+  prompt_template:
+    system: Correct grammar and improve fluency. Return only the corrected sentence.
+    user: '{text}'
+generation:
+  max_output_tokens: 128
+  temperature: 0.0
+  streaming: false
+limits:
+  max_rendered_input_tokens: 512
+  max_inflight_requests: 8
+  request_timeout_ms: 2000
+traffic_allowance:
+  unit: request
+  sustained_per_second: 1.0
+  burst_per_second: 2.0
+  max_burst_duration_s: 60
+slo:
+  window_s: 300
+  minimum_eligible_requests: 100
+  targets:
+  - metric: completion_latency_ms
+    threshold_ms: 1000.0
+    minimum_attainment_fraction: 0.95
+quality:
+  evaluator: jfleg_gleu
+  notes: Aggregate fluency evaluation against multiple references; not exact-match accuracy.

@@ -1,0 +1,419 @@
+{
+  "$defs": {
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "uri": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "CustomerMeasurements": {
+      "additionalProperties": false,
+      "properties": {
+        "cached_input_tokens": {
+          "minimum": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "latencies": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LatencySummary"
+          },
+          "propertyNames": {
+            "enum": [
+              "completion_latency_ms",
+              "ttft_ms",
+              "tpot_ms",
+              "session_latency_ms"
+            ]
+          },
+          "title": "Latencies",
+          "type": "object"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens"
+      ],
+      "title": "CustomerMeasurements",
+      "type": "object"
+    },
+    "LatencySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "p50_ms": {
+          "exclusiveMinimum": 0,
+          "title": "P50 Ms",
+          "type": "number"
+        },
+        "p95_ms": {
+          "exclusiveMinimum": 0,
+          "title": "P95 Ms",
+          "type": "number"
+        },
+        "p99_ms": {
+          "exclusiveMinimum": 0,
+          "title": "P99 Ms",
+          "type": "number"
+        },
+        "sample_count": {
+          "exclusiveMinimum": 0,
+          "title": "Sample Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sample_count",
+        "p50_ms",
+        "p95_ms",
+        "p99_ms"
+      ],
+      "title": "LatencySummary",
+      "type": "object"
+    },
+    "QualityResult": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "evaluator": {
+          "minLength": 1,
+          "title": "Evaluator",
+          "type": "string"
+        },
+        "notes": {
+          "minLength": 1,
+          "title": "Notes",
+          "type": "string"
+        },
+        "scores": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Scores",
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "measured",
+            "not_evaluated"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "evaluator",
+        "status",
+        "notes"
+      ],
+      "title": "QualityResult",
+      "type": "object"
+    },
+    "RequestCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "attempted": {
+          "minimum": 0,
+          "title": "Attempted",
+          "type": "integer"
+        },
+        "cancelled": {
+          "minimum": 0,
+          "title": "Cancelled",
+          "type": "integer"
+        },
+        "completed": {
+          "minimum": 0,
+          "title": "Completed",
+          "type": "integer"
+        },
+        "eligible_for_slo": {
+          "minimum": 0,
+          "title": "Eligible For Slo",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "not_sent": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Not Sent",
+          "type": "integer"
+        },
+        "offered": {
+          "minimum": 0,
+          "title": "Offered",
+          "type": "integer"
+        },
+        "rejected": {
+          "minimum": 0,
+          "title": "Rejected",
+          "type": "integer"
+        },
+        "timed_out": {
+          "minimum": 0,
+          "title": "Timed Out",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "offered",
+        "attempted",
+        "eligible_for_slo",
+        "completed",
+        "rejected",
+        "failed",
+        "timed_out",
+        "cancelled"
+      ],
+      "title": "RequestCounts",
+      "type": "object"
+    },
+    "SLOAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "metric": {
+          "enum": [
+            "completion_latency_ms",
+            "ttft_ms",
+            "tpot_ms",
+            "session_latency_ms"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "minimum_attainment_fraction": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Attainment Fraction",
+          "type": "number"
+        },
+        "minimum_eligible_requests": {
+          "exclusiveMinimum": 0,
+          "title": "Minimum Eligible Requests",
+          "type": "integer"
+        },
+        "threshold_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Threshold Ms",
+          "type": "number"
+        },
+        "verdict": {
+          "$ref": "#/$defs/SLOVerdict"
+        },
+        "windows": {
+          "items": {
+            "$ref": "#/$defs/SLOWindow"
+          },
+          "minItems": 1,
+          "title": "Windows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "metric",
+        "threshold_ms",
+        "minimum_attainment_fraction",
+        "minimum_eligible_requests",
+        "windows",
+        "verdict"
+      ],
+      "title": "SLOAssessment",
+      "type": "object"
+    },
+    "SLOVerdict": {
+      "enum": [
+        "passing",
+        "violating",
+        "insufficient_data",
+        "not_evaluated"
+      ],
+      "title": "SLOVerdict",
+      "type": "string"
+    },
+    "SLOWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_s": {
+          "exclusiveMinimum": 0,
+          "title": "Duration S",
+          "type": "integer"
+        },
+        "eligible_requests": {
+          "minimum": 0,
+          "title": "Eligible Requests",
+          "type": "integer"
+        },
+        "good_requests": {
+          "minimum": 0,
+          "title": "Good Requests",
+          "type": "integer"
+        },
+        "offset_s": {
+          "minimum": 0,
+          "title": "Offset S",
+          "type": "integer"
+        },
+        "verdict": {
+          "$ref": "#/$defs/SLOVerdict"
+        }
+      },
+      "required": [
+        "offset_s",
+        "duration_s",
+        "eligible_requests",
+        "good_requests",
+        "verdict"
+      ],
+      "title": "SLOWindow",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/run-result.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "artifacts": {
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+          "$ref": "#/$defs/Artifact"
+        }
+      },
+      "title": "Artifacts",
+      "type": "object"
+    },
+    "customer_requests": {
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$": {
+          "$ref": "#/$defs/RequestCounts"
+        }
+      },
+      "title": "Customer Requests",
+      "type": "object"
+    },
+    "invalid_reasons": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Invalid Reasons",
+      "type": "array"
+    },
+    "measurements": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/CustomerMeasurements"
+      },
+      "title": "Measurements",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    },
+    "quality": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/QualityResult"
+      },
+      "title": "Quality",
+      "type": "array"
+    },
+    "requests": {
+      "$ref": "#/$defs/RequestCounts"
+    },
+    "slo_assessments": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/SLOAssessment"
+      },
+      "title": "Slo Assessments",
+      "type": "array"
+    },
+    "slo_verdict": {
+      "$ref": "#/$defs/SLOVerdict"
+    },
+    "validity": {
+      "enum": [
+        "valid",
+        "invalid"
+      ],
+      "title": "Validity",
+      "type": "string"
+    }
+  },
+  "required": [
+    "validity",
+    "requests",
+    "customer_requests",
+    "slo_verdict"
+  ],
+  "title": "RunResult",
+  "type": "object"
+}

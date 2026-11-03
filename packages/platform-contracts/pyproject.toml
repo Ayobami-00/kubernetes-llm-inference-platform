@@ -1,0 +1,13 @@
+[project]
+name = "platform-contracts"
+version = "0.1.0"
+description = "Shared contracts for the Kubernetes LLM inference platform"
+requires-python = ">=3.12"
+dependencies = ["pydantic>=2,<3", "PyYAML>=6,<7"]
+
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"
+
+[tool.hatch.build.targets.wheel]
+packages = ["src/platform_contracts"]

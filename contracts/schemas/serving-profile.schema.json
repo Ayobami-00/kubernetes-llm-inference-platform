@@ -1,0 +1,303 @@
+{
+  "$defs": {
+    "AggregatedTopology": {
+      "additionalProperties": false,
+      "properties": {
+        "gpus_per_replica": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Gpus Per Replica",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "aggregated",
+          "default": "aggregated",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pipeline_parallel_size": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Pipeline Parallel Size",
+          "type": "integer"
+        },
+        "replicas": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Replicas",
+          "type": "integer"
+        },
+        "tensor_parallel_size": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Tensor Parallel Size",
+          "type": "integer"
+        }
+      },
+      "title": "AggregatedTopology",
+      "type": "object"
+    },
+    "EngineSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "const": "vllm",
+          "default": "vllm",
+          "title": "Backend",
+          "type": "string"
+        },
+        "dtype": {
+          "default": "bfloat16",
+          "enum": [
+            "auto",
+            "bfloat16",
+            "float16"
+          ],
+          "title": "Dtype",
+          "type": "string"
+        },
+        "gpu_memory_utilization": {
+          "default": 0.8,
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Gpu Memory Utilization",
+          "type": "number"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image"
+        },
+        "max_model_len": {
+          "exclusiveMinimum": 0,
+          "title": "Max Model Len",
+          "type": "integer"
+        },
+        "max_num_seqs": {
+          "default": 8,
+          "exclusiveMinimum": 0,
+          "title": "Max Num Seqs",
+          "type": "integer"
+        },
+        "prefix_caching": {
+          "default": false,
+          "title": "Prefix Caching",
+          "type": "boolean"
+        },
+        "speculative_decoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpeculativeDecoding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "max_model_len"
+      ],
+      "title": "EngineSettings",
+      "type": "object"
+    },
+    "GPURequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "gpu_model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gpu Model"
+        },
+        "min_vram_gib_per_gpu": {
+          "exclusiveMinimum": 0,
+          "title": "Min Vram Gib Per Gpu",
+          "type": "number"
+        },
+        "vendor": {
+          "const": "nvidia",
+          "default": "nvidia",
+          "title": "Vendor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "min_vram_gib_per_gpu"
+      ],
+      "title": "GPURequirements",
+      "type": "object"
+    },
+    "ModelSource": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Alias",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "tokenizer_revision": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tokenizer Revision"
+        }
+      },
+      "required": [
+        "alias",
+        "repository"
+      ],
+      "title": "ModelSource",
+      "type": "object"
+    },
+    "SpeculativeDecoding": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "const": "ngram",
+          "title": "Method",
+          "type": "string"
+        },
+        "num_speculative_tokens": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "title": "Num Speculative Tokens",
+          "type": "integer"
+        },
+        "prompt_lookup_max": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "title": "Prompt Lookup Max",
+          "type": "integer"
+        },
+        "prompt_lookup_min": {
+          "default": 2,
+          "exclusiveMinimum": 0,
+          "title": "Prompt Lookup Min",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "SpeculativeDecoding",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/serving-profile.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "draft": {
+      "default": true,
+      "title": "Draft",
+      "type": "boolean"
+    },
+    "engine": {
+      "$ref": "#/$defs/EngineSettings"
+    },
+    "hardware": {
+      "$ref": "#/$defs/GPURequirements"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "model": {
+      "$ref": "#/$defs/ModelSource"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    },
+    "revision": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "routing_policy": {
+      "default": "load_aware",
+      "enum": [
+        "load_aware",
+        "cache_aware"
+      ],
+      "title": "Routing Policy",
+      "type": "string"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "topology": {
+      "$ref": "#/$defs/AggregatedTopology"
+    },
+    "worker_class": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Worker Class",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "model",
+    "engine",
+    "hardware",
+    "worker_class"
+  ],
+  "title": "ServingProfile",
+  "type": "object"
+}

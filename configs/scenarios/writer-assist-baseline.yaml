@@ -1,0 +1,38 @@
+schema_version: '0.1'
+id: writer-assist-baseline
+revision: 1
+notes: DRAFT deterministic experiment configuration; arrival rates are assumptions, not customer telemetry.
+seed: 42
+participants:
+- writer-assist@1
+warmup:
+  duration_s: 60
+  datasets:
+    writer-assist: jfleg-dev@1
+phases:
+- id: steady
+  duration_s: 180
+  arrivals:
+    writer-assist:
+      pattern: poisson
+      unit: request
+      rate: 0.5
+      per: second
+- id: burst
+  duration_s: 60
+  arrivals:
+    writer-assist:
+      pattern: poisson
+      unit: request
+      rate: 1.5
+      per: second
+- id: recovery
+  duration_s: 360
+  arrivals:
+    writer-assist:
+      pattern: poisson
+      unit: request
+      rate: 0.5
+      per: second
+faults: []
+drain_timeout_s: 120

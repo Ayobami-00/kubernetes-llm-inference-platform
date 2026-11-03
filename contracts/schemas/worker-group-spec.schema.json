@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "GPUHardware": {
+      "additionalProperties": false,
+      "properties": {
+        "gpu_count": {
+          "exclusiveMinimum": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
+        "gpu_model": {
+          "minLength": 1,
+          "title": "Gpu Model",
+          "type": "string"
+        },
+        "vendor": {
+          "const": "nvidia",
+          "default": "nvidia",
+          "title": "Vendor",
+          "type": "string"
+        },
+        "vram_gib_per_gpu": {
+          "exclusiveMinimum": 0,
+          "title": "Vram Gib Per Gpu",
+          "type": "number"
+        }
+      },
+      "required": [
+        "gpu_model",
+        "gpu_count",
+        "vram_gib_per_gpu"
+      ],
+      "title": "GPUHardware",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/worker-group-spec.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "desired_instances": {
+      "default": 1,
+      "minimum": 0,
+      "title": "Desired Instances",
+      "type": "integer"
+    },
+    "drain_timeout_s": {
+      "default": 120,
+      "exclusiveMinimum": 0,
+      "title": "Drain Timeout S",
+      "type": "integer"
+    },
+    "hardware": {
+      "$ref": "#/$defs/GPUHardware"
+    },
+    "host_profile": {
+      "default": "lambda-gpu-worker-v1",
+      "minLength": 1,
+      "title": "Host Profile",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "instance_type": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Instance Type"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    },
+    "provider": {
+      "const": "lambda",
+      "default": "lambda",
+      "title": "Provider",
+      "type": "string"
+    },
+    "region": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Region"
+    },
+    "revision": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "ttl_minutes": {
+      "default": 90,
+      "exclusiveMinimum": 0,
+      "title": "Ttl Minutes",
+      "type": "integer"
+    },
+    "worker_class": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Worker Class",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "hardware",
+    "worker_class"
+  ],
+  "title": "WorkerGroupSpec",
+  "type": "object"
+}

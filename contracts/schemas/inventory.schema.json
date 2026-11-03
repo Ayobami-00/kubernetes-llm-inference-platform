@@ -1,0 +1,344 @@
+{
+  "$defs": {
+    "ClusterInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "api_endpoint": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Api Endpoint",
+          "type": "string"
+        },
+        "ca_bundle_ref": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Ca Bundle Ref",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inference_endpoint": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Inference Endpoint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "api_endpoint",
+        "inference_endpoint",
+        "ca_bundle_ref"
+      ],
+      "title": "ClusterInfo",
+      "type": "object"
+    },
+    "GPUHardware": {
+      "additionalProperties": false,
+      "properties": {
+        "gpu_count": {
+          "exclusiveMinimum": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
+        "gpu_model": {
+          "minLength": 1,
+          "title": "Gpu Model",
+          "type": "string"
+        },
+        "vendor": {
+          "const": "nvidia",
+          "default": "nvidia",
+          "title": "Vendor",
+          "type": "string"
+        },
+        "vram_gib_per_gpu": {
+          "exclusiveMinimum": 0,
+          "title": "Vram Gib Per Gpu",
+          "type": "number"
+        }
+      },
+      "required": [
+        "gpu_model",
+        "gpu_count",
+        "vram_gib_per_gpu"
+      ],
+      "title": "GPUHardware",
+      "type": "object"
+    },
+    "HostAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "ssh_credential_ref": {
+          "minLength": 1,
+          "title": "Ssh Credential Ref",
+          "type": "string"
+        },
+        "ssh_user": {
+          "minLength": 1,
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ssh_user",
+        "ssh_credential_ref"
+      ],
+      "title": "HostAccess",
+      "type": "object"
+    },
+    "KubernetesNode": {
+      "additionalProperties": false,
+      "properties": {
+        "allocatable_gpu_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Allocatable Gpu Count",
+          "type": "integer"
+        },
+        "allocated_gpu_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Allocated Gpu Count",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "uid": {
+          "minLength": 1,
+          "title": "Uid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "uid"
+      ],
+      "title": "KubernetesNode",
+      "type": "object"
+    },
+    "NetworkInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "pod_cidr": {
+          "format": "ipvanynetwork",
+          "title": "Pod Cidr",
+          "type": "string"
+        },
+        "service_cidr": {
+          "format": "ipvanynetwork",
+          "title": "Service Cidr",
+          "type": "string"
+        },
+        "wireguard_cidr": {
+          "format": "ipvanynetwork",
+          "title": "Wireguard Cidr",
+          "type": "string"
+        }
+      },
+      "required": [
+        "wireguard_cidr",
+        "pod_cidr",
+        "service_cidr"
+      ],
+      "title": "NetworkInfo",
+      "type": "object"
+    },
+    "NodeObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "$ref": "#/$defs/HostAccess"
+        },
+        "hardware": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GPUHardware"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kubernetes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KubernetesNode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "managed_by": {
+          "enum": [
+            "foundation",
+            "management"
+          ],
+          "title": "Managed By",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "aws",
+            "lambda"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "provider_instance_id": {
+          "minLength": 1,
+          "title": "Provider Instance Id",
+          "type": "string"
+        },
+        "public_ip": {
+          "format": "ipvanyaddress",
+          "title": "Public Ip",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/Readiness"
+        },
+        "role": {
+          "enum": [
+            "control_plane",
+            "gpu_worker"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "wireguard_ip": {
+          "format": "ipvanyaddress",
+          "title": "Wireguard Ip",
+          "type": "string"
+        },
+        "worker_group_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worker Group Ref"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "provider_instance_id",
+        "managed_by",
+        "role",
+        "public_ip",
+        "wireguard_ip",
+        "observed_at",
+        "access",
+        "readiness"
+      ],
+      "title": "NodeObservation",
+      "type": "object"
+    },
+    "Readiness": {
+      "additionalProperties": false,
+      "properties": {
+        "cilium": {
+          "default": false,
+          "title": "Cilium",
+          "type": "boolean"
+        },
+        "gpu_runtime": {
+          "default": false,
+          "title": "Gpu Runtime",
+          "type": "boolean"
+        },
+        "host": {
+          "default": false,
+          "title": "Host",
+          "type": "boolean"
+        },
+        "kubernetes": {
+          "default": false,
+          "title": "Kubernetes",
+          "type": "boolean"
+        },
+        "wireguard": {
+          "default": false,
+          "title": "Wireguard",
+          "type": "boolean"
+        }
+      },
+      "title": "Readiness",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/inventory.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "captured_at": {
+      "format": "date-time",
+      "title": "Captured At",
+      "type": "string"
+    },
+    "cluster": {
+      "$ref": "#/$defs/ClusterInfo"
+    },
+    "fixture": {
+      "default": false,
+      "title": "Fixture",
+      "type": "boolean"
+    },
+    "network": {
+      "$ref": "#/$defs/NetworkInfo"
+    },
+    "nodes": {
+      "items": {
+        "$ref": "#/$defs/NodeObservation"
+      },
+      "title": "Nodes",
+      "type": "array"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot_id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Snapshot Id",
+      "type": "string"
+    }
+  },
+  "required": [
+    "snapshot_id",
+    "captured_at",
+    "cluster",
+    "network",
+    "nodes"
+  ],
+  "title": "InfrastructureInventory",
+  "type": "object"
+}

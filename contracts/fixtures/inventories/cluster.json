@@ -1,0 +1,208 @@
+{
+  "captured_at": "2026-11-03T12:00:00Z",
+  "cluster": {
+    "api_endpoint": "https://api.cluster.example.com:6443/",
+    "ca_bundle_ref": "fixture://foundation/cluster-ca.crt",
+    "id": "inference-cluster-01",
+    "inference_endpoint": "https://inference.example.com/"
+  },
+  "fixture": true,
+  "network": {
+    "pod_cidr": "10.244.0.0/16",
+    "service_cidr": "10.96.0.0/12",
+    "wireguard_cidr": "10.200.0.0/24"
+  },
+  "nodes": [
+    {
+      "access": {
+        "ssh_credential_ref": "foundation-bootstrap-ssh",
+        "ssh_user": "ubuntu"
+      },
+      "hardware": null,
+      "id": "cpu-01",
+      "kubernetes": {
+        "allocatable_gpu_count": 0,
+        "allocated_gpu_count": 0,
+        "name": "cpu-01",
+        "uid": "fixture-cpu-uid-01"
+      },
+      "managed_by": "foundation",
+      "observed_at": "2026-11-03T12:00:00Z",
+      "provider": "aws",
+      "provider_instance_id": "fixture-ec2-01",
+      "public_ip": "203.0.113.10",
+      "readiness": {
+        "cilium": true,
+        "gpu_runtime": false,
+        "host": true,
+        "kubernetes": true,
+        "wireguard": true
+      },
+      "role": "control_plane",
+      "wireguard_ip": "10.200.0.1",
+      "worker_group_ref": null
+    },
+    {
+      "access": {
+        "ssh_credential_ref": "foundation-bootstrap-ssh",
+        "ssh_user": "ubuntu"
+      },
+      "hardware": null,
+      "id": "cpu-02",
+      "kubernetes": {
+        "allocatable_gpu_count": 0,
+        "allocated_gpu_count": 0,
+        "name": "cpu-02",
+        "uid": "fixture-cpu-uid-02"
+      },
+      "managed_by": "foundation",
+      "observed_at": "2026-11-03T12:00:00Z",
+      "provider": "aws",
+      "provider_instance_id": "fixture-ec2-02",
+      "public_ip": "203.0.113.11",
+      "readiness": {
+        "cilium": true,
+        "gpu_runtime": false,
+        "host": true,
+        "kubernetes": true,
+        "wireguard": true
+      },
+      "role": "control_plane",
+      "wireguard_ip": "10.200.0.2",
+      "worker_group_ref": null
+    },
+    {
+      "access": {
+        "ssh_credential_ref": "foundation-bootstrap-ssh",
+        "ssh_user": "ubuntu"
+      },
+      "hardware": null,
+      "id": "cpu-03",
+      "kubernetes": {
+        "allocatable_gpu_count": 0,
+        "allocated_gpu_count": 0,
+        "name": "cpu-03",
+        "uid": "fixture-cpu-uid-03"
+      },
+      "managed_by": "foundation",
+      "observed_at": "2026-11-03T12:00:00Z",
+      "provider": "aws",
+      "provider_instance_id": "fixture-ec2-03",
+      "public_ip": "203.0.113.12",
+      "readiness": {
+        "cilium": true,
+        "gpu_runtime": false,
+        "host": true,
+        "kubernetes": true,
+        "wireguard": true
+      },
+      "role": "control_plane",
+      "wireguard_ip": "10.200.0.3",
+      "worker_group_ref": null
+    },
+    {
+      "access": {
+        "ssh_credential_ref": "gpu-bootstrap-ssh",
+        "ssh_user": "ubuntu"
+      },
+      "hardware": {
+        "gpu_count": 1,
+        "gpu_model": "A10",
+        "vendor": "nvidia",
+        "vram_gib_per_gpu": 24.0
+      },
+      "id": "gpu-01",
+      "kubernetes": {
+        "allocatable_gpu_count": 1,
+        "allocated_gpu_count": 1,
+        "name": "lambda-gpu-01",
+        "uid": "fixture-gpu-uid-01"
+      },
+      "managed_by": "management",
+      "observed_at": "2026-11-03T12:00:00Z",
+      "provider": "lambda",
+      "provider_instance_id": "fixture-lambda-01",
+      "public_ip": "198.51.100.20",
+      "readiness": {
+        "cilium": true,
+        "gpu_runtime": true,
+        "host": true,
+        "kubernetes": true,
+        "wireguard": true
+      },
+      "role": "gpu_worker",
+      "wireguard_ip": "10.200.0.10",
+      "worker_group_ref": "latency-workers@1"
+    },
+    {
+      "access": {
+        "ssh_credential_ref": "gpu-bootstrap-ssh",
+        "ssh_user": "ubuntu"
+      },
+      "hardware": {
+        "gpu_count": 4,
+        "gpu_model": "H100",
+        "vendor": "nvidia",
+        "vram_gib_per_gpu": 80.0
+      },
+      "id": "gpu-02",
+      "kubernetes": {
+        "allocatable_gpu_count": 4,
+        "allocated_gpu_count": 4,
+        "name": "lambda-gpu-02",
+        "uid": "fixture-gpu-uid-02"
+      },
+      "managed_by": "management",
+      "observed_at": "2026-11-03T12:00:00Z",
+      "provider": "lambda",
+      "provider_instance_id": "fixture-lambda-02",
+      "public_ip": "198.51.100.21",
+      "readiness": {
+        "cilium": true,
+        "gpu_runtime": true,
+        "host": true,
+        "kubernetes": true,
+        "wireguard": true
+      },
+      "role": "gpu_worker",
+      "wireguard_ip": "10.200.0.11",
+      "worker_group_ref": "shared-workers@1"
+    },
+    {
+      "access": {
+        "ssh_credential_ref": "gpu-bootstrap-ssh",
+        "ssh_user": "ubuntu"
+      },
+      "hardware": {
+        "gpu_count": 8,
+        "gpu_model": "H100",
+        "vendor": "nvidia",
+        "vram_gib_per_gpu": 80.0
+      },
+      "id": "gpu-03",
+      "kubernetes": {
+        "allocatable_gpu_count": 8,
+        "allocated_gpu_count": 8,
+        "name": "lambda-gpu-03",
+        "uid": "fixture-gpu-uid-03"
+      },
+      "managed_by": "management",
+      "observed_at": "2026-11-03T12:00:00Z",
+      "provider": "lambda",
+      "provider_instance_id": "fixture-lambda-03",
+      "public_ip": "198.51.100.22",
+      "readiness": {
+        "cilium": true,
+        "gpu_runtime": true,
+        "host": true,
+        "kubernetes": true,
+        "wireguard": true
+      },
+      "role": "gpu_worker",
+      "wireguard_ip": "10.200.0.12",
+      "worker_group_ref": "large-workers@1"
+    }
+  ],
+  "schema_version": "0.1",
+  "snapshot_id": "fixture-inventory-001"
+}

@@ -1,0 +1,2248 @@
+{
+  "$defs": {
+    "AggregatedTopology": {
+      "additionalProperties": false,
+      "properties": {
+        "gpus_per_replica": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Gpus Per Replica",
+          "type": "integer"
+        },
+        "kind": {
+          "const": "aggregated",
+          "default": "aggregated",
+          "title": "Kind",
+          "type": "string"
+        },
+        "pipeline_parallel_size": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Pipeline Parallel Size",
+          "type": "integer"
+        },
+        "replicas": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Replicas",
+          "type": "integer"
+        },
+        "tensor_parallel_size": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Tensor Parallel Size",
+          "type": "integer"
+        }
+      },
+      "title": "AggregatedTopology",
+      "type": "object"
+    },
+    "Arrival": {
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "default": "poisson",
+          "enum": [
+            "poisson",
+            "constant"
+          ],
+          "title": "Pattern",
+          "type": "string"
+        },
+        "per": {
+          "default": "second",
+          "enum": [
+            "second",
+            "minute"
+          ],
+          "title": "Per",
+          "type": "string"
+        },
+        "rate": {
+          "exclusiveMinimum": 0,
+          "title": "Rate",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "request",
+            "session"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit",
+        "rate"
+      ],
+      "title": "Arrival",
+      "type": "object"
+    },
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "uri": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "ClusterInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "api_endpoint": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Api Endpoint",
+          "type": "string"
+        },
+        "ca_bundle_ref": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Ca Bundle Ref",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "inference_endpoint": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Inference Endpoint",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "api_endpoint",
+        "inference_endpoint",
+        "ca_bundle_ref"
+      ],
+      "title": "ClusterInfo",
+      "type": "object"
+    },
+    "CustomerLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_inflight_requests": {
+          "exclusiveMinimum": 0,
+          "title": "Max Inflight Requests",
+          "type": "integer"
+        },
+        "max_rendered_input_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Rendered Input Tokens",
+          "type": "integer"
+        },
+        "request_timeout_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Request Timeout Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_rendered_input_tokens",
+        "max_inflight_requests",
+        "request_timeout_ms"
+      ],
+      "title": "CustomerLimits",
+      "type": "object"
+    },
+    "CustomerMeasurements": {
+      "additionalProperties": false,
+      "properties": {
+        "cached_input_tokens": {
+          "minimum": 0,
+          "title": "Cached Input Tokens",
+          "type": "integer"
+        },
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "latencies": {
+          "additionalProperties": {
+            "$ref": "#/$defs/LatencySummary"
+          },
+          "propertyNames": {
+            "enum": [
+              "completion_latency_ms",
+              "ttft_ms",
+              "tpot_ms",
+              "session_latency_ms"
+            ]
+          },
+          "title": "Latencies",
+          "type": "object"
+        },
+        "output_tokens": {
+          "minimum": 0,
+          "title": "Output Tokens",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "input_tokens",
+        "cached_input_tokens",
+        "output_tokens"
+      ],
+      "title": "CustomerMeasurements",
+      "type": "object"
+    },
+    "CustomerSLO": {
+      "additionalProperties": false,
+      "properties": {
+        "minimum_eligible_requests": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "title": "Minimum Eligible Requests",
+          "type": "integer"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/LatencyTarget"
+          },
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        },
+        "window_s": {
+          "default": 300,
+          "exclusiveMinimum": 0,
+          "title": "Window S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "targets"
+      ],
+      "title": "CustomerSLO",
+      "type": "object"
+    },
+    "CustomerSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "generation": {
+          "$ref": "#/$defs/Generation"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "limits": {
+          "$ref": "#/$defs/CustomerLimits"
+        },
+        "model_alias": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Model Alias",
+          "type": "string"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "quality": {
+          "$ref": "#/$defs/QualityConfig"
+        },
+        "reserved_concurrency": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Reserved Concurrency",
+          "type": "integer"
+        },
+        "revision": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "slo": {
+          "$ref": "#/$defs/CustomerSLO"
+        },
+        "tier": {
+          "enum": [
+            "dedicated",
+            "provisioned",
+            "best_effort"
+          ],
+          "title": "Tier",
+          "type": "string"
+        },
+        "traffic_allowance": {
+          "$ref": "#/$defs/TrafficAllowance"
+        },
+        "workload": {
+          "$ref": "#/$defs/Workload"
+        }
+      },
+      "required": [
+        "id",
+        "name",
+        "model_alias",
+        "tier",
+        "workload",
+        "generation",
+        "limits",
+        "traffic_allowance",
+        "slo",
+        "quality"
+      ],
+      "title": "CustomerSpec",
+      "type": "object"
+    },
+    "DatasetManifest": {
+      "additionalProperties": false,
+      "properties": {
+        "format": {
+          "enum": [
+            "custom_single_turn",
+            "custom_multi_turn",
+            "exgentic_snapshot"
+          ],
+          "title": "Format",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "interaction": {
+          "enum": [
+            "independent_requests",
+            "session"
+          ],
+          "title": "Interaction",
+          "type": "string"
+        },
+        "limitations": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Limitations",
+          "type": "array"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "preparation": {
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Preparation",
+          "type": "array"
+        },
+        "prepared": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PreparedDataset"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "references": {
+          "enum": [
+            "multiple_corrections",
+            "dialogue_annotations",
+            "clause_spans",
+            "answers_and_supporting_facts",
+            "not_available"
+          ],
+          "title": "References",
+          "type": "string"
+        },
+        "revision": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "source": {
+          "$ref": "#/$defs/DatasetSource"
+        },
+        "timing_provenance": {
+          "enum": [
+            "experimental_assumption",
+            "recorded_trace",
+            "not_provided"
+          ],
+          "title": "Timing Provenance",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "source",
+        "format",
+        "interaction",
+        "references",
+        "timing_provenance",
+        "preparation",
+        "limitations"
+      ],
+      "title": "DatasetManifest",
+      "type": "object"
+    },
+    "DatasetSource": {
+      "additionalProperties": false,
+      "properties": {
+        "filters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Filters",
+          "type": "object"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "subset": {
+          "minLength": 1,
+          "title": "Subset",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "subset"
+      ],
+      "title": "DatasetSource",
+      "type": "object"
+    },
+    "EngineSettings": {
+      "additionalProperties": false,
+      "properties": {
+        "backend": {
+          "const": "vllm",
+          "default": "vllm",
+          "title": "Backend",
+          "type": "string"
+        },
+        "dtype": {
+          "default": "bfloat16",
+          "enum": [
+            "auto",
+            "bfloat16",
+            "float16"
+          ],
+          "title": "Dtype",
+          "type": "string"
+        },
+        "gpu_memory_utilization": {
+          "default": 0.8,
+          "exclusiveMaximum": 1,
+          "exclusiveMinimum": 0,
+          "title": "Gpu Memory Utilization",
+          "type": "number"
+        },
+        "image": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Image"
+        },
+        "max_model_len": {
+          "exclusiveMinimum": 0,
+          "title": "Max Model Len",
+          "type": "integer"
+        },
+        "max_num_seqs": {
+          "default": 8,
+          "exclusiveMinimum": 0,
+          "title": "Max Num Seqs",
+          "type": "integer"
+        },
+        "prefix_caching": {
+          "default": false,
+          "title": "Prefix Caching",
+          "type": "boolean"
+        },
+        "speculative_decoding": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/SpeculativeDecoding"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        }
+      },
+      "required": [
+        "max_model_len"
+      ],
+      "title": "EngineSettings",
+      "type": "object"
+    },
+    "ErrorInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorInfo",
+      "type": "object"
+    },
+    "ExecutionStatus": {
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed",
+        "cancelled"
+      ],
+      "title": "ExecutionStatus",
+      "type": "string"
+    },
+    "ExecutionVersions": {
+      "additionalProperties": false,
+      "properties": {
+        "aiperf_version": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Aiperf Version"
+        },
+        "evaluator_version": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Evaluator Version"
+        },
+        "platform_versions": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+              "minLength": 1,
+              "type": "string"
+            }
+          },
+          "title": "Platform Versions",
+          "type": "object"
+        },
+        "runner_image": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Runner Image"
+        }
+      },
+      "title": "ExecutionVersions",
+      "type": "object"
+    },
+    "Fault": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Customer Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "pod_delete",
+          "title": "Kind",
+          "type": "string"
+        },
+        "offset_s": {
+          "minimum": 0,
+          "title": "Offset S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "customer_id",
+        "offset_s"
+      ],
+      "title": "Fault",
+      "type": "object"
+    },
+    "GPUHardware": {
+      "additionalProperties": false,
+      "properties": {
+        "gpu_count": {
+          "exclusiveMinimum": 0,
+          "title": "Gpu Count",
+          "type": "integer"
+        },
+        "gpu_model": {
+          "minLength": 1,
+          "title": "Gpu Model",
+          "type": "string"
+        },
+        "vendor": {
+          "const": "nvidia",
+          "default": "nvidia",
+          "title": "Vendor",
+          "type": "string"
+        },
+        "vram_gib_per_gpu": {
+          "exclusiveMinimum": 0,
+          "title": "Vram Gib Per Gpu",
+          "type": "number"
+        }
+      },
+      "required": [
+        "gpu_model",
+        "gpu_count",
+        "vram_gib_per_gpu"
+      ],
+      "title": "GPUHardware",
+      "type": "object"
+    },
+    "GPURequirements": {
+      "additionalProperties": false,
+      "properties": {
+        "gpu_model": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Gpu Model"
+        },
+        "min_vram_gib_per_gpu": {
+          "exclusiveMinimum": 0,
+          "title": "Min Vram Gib Per Gpu",
+          "type": "number"
+        },
+        "vendor": {
+          "const": "nvidia",
+          "default": "nvidia",
+          "title": "Vendor",
+          "type": "string"
+        }
+      },
+      "required": [
+        "min_vram_gib_per_gpu"
+      ],
+      "title": "GPURequirements",
+      "type": "object"
+    },
+    "Generation": {
+      "additionalProperties": false,
+      "properties": {
+        "max_output_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Output Tokens",
+          "type": "integer"
+        },
+        "streaming": {
+          "default": false,
+          "title": "Streaming",
+          "type": "boolean"
+        },
+        "temperature": {
+          "default": 0.0,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Temperature",
+          "type": "number"
+        }
+      },
+      "required": [
+        "max_output_tokens"
+      ],
+      "title": "Generation",
+      "type": "object"
+    },
+    "HostAccess": {
+      "additionalProperties": false,
+      "properties": {
+        "ssh_credential_ref": {
+          "minLength": 1,
+          "title": "Ssh Credential Ref",
+          "type": "string"
+        },
+        "ssh_user": {
+          "minLength": 1,
+          "title": "Ssh User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "ssh_user",
+        "ssh_credential_ref"
+      ],
+      "title": "HostAccess",
+      "type": "object"
+    },
+    "InfrastructureInventory": {
+      "additionalProperties": false,
+      "properties": {
+        "captured_at": {
+          "format": "date-time",
+          "title": "Captured At",
+          "type": "string"
+        },
+        "cluster": {
+          "$ref": "#/$defs/ClusterInfo"
+        },
+        "fixture": {
+          "default": false,
+          "title": "Fixture",
+          "type": "boolean"
+        },
+        "network": {
+          "$ref": "#/$defs/NetworkInfo"
+        },
+        "nodes": {
+          "items": {
+            "$ref": "#/$defs/NodeObservation"
+          },
+          "title": "Nodes",
+          "type": "array"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "snapshot_id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Snapshot Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "snapshot_id",
+        "captured_at",
+        "cluster",
+        "network",
+        "nodes"
+      ],
+      "title": "InfrastructureInventory",
+      "type": "object"
+    },
+    "KubernetesNode": {
+      "additionalProperties": false,
+      "properties": {
+        "allocatable_gpu_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Allocatable Gpu Count",
+          "type": "integer"
+        },
+        "allocated_gpu_count": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Allocated Gpu Count",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "uid": {
+          "minLength": 1,
+          "title": "Uid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "name",
+        "uid"
+      ],
+      "title": "KubernetesNode",
+      "type": "object"
+    },
+    "LatencySummary": {
+      "additionalProperties": false,
+      "properties": {
+        "p50_ms": {
+          "exclusiveMinimum": 0,
+          "title": "P50 Ms",
+          "type": "number"
+        },
+        "p95_ms": {
+          "exclusiveMinimum": 0,
+          "title": "P95 Ms",
+          "type": "number"
+        },
+        "p99_ms": {
+          "exclusiveMinimum": 0,
+          "title": "P99 Ms",
+          "type": "number"
+        },
+        "sample_count": {
+          "exclusiveMinimum": 0,
+          "title": "Sample Count",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "sample_count",
+        "p50_ms",
+        "p95_ms",
+        "p99_ms"
+      ],
+      "title": "LatencySummary",
+      "type": "object"
+    },
+    "LatencyTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "completion_latency_ms",
+            "ttft_ms",
+            "tpot_ms",
+            "session_latency_ms"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "minimum_attainment_fraction": {
+          "default": 0.95,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Attainment Fraction",
+          "type": "number"
+        },
+        "threshold_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Threshold Ms",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric",
+        "threshold_ms"
+      ],
+      "title": "LatencyTarget",
+      "type": "object"
+    },
+    "ModelSource": {
+      "additionalProperties": false,
+      "properties": {
+        "alias": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Alias",
+          "type": "string"
+        },
+        "repository": {
+          "minLength": 1,
+          "title": "Repository",
+          "type": "string"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "tokenizer_revision": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Tokenizer Revision"
+        }
+      },
+      "required": [
+        "alias",
+        "repository"
+      ],
+      "title": "ModelSource",
+      "type": "object"
+    },
+    "NetworkInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "pod_cidr": {
+          "format": "ipvanynetwork",
+          "title": "Pod Cidr",
+          "type": "string"
+        },
+        "service_cidr": {
+          "format": "ipvanynetwork",
+          "title": "Service Cidr",
+          "type": "string"
+        },
+        "wireguard_cidr": {
+          "format": "ipvanynetwork",
+          "title": "Wireguard Cidr",
+          "type": "string"
+        }
+      },
+      "required": [
+        "wireguard_cidr",
+        "pod_cidr",
+        "service_cidr"
+      ],
+      "title": "NetworkInfo",
+      "type": "object"
+    },
+    "NodeObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "access": {
+          "$ref": "#/$defs/HostAccess"
+        },
+        "hardware": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GPUHardware"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "kubernetes": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/KubernetesNode"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "managed_by": {
+          "enum": [
+            "foundation",
+            "management"
+          ],
+          "title": "Managed By",
+          "type": "string"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        },
+        "provider": {
+          "enum": [
+            "aws",
+            "lambda"
+          ],
+          "title": "Provider",
+          "type": "string"
+        },
+        "provider_instance_id": {
+          "minLength": 1,
+          "title": "Provider Instance Id",
+          "type": "string"
+        },
+        "public_ip": {
+          "format": "ipvanyaddress",
+          "title": "Public Ip",
+          "type": "string"
+        },
+        "readiness": {
+          "$ref": "#/$defs/Readiness"
+        },
+        "role": {
+          "enum": [
+            "control_plane",
+            "gpu_worker"
+          ],
+          "title": "Role",
+          "type": "string"
+        },
+        "wireguard_ip": {
+          "format": "ipvanyaddress",
+          "title": "Wireguard Ip",
+          "type": "string"
+        },
+        "worker_group_ref": {
+          "anyOf": [
+            {
+              "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Worker Group Ref"
+        }
+      },
+      "required": [
+        "id",
+        "provider",
+        "provider_instance_id",
+        "managed_by",
+        "role",
+        "public_ip",
+        "wireguard_ip",
+        "observed_at",
+        "access",
+        "readiness"
+      ],
+      "title": "NodeObservation",
+      "type": "object"
+    },
+    "Phase": {
+      "additionalProperties": false,
+      "properties": {
+        "arrivals": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+              "$ref": "#/$defs/Arrival"
+            }
+          },
+          "title": "Arrivals",
+          "type": "object"
+        },
+        "duration_s": {
+          "exclusiveMinimum": 0,
+          "title": "Duration S",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "duration_s",
+        "arrivals"
+      ],
+      "title": "Phase",
+      "type": "object"
+    },
+    "PreparedDataset": {
+      "additionalProperties": false,
+      "properties": {
+        "max_rendered_input_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Rendered Input Tokens",
+          "type": "integer"
+        },
+        "prompt_template_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Prompt Template Sha256",
+          "type": "string"
+        },
+        "record_count": {
+          "exclusiveMinimum": 0,
+          "title": "Record Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "tokenizer_revision": {
+          "minLength": 1,
+          "title": "Tokenizer Revision",
+          "type": "string"
+        },
+        "uri": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256",
+        "record_count",
+        "tokenizer_revision",
+        "prompt_template_sha256",
+        "max_rendered_input_tokens"
+      ],
+      "title": "PreparedDataset",
+      "type": "object"
+    },
+    "PromptTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "minLength": 1,
+          "title": "System",
+          "type": "string"
+        },
+        "user": {
+          "minLength": 1,
+          "title": "User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "user"
+      ],
+      "title": "PromptTemplate",
+      "type": "object"
+    },
+    "QualityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluator": {
+          "enum": [
+            "jfleg_gleu",
+            "tutoring_reference_review",
+            "extraction_f1",
+            "hotpotqa_em_f1",
+            "not_evaluated"
+          ],
+          "title": "Evaluator",
+          "type": "string"
+        },
+        "notes": {
+          "minLength": 1,
+          "title": "Notes",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evaluator",
+        "notes"
+      ],
+      "title": "QualityConfig",
+      "type": "object"
+    },
+    "QualityResult": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "evaluator": {
+          "minLength": 1,
+          "title": "Evaluator",
+          "type": "string"
+        },
+        "notes": {
+          "minLength": 1,
+          "title": "Notes",
+          "type": "string"
+        },
+        "scores": {
+          "additionalProperties": {
+            "type": "number"
+          },
+          "propertyNames": {
+            "minLength": 1
+          },
+          "title": "Scores",
+          "type": "object"
+        },
+        "status": {
+          "enum": [
+            "measured",
+            "not_evaluated"
+          ],
+          "title": "Status",
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "evaluator",
+        "status",
+        "notes"
+      ],
+      "title": "QualityResult",
+      "type": "object"
+    },
+    "Readiness": {
+      "additionalProperties": false,
+      "properties": {
+        "cilium": {
+          "default": false,
+          "title": "Cilium",
+          "type": "boolean"
+        },
+        "gpu_runtime": {
+          "default": false,
+          "title": "Gpu Runtime",
+          "type": "boolean"
+        },
+        "host": {
+          "default": false,
+          "title": "Host",
+          "type": "boolean"
+        },
+        "kubernetes": {
+          "default": false,
+          "title": "Kubernetes",
+          "type": "boolean"
+        },
+        "wireguard": {
+          "default": false,
+          "title": "Wireguard",
+          "type": "boolean"
+        }
+      },
+      "title": "Readiness",
+      "type": "object"
+    },
+    "RequestCounts": {
+      "additionalProperties": false,
+      "properties": {
+        "attempted": {
+          "minimum": 0,
+          "title": "Attempted",
+          "type": "integer"
+        },
+        "cancelled": {
+          "minimum": 0,
+          "title": "Cancelled",
+          "type": "integer"
+        },
+        "completed": {
+          "minimum": 0,
+          "title": "Completed",
+          "type": "integer"
+        },
+        "eligible_for_slo": {
+          "minimum": 0,
+          "title": "Eligible For Slo",
+          "type": "integer"
+        },
+        "failed": {
+          "minimum": 0,
+          "title": "Failed",
+          "type": "integer"
+        },
+        "not_sent": {
+          "default": 0,
+          "minimum": 0,
+          "title": "Not Sent",
+          "type": "integer"
+        },
+        "offered": {
+          "minimum": 0,
+          "title": "Offered",
+          "type": "integer"
+        },
+        "rejected": {
+          "minimum": 0,
+          "title": "Rejected",
+          "type": "integer"
+        },
+        "timed_out": {
+          "minimum": 0,
+          "title": "Timed Out",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "offered",
+        "attempted",
+        "eligible_for_slo",
+        "completed",
+        "rejected",
+        "failed",
+        "timed_out",
+        "cancelled"
+      ],
+      "title": "RequestCounts",
+      "type": "object"
+    },
+    "RunResult": {
+      "additionalProperties": false,
+      "properties": {
+        "artifacts": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+              "$ref": "#/$defs/Artifact"
+            }
+          },
+          "title": "Artifacts",
+          "type": "object"
+        },
+        "customer_requests": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$": {
+              "$ref": "#/$defs/RequestCounts"
+            }
+          },
+          "title": "Customer Requests",
+          "type": "object"
+        },
+        "invalid_reasons": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Invalid Reasons",
+          "type": "array"
+        },
+        "measurements": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/CustomerMeasurements"
+          },
+          "title": "Measurements",
+          "type": "array"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "quality": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/QualityResult"
+          },
+          "title": "Quality",
+          "type": "array"
+        },
+        "requests": {
+          "$ref": "#/$defs/RequestCounts"
+        },
+        "slo_assessments": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/SLOAssessment"
+          },
+          "title": "Slo Assessments",
+          "type": "array"
+        },
+        "slo_verdict": {
+          "$ref": "#/$defs/SLOVerdict"
+        },
+        "validity": {
+          "enum": [
+            "valid",
+            "invalid"
+          ],
+          "title": "Validity",
+          "type": "string"
+        }
+      },
+      "required": [
+        "validity",
+        "requests",
+        "customer_requests",
+        "slo_verdict"
+      ],
+      "title": "RunResult",
+      "type": "object"
+    },
+    "RunSnapshot": {
+      "additionalProperties": false,
+      "properties": {
+        "admission_schedule": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/Artifact"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "bindings": {
+          "items": {
+            "$ref": "#/$defs/ServingBinding"
+          },
+          "title": "Bindings",
+          "type": "array"
+        },
+        "customers": {
+          "items": {
+            "$ref": "#/$defs/CustomerSpec"
+          },
+          "title": "Customers",
+          "type": "array"
+        },
+        "datasets": {
+          "items": {
+            "$ref": "#/$defs/DatasetManifest"
+          },
+          "title": "Datasets",
+          "type": "array"
+        },
+        "inventory": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/InfrastructureInventory"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "scenario": {
+          "$ref": "#/$defs/ScenarioSpec"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "serving_profiles": {
+          "items": {
+            "$ref": "#/$defs/ServingProfile"
+          },
+          "title": "Serving Profiles",
+          "type": "array"
+        },
+        "versions": {
+          "$ref": "#/$defs/ExecutionVersions"
+        },
+        "worker_groups": {
+          "items": {
+            "$ref": "#/$defs/WorkerGroupSpec"
+          },
+          "title": "Worker Groups",
+          "type": "array"
+        }
+      },
+      "required": [
+        "scenario",
+        "customers",
+        "serving_profiles",
+        "worker_groups",
+        "datasets",
+        "bindings"
+      ],
+      "title": "RunSnapshot",
+      "type": "object"
+    },
+    "SLOAssessment": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "metric": {
+          "enum": [
+            "completion_latency_ms",
+            "ttft_ms",
+            "tpot_ms",
+            "session_latency_ms"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "minimum_attainment_fraction": {
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Attainment Fraction",
+          "type": "number"
+        },
+        "minimum_eligible_requests": {
+          "exclusiveMinimum": 0,
+          "title": "Minimum Eligible Requests",
+          "type": "integer"
+        },
+        "threshold_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Threshold Ms",
+          "type": "number"
+        },
+        "verdict": {
+          "$ref": "#/$defs/SLOVerdict"
+        },
+        "windows": {
+          "items": {
+            "$ref": "#/$defs/SLOWindow"
+          },
+          "minItems": 1,
+          "title": "Windows",
+          "type": "array"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "metric",
+        "threshold_ms",
+        "minimum_attainment_fraction",
+        "minimum_eligible_requests",
+        "windows",
+        "verdict"
+      ],
+      "title": "SLOAssessment",
+      "type": "object"
+    },
+    "SLOVerdict": {
+      "enum": [
+        "passing",
+        "violating",
+        "insufficient_data",
+        "not_evaluated"
+      ],
+      "title": "SLOVerdict",
+      "type": "string"
+    },
+    "SLOWindow": {
+      "additionalProperties": false,
+      "properties": {
+        "duration_s": {
+          "exclusiveMinimum": 0,
+          "title": "Duration S",
+          "type": "integer"
+        },
+        "eligible_requests": {
+          "minimum": 0,
+          "title": "Eligible Requests",
+          "type": "integer"
+        },
+        "good_requests": {
+          "minimum": 0,
+          "title": "Good Requests",
+          "type": "integer"
+        },
+        "offset_s": {
+          "minimum": 0,
+          "title": "Offset S",
+          "type": "integer"
+        },
+        "verdict": {
+          "$ref": "#/$defs/SLOVerdict"
+        }
+      },
+      "required": [
+        "offset_s",
+        "duration_s",
+        "eligible_requests",
+        "good_requests",
+        "verdict"
+      ],
+      "title": "SLOWindow",
+      "type": "object"
+    },
+    "ScenarioSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "drain_timeout_s": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "title": "Drain Timeout S",
+          "type": "integer"
+        },
+        "faults": {
+          "default": [],
+          "items": {
+            "$ref": "#/$defs/Fault"
+          },
+          "title": "Faults",
+          "type": "array"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "participants": {
+          "items": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+            "type": "string"
+          },
+          "minItems": 1,
+          "title": "Participants",
+          "type": "array"
+        },
+        "phases": {
+          "items": {
+            "$ref": "#/$defs/Phase"
+          },
+          "minItems": 1,
+          "title": "Phases",
+          "type": "array"
+        },
+        "revision": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "seed": {
+          "default": 42,
+          "minimum": 0,
+          "title": "Seed",
+          "type": "integer"
+        },
+        "warmup": {
+          "$ref": "#/$defs/Warmup"
+        }
+      },
+      "required": [
+        "id",
+        "participants",
+        "phases"
+      ],
+      "title": "ScenarioSpec",
+      "type": "object"
+    },
+    "ServingBinding": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Customer Ref",
+          "type": "string"
+        },
+        "deployment_id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Deployment Id",
+          "type": "string"
+        },
+        "serving_profile_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Serving Profile Ref",
+          "type": "string"
+        },
+        "worker_group_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Worker Group Ref",
+          "type": "string"
+        }
+      },
+      "required": [
+        "customer_ref",
+        "serving_profile_ref",
+        "worker_group_ref",
+        "deployment_id"
+      ],
+      "title": "ServingBinding",
+      "type": "object"
+    },
+    "ServingProfile": {
+      "additionalProperties": false,
+      "properties": {
+        "draft": {
+          "default": true,
+          "title": "Draft",
+          "type": "boolean"
+        },
+        "engine": {
+          "$ref": "#/$defs/EngineSettings"
+        },
+        "hardware": {
+          "$ref": "#/$defs/GPURequirements"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "model": {
+          "$ref": "#/$defs/ModelSource"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "revision": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "routing_policy": {
+          "default": "load_aware",
+          "enum": [
+            "load_aware",
+            "cache_aware"
+          ],
+          "title": "Routing Policy",
+          "type": "string"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "topology": {
+          "$ref": "#/$defs/AggregatedTopology"
+        },
+        "worker_class": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Worker Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "model",
+        "engine",
+        "hardware",
+        "worker_class"
+      ],
+      "title": "ServingProfile",
+      "type": "object"
+    },
+    "SpeculativeDecoding": {
+      "additionalProperties": false,
+      "properties": {
+        "method": {
+          "const": "ngram",
+          "title": "Method",
+          "type": "string"
+        },
+        "num_speculative_tokens": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "title": "Num Speculative Tokens",
+          "type": "integer"
+        },
+        "prompt_lookup_max": {
+          "default": 5,
+          "exclusiveMinimum": 0,
+          "title": "Prompt Lookup Max",
+          "type": "integer"
+        },
+        "prompt_lookup_min": {
+          "default": 2,
+          "exclusiveMinimum": 0,
+          "title": "Prompt Lookup Min",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "method"
+      ],
+      "title": "SpeculativeDecoding",
+      "type": "object"
+    },
+    "TrafficAllowance": {
+      "additionalProperties": false,
+      "properties": {
+        "burst_per_second": {
+          "exclusiveMinimum": 0,
+          "title": "Burst Per Second",
+          "type": "number"
+        },
+        "max_burst_duration_s": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "title": "Max Burst Duration S",
+          "type": "integer"
+        },
+        "sustained_per_second": {
+          "exclusiveMinimum": 0,
+          "title": "Sustained Per Second",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "request",
+            "session"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit",
+        "sustained_per_second",
+        "burst_per_second"
+      ],
+      "title": "TrafficAllowance",
+      "type": "object"
+    },
+    "Warmup": {
+      "additionalProperties": false,
+      "properties": {
+        "datasets": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+              "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+              "type": "string"
+            }
+          },
+          "title": "Datasets",
+          "type": "object"
+        },
+        "duration_s": {
+          "default": 60,
+          "minimum": 0,
+          "title": "Duration S",
+          "type": "integer"
+        }
+      },
+      "title": "Warmup",
+      "type": "object"
+    },
+    "WorkerGroupSpec": {
+      "additionalProperties": false,
+      "properties": {
+        "desired_instances": {
+          "default": 1,
+          "minimum": 0,
+          "title": "Desired Instances",
+          "type": "integer"
+        },
+        "drain_timeout_s": {
+          "default": 120,
+          "exclusiveMinimum": 0,
+          "title": "Drain Timeout S",
+          "type": "integer"
+        },
+        "hardware": {
+          "$ref": "#/$defs/GPUHardware"
+        },
+        "host_profile": {
+          "default": "lambda-gpu-worker-v1",
+          "minLength": 1,
+          "title": "Host Profile",
+          "type": "string"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        },
+        "instance_type": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Instance Type"
+        },
+        "notes": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Notes"
+        },
+        "provider": {
+          "const": "lambda",
+          "default": "lambda",
+          "title": "Provider",
+          "type": "string"
+        },
+        "region": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Region"
+        },
+        "revision": {
+          "default": 1,
+          "exclusiveMinimum": 0,
+          "title": "Revision",
+          "type": "integer"
+        },
+        "schema_version": {
+          "const": "0.1",
+          "default": "0.1",
+          "title": "Schema Version",
+          "type": "string"
+        },
+        "ttl_minutes": {
+          "default": 90,
+          "exclusiveMinimum": 0,
+          "title": "Ttl Minutes",
+          "type": "integer"
+        },
+        "worker_class": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Worker Class",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "hardware",
+        "worker_class"
+      ],
+      "title": "WorkerGroupSpec",
+      "type": "object"
+    },
+    "Workload": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Dataset Ref",
+          "type": "string"
+        },
+        "interaction": {
+          "enum": [
+            "independent_requests",
+            "session"
+          ],
+          "title": "Interaction",
+          "type": "string"
+        },
+        "preserve_recorded_context": {
+          "default": false,
+          "title": "Preserve Recorded Context",
+          "type": "boolean"
+        },
+        "prompt_template": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "task": {
+          "enum": [
+            "sentence_correction",
+            "coding",
+            "tutoring",
+            "extraction",
+            "research"
+          ],
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "dataset_ref",
+        "interaction"
+      ],
+      "title": "Workload",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/run.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "created_at": {
+      "format": "date-time",
+      "title": "Created At",
+      "type": "string"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ErrorInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "execution_attempt": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Execution Attempt",
+      "type": "integer"
+    },
+    "finished_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finished At"
+    },
+    "fixture": {
+      "default": false,
+      "title": "Fixture",
+      "type": "boolean"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "result": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/RunResult"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "snapshot": {
+      "$ref": "#/$defs/RunSnapshot"
+    },
+    "stage": {
+      "anyOf": [
+        {
+          "enum": [
+            "preparing",
+            "warming_up",
+            "measuring",
+            "draining",
+            "finalizing"
+          ],
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Stage"
+    },
+    "started_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Started At"
+    },
+    "status": {
+      "$ref": "#/$defs/ExecutionStatus"
+    }
+  },
+  "required": [
+    "id",
+    "status",
+    "created_at",
+    "snapshot"
+  ],
+  "title": "Run",
+  "type": "object"
+}

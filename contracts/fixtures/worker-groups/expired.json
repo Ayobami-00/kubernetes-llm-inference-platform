@@ -1,0 +1,47 @@
+{
+  "fixture": true,
+  "schema_version": "0.1",
+  "spec": {
+    "desired_instances": 1,
+    "drain_timeout_s": 120,
+    "hardware": {
+      "gpu_count": 1,
+      "gpu_model": "A10",
+      "vendor": "nvidia",
+      "vram_gib_per_gpu": 24.0
+    },
+    "host_profile": "lambda-gpu-worker-v1",
+    "id": "latency-workers",
+    "instance_type": null,
+    "notes": "DRAFT hardware description. Resolve actual Lambda SKU, region and availability before allocation.",
+    "provider": "lambda",
+    "region": null,
+    "revision": 1,
+    "schema_version": "0.1",
+    "ttl_minutes": 90,
+    "worker_class": "latency"
+  },
+  "status": {
+    "active_operation_id": null,
+    "allocated_at": "2026-11-03T12:00:00Z",
+    "counts": {
+      "allocated_instances": 0,
+      "desired_instances": 1,
+      "gpu_ready_nodes": 0,
+      "joined_nodes": 0
+    },
+    "expires_at": "2026-11-03T13:30:00Z",
+    "members": [
+      {
+        "error": null,
+        "node_name": "lambda-latency-01",
+        "node_uid": "fixture-node-latency-01",
+        "phase": "terminated",
+        "provider_instance_id": "fixture-lambda-latency-01"
+      }
+    ],
+    "observed_at": "2026-11-03T13:31:00Z",
+    "phase": "expired",
+    "worker_group_ref": "latency-workers@1"
+  }
+}

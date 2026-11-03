@@ -1,0 +1,22 @@
+schema_version: '0.1'
+id: hotpotqa
+revision: 1
+notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+source:
+  url: https://hotpotqa.github.io/
+  revision: null
+  subset: development distractor
+  license: CC-BY-SA-4.0
+  filters: {}
+format: custom_multi_turn
+interaction: session
+references: answers_and_supporting_facts
+timing_provenance: experimental_assumption
+preparation:
+- Pin the development distractor source; reserve disjoint warmup examples.
+- Prepare ordered evidence-selection and answer steps retaining answers and supporting facts.
+- Label step timing as assumed; record templates, token lengths, filtering and checksums.
+limitations:
+- Prepared multi-hop QA substeps, not a full web browsing or retrieval agent.
+- No claim that these are Parallel production requests or timing traces.
+prepared: null

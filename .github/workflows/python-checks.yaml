@@ -1,0 +1,23 @@
+name: Python contracts
+
+on:
+  push:
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  contracts:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: "3.12"
+      - run: uv sync --locked --all-packages
+      - run: uv run --locked --package platform-contracts ruff check .
+      - run: uv run --locked --package platform-contracts ruff format --check .
+      - run: uv run --locked --package platform-contracts pytest
+      - run: bash scripts/check-generated.sh

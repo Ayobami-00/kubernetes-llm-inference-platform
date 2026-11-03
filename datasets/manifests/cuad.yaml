@@ -1,0 +1,22 @@
+schema_version: '0.1'
+id: cuad
+revision: 1
+notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+source:
+  url: https://www.atticusprojectai.org/cuad/
+  revision: null
+  subset: CUAD v1 held-out clause extraction
+  license: CC-BY-4.0
+  filters: {}
+format: custom_single_turn
+interaction: independent_requests
+references: clause_spans
+timing_provenance: not_provided
+preparation:
+- Pin the CUAD v1 source and held-out split; reserve disjoint warmup examples.
+- Prepare evidence-preserving text chunks and clause prompts with retained reference spans.
+- Record transformations, token lengths, filtering and checksums.
+limitations:
+- Document text extraction only; no PDF rendering or OCR.
+- Chunked or otherwise adapted evaluation is not an official CUAD score.
+prepared: null

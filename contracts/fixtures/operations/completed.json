@@ -1,0 +1,19 @@
+{
+  "cleanup_pending": false,
+  "created_at": "2026-11-03T12:00:00Z",
+  "current_step": null,
+  "error": null,
+  "finished_at": "2026-11-03T12:05:00Z",
+  "fixture": true,
+  "id": "fixture-operation-completed",
+  "schema_version": "0.1",
+  "started_at": "2026-11-03T12:00:01Z",
+  "status": "completed",
+  "target": {
+    "requested_revision": 1,
+    "resource_id": "latency-workers",
+    "resource_type": "worker_group"
+  },
+  "type": "create_worker_group",
+  "updated_at": "2026-11-03T12:05:00Z"
+}

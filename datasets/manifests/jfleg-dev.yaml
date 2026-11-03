@@ -1,0 +1,22 @@
+schema_version: '0.1'
+id: jfleg-dev
+revision: 1
+notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+source:
+  url: https://github.com/keisks/jfleg
+  revision: null
+  subset: dev
+  license: null
+  filters: {}
+format: custom_single_turn
+interaction: independent_requests
+references: multiple_corrections
+timing_provenance: not_provided
+preparation:
+- Pair original source sentences with all four references.
+- Use only for unscored warmup.
+- Render the GEC prompt and record tokenizer, template hash, filtering and checksums.
+limitations:
+- No keystroke timing or real Grammarly traffic.
+- Fluency edits are broader than minimal grammar edits.
+prepared: null

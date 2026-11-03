@@ -1,0 +1,219 @@
+{
+  "$defs": {
+    "DatasetSource": {
+      "additionalProperties": false,
+      "properties": {
+        "filters": {
+          "additionalProperties": {
+            "type": "string"
+          },
+          "title": "Filters",
+          "type": "object"
+        },
+        "license": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "License"
+        },
+        "revision": {
+          "anyOf": [
+            {
+              "minLength": 1,
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Revision"
+        },
+        "subset": {
+          "minLength": 1,
+          "title": "Subset",
+          "type": "string"
+        },
+        "url": {
+          "format": "uri",
+          "maxLength": 2083,
+          "minLength": 1,
+          "title": "Url",
+          "type": "string"
+        }
+      },
+      "required": [
+        "url",
+        "subset"
+      ],
+      "title": "DatasetSource",
+      "type": "object"
+    },
+    "PreparedDataset": {
+      "additionalProperties": false,
+      "properties": {
+        "max_rendered_input_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Rendered Input Tokens",
+          "type": "integer"
+        },
+        "prompt_template_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Prompt Template Sha256",
+          "type": "string"
+        },
+        "record_count": {
+          "exclusiveMinimum": 0,
+          "title": "Record Count",
+          "type": "integer"
+        },
+        "sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Sha256",
+          "type": "string"
+        },
+        "tokenizer_revision": {
+          "minLength": 1,
+          "title": "Tokenizer Revision",
+          "type": "string"
+        },
+        "uri": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri",
+        "sha256",
+        "record_count",
+        "tokenizer_revision",
+        "prompt_template_sha256",
+        "max_rendered_input_tokens"
+      ],
+      "title": "PreparedDataset",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/dataset-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "format": {
+      "enum": [
+        "custom_single_turn",
+        "custom_multi_turn",
+        "exgentic_snapshot"
+      ],
+      "title": "Format",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "interaction": {
+      "enum": [
+        "independent_requests",
+        "session"
+      ],
+      "title": "Interaction",
+      "type": "string"
+    },
+    "limitations": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Limitations",
+      "type": "array"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    },
+    "preparation": {
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Preparation",
+      "type": "array"
+    },
+    "prepared": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/PreparedDataset"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "references": {
+      "enum": [
+        "multiple_corrections",
+        "dialogue_annotations",
+        "clause_spans",
+        "answers_and_supporting_facts",
+        "not_available"
+      ],
+      "title": "References",
+      "type": "string"
+    },
+    "revision": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source": {
+      "$ref": "#/$defs/DatasetSource"
+    },
+    "timing_provenance": {
+      "enum": [
+        "experimental_assumption",
+        "recorded_trace",
+        "not_provided"
+      ],
+      "title": "Timing Provenance",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "source",
+    "format",
+    "interaction",
+    "references",
+    "timing_provenance",
+    "preparation",
+    "limitations"
+  ],
+  "title": "DatasetManifest",
+  "type": "object"
+}

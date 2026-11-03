@@ -1,0 +1,21 @@
+schema_version: '0.1'
+id: jfleg-test
+revision: 1
+notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+source:
+  url: https://github.com/keisks/jfleg
+  revision: null
+  subset: test
+  license: null
+  filters: {}
+format: custom_single_turn
+interaction: independent_requests
+references: multiple_corrections
+timing_provenance: not_provided
+preparation:
+- Preserve source sentences and all four references.
+- Keep evaluation separate from development warmup.
+- Render the GEC prompt and record tokenizer, template hash, filtering and checksums.
+limitations:
+- Public task proxy, not customer text or production length distribution.
+prepared: null

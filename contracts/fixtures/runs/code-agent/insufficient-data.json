@@ -1,0 +1,316 @@
+{
+  "created_at": "2026-11-03T12:00:00Z",
+  "error": null,
+  "execution_attempt": 1,
+  "finished_at": "2026-11-03T12:13:01Z",
+  "fixture": true,
+  "id": "fixture-code-agent-insufficient-data",
+  "result": {
+    "artifacts": {
+      "request-records": {
+        "sha256": null,
+        "uri": "fixture://runs/code-agent/insufficient-data/requests.jsonl"
+      }
+    },
+    "customer_requests": {
+      "code-agent@1": {
+        "attempted": 10,
+        "cancelled": 0,
+        "completed": 10,
+        "eligible_for_slo": 10,
+        "failed": 0,
+        "not_sent": 0,
+        "offered": 10,
+        "rejected": 0,
+        "timed_out": 0
+      }
+    },
+    "invalid_reasons": [],
+    "measurements": [
+      {
+        "cached_input_tokens": 0,
+        "customer_ref": "code-agent@1",
+        "input_tokens": 320,
+        "latencies": {
+          "ttft_ms": {
+            "p50_ms": 800.0,
+            "p95_ms": 1600.0,
+            "p99_ms": 1980.0,
+            "sample_count": 10
+          }
+        },
+        "output_tokens": 160
+      }
+    ],
+    "notes": "Synthetic test data; counts and latencies are illustrative, not seed-42 execution results.",
+    "quality": [
+      {
+        "customer_ref": "code-agent@1",
+        "evaluator": "not_evaluated",
+        "notes": "Synthetic fixture: no quality evaluation has been executed.",
+        "scores": {},
+        "status": "not_evaluated"
+      }
+    ],
+    "requests": {
+      "attempted": 10,
+      "cancelled": 0,
+      "completed": 10,
+      "eligible_for_slo": 10,
+      "failed": 0,
+      "not_sent": 0,
+      "offered": 10,
+      "rejected": 0,
+      "timed_out": 0
+    },
+    "slo_assessments": [
+      {
+        "customer_ref": "code-agent@1",
+        "metric": "ttft_ms",
+        "minimum_attainment_fraction": 0.95,
+        "minimum_eligible_requests": 20,
+        "threshold_ms": 2000.0,
+        "verdict": "insufficient_data",
+        "windows": [
+          {
+            "duration_s": 300,
+            "eligible_requests": 5,
+            "good_requests": 5,
+            "offset_s": 0,
+            "verdict": "insufficient_data"
+          },
+          {
+            "duration_s": 300,
+            "eligible_requests": 5,
+            "good_requests": 5,
+            "offset_s": 300,
+            "verdict": "insufficient_data"
+          }
+        ]
+      }
+    ],
+    "slo_verdict": "insufficient_data",
+    "validity": "valid"
+  },
+  "schema_version": "0.1",
+  "snapshot": {
+    "admission_schedule": null,
+    "bindings": [
+      {
+        "customer_ref": "code-agent@1",
+        "deployment_id": "code-large",
+        "serving_profile_ref": "code-agent-baseline@1",
+        "worker_group_ref": "large-workers@1"
+      }
+    ],
+    "customers": [
+      {
+        "generation": {
+          "max_output_tokens": 2048,
+          "streaming": true,
+          "temperature": 0.0
+        },
+        "id": "code-agent",
+        "limits": {
+          "max_inflight_requests": 8,
+          "max_rendered_input_tokens": 16384,
+          "request_timeout_ms": 120000
+        },
+        "model_alias": "code-large",
+        "name": "CodeAgent",
+        "notes": "DRAFT experimental settings, not measured production behavior. Cognition/Devin-inspired coding workload. Exgentic is an independent public proxy.",
+        "quality": {
+          "evaluator": "not_evaluated",
+          "notes": "Recorded call replay does not execute tools, solve SWE-bench tasks, or measure agent success."
+        },
+        "reserved_concurrency": 0,
+        "revision": 1,
+        "schema_version": "0.1",
+        "slo": {
+          "minimum_eligible_requests": 20,
+          "targets": [
+            {
+              "metric": "ttft_ms",
+              "minimum_attainment_fraction": 0.95,
+              "threshold_ms": 2000.0
+            }
+          ],
+          "window_s": 300
+        },
+        "tier": "dedicated",
+        "traffic_allowance": {
+          "burst_per_second": 0.06666666666666667,
+          "max_burst_duration_s": 60,
+          "sustained_per_second": 0.03333333333333333,
+          "unit": "session"
+        },
+        "workload": {
+          "dataset_ref": "exgentic-code@1",
+          "interaction": "session",
+          "preserve_recorded_context": true,
+          "prompt_template": null,
+          "task": "coding"
+        }
+      }
+    ],
+    "datasets": [
+      {
+        "format": "exgentic_snapshot",
+        "id": "exgentic-code",
+        "interaction": "session",
+        "limitations": [
+          "The source revision is the documented AIPerf v0.13.0 default; preparation has not run.",
+          "No tools execute and live responses do not change later recorded contexts.",
+          "Replay cannot measure SWE-bench resolution rate or complete agent quality."
+        ],
+        "notes": "Source manifest only: no data downloaded, converted, tokenized or benchmarked.",
+        "preparation": [
+          "Confirm the pinned source revision matches the selected AIPerf release before preparation.",
+          "Select bounded sessions; preserve recorded messages, tool schemas, call controls and residual delays.",
+          "Filter unsupported rendered contexts and report exclusion counts; never silently truncate.",
+          "Preserve session identities and response-dependent ordering without executing tools."
+        ],
+        "prepared": null,
+        "references": "not_available",
+        "revision": 1,
+        "schema_version": "0.1",
+        "source": {
+          "filters": {
+            "benchmark": "swebench"
+          },
+          "license": null,
+          "revision": "4b8ad4ab198438e5a170f9171c19c6a2cf7c1814",
+          "subset": "SWE-bench coding sessions",
+          "url": "https://huggingface.co/datasets/Exgentic/agent-llm-traces-v2"
+        },
+        "timing_provenance": "recorded_trace"
+      }
+    ],
+    "inventory": null,
+    "scenario": {
+      "drain_timeout_s": 120,
+      "faults": [],
+      "id": "code-agent-baseline",
+      "notes": "DRAFT deterministic experiment configuration; arrival rates are assumptions, not customer telemetry.",
+      "participants": [
+        "code-agent@1"
+      ],
+      "phases": [
+        {
+          "arrivals": {
+            "code-agent": {
+              "pattern": "poisson",
+              "per": "minute",
+              "rate": 1.0,
+              "unit": "session"
+            }
+          },
+          "duration_s": 180,
+          "id": "steady"
+        },
+        {
+          "arrivals": {
+            "code-agent": {
+              "pattern": "poisson",
+              "per": "minute",
+              "rate": 3.0,
+              "unit": "session"
+            }
+          },
+          "duration_s": 60,
+          "id": "burst"
+        },
+        {
+          "arrivals": {
+            "code-agent": {
+              "pattern": "poisson",
+              "per": "minute",
+              "rate": 1.0,
+              "unit": "session"
+            }
+          },
+          "duration_s": 360,
+          "id": "recovery"
+        }
+      ],
+      "revision": 1,
+      "schema_version": "0.1",
+      "seed": 42,
+      "warmup": {
+        "datasets": {},
+        "duration_s": 60
+      }
+    },
+    "schema_version": "0.1",
+    "serving_profiles": [
+      {
+        "draft": true,
+        "engine": {
+          "backend": "vllm",
+          "dtype": "bfloat16",
+          "gpu_memory_utilization": 0.8,
+          "image": null,
+          "max_model_len": 32768,
+          "max_num_seqs": 4,
+          "prefix_caching": true,
+          "speculative_decoding": null
+        },
+        "hardware": {
+          "gpu_model": "H100",
+          "min_vram_gib_per_gpu": 80.0,
+          "vendor": "nvidia"
+        },
+        "id": "code-agent-baseline",
+        "model": {
+          "alias": "code-large",
+          "repository": "Qwen/Qwen3-235B-A22B",
+          "revision": null,
+          "tokenizer_revision": null
+        },
+        "notes": "Unvalidated model and hardware candidate; pins, compatibility and memory headroom require verification.",
+        "revision": 1,
+        "routing_policy": "load_aware",
+        "schema_version": "0.1",
+        "topology": {
+          "gpus_per_replica": 8,
+          "kind": "aggregated",
+          "pipeline_parallel_size": 1,
+          "replicas": 1,
+          "tensor_parallel_size": 8
+        },
+        "worker_class": "large"
+      }
+    ],
+    "versions": {
+      "aiperf_version": null,
+      "evaluator_version": null,
+      "platform_versions": {},
+      "runner_image": null
+    },
+    "worker_groups": [
+      {
+        "desired_instances": 1,
+        "drain_timeout_s": 120,
+        "hardware": {
+          "gpu_count": 8,
+          "gpu_model": "H100",
+          "vendor": "nvidia",
+          "vram_gib_per_gpu": 80.0
+        },
+        "host_profile": "lambda-gpu-worker-v1",
+        "id": "large-workers",
+        "instance_type": null,
+        "notes": "DRAFT hardware description. Resolve actual Lambda SKU, region and availability before allocation.",
+        "provider": "lambda",
+        "region": null,
+        "revision": 1,
+        "schema_version": "0.1",
+        "ttl_minutes": 90,
+        "worker_class": "large"
+      }
+    ]
+  },
+  "stage": null,
+  "started_at": "2026-11-03T12:00:01Z",
+  "status": "completed"
+}

@@ -1,0 +1,209 @@
+{
+  "$defs": {
+    "Arrival": {
+      "additionalProperties": false,
+      "properties": {
+        "pattern": {
+          "default": "poisson",
+          "enum": [
+            "poisson",
+            "constant"
+          ],
+          "title": "Pattern",
+          "type": "string"
+        },
+        "per": {
+          "default": "second",
+          "enum": [
+            "second",
+            "minute"
+          ],
+          "title": "Per",
+          "type": "string"
+        },
+        "rate": {
+          "exclusiveMinimum": 0,
+          "title": "Rate",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "request",
+            "session"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit",
+        "rate"
+      ],
+      "title": "Arrival",
+      "type": "object"
+    },
+    "Fault": {
+      "additionalProperties": false,
+      "properties": {
+        "customer_id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Customer Id",
+          "type": "string"
+        },
+        "kind": {
+          "const": "pod_delete",
+          "title": "Kind",
+          "type": "string"
+        },
+        "offset_s": {
+          "minimum": 0,
+          "title": "Offset S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "kind",
+        "customer_id",
+        "offset_s"
+      ],
+      "title": "Fault",
+      "type": "object"
+    },
+    "Phase": {
+      "additionalProperties": false,
+      "properties": {
+        "arrivals": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+              "$ref": "#/$defs/Arrival"
+            }
+          },
+          "title": "Arrivals",
+          "type": "object"
+        },
+        "duration_s": {
+          "exclusiveMinimum": 0,
+          "title": "Duration S",
+          "type": "integer"
+        },
+        "id": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+          "title": "Id",
+          "type": "string"
+        }
+      },
+      "required": [
+        "id",
+        "duration_s",
+        "arrivals"
+      ],
+      "title": "Phase",
+      "type": "object"
+    },
+    "Warmup": {
+      "additionalProperties": false,
+      "properties": {
+        "datasets": {
+          "patternProperties": {
+            "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+              "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+              "type": "string"
+            }
+          },
+          "title": "Datasets",
+          "type": "object"
+        },
+        "duration_s": {
+          "default": 60,
+          "minimum": 0,
+          "title": "Duration S",
+          "type": "integer"
+        }
+      },
+      "title": "Warmup",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/scenario.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "drain_timeout_s": {
+      "default": 120,
+      "exclusiveMinimum": 0,
+      "title": "Drain Timeout S",
+      "type": "integer"
+    },
+    "faults": {
+      "default": [],
+      "items": {
+        "$ref": "#/$defs/Fault"
+      },
+      "title": "Faults",
+      "type": "array"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    },
+    "participants": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Participants",
+      "type": "array"
+    },
+    "phases": {
+      "items": {
+        "$ref": "#/$defs/Phase"
+      },
+      "minItems": 1,
+      "title": "Phases",
+      "type": "array"
+    },
+    "revision": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "seed": {
+      "default": 42,
+      "minimum": 0,
+      "title": "Seed",
+      "type": "integer"
+    },
+    "warmup": {
+      "$ref": "#/$defs/Warmup"
+    }
+  },
+  "required": [
+    "id",
+    "participants",
+    "phases"
+  ],
+  "title": "ScenarioSpec",
+  "type": "object"
+}

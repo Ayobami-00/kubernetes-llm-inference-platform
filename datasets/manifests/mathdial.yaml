@@ -1,0 +1,22 @@
+schema_version: '0.1'
+id: mathdial
+revision: 1
+notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+source:
+  url: https://github.com/eth-nlped/mathdial
+  revision: null
+  subset: held-out tutoring dialogues
+  license: null
+  filters: {}
+format: custom_multi_turn
+interaction: session
+references: dialogue_annotations
+timing_provenance: experimental_assumption
+preparation:
+- Choose and pin the held-out split, reserving disjoint warmup examples.
+- Preserve dialogue ordering and recorded context; label timing as experimental.
+- Render templates, tokenize and report all context filtering.
+limitations:
+- Human teachers interact with LLM-simulated students.
+- Math tutoring is narrower than MasterClass teaching agents; not real student traffic.
+prepared: null

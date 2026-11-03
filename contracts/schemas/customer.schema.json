@@ -1,0 +1,350 @@
+{
+  "$defs": {
+    "CustomerLimits": {
+      "additionalProperties": false,
+      "properties": {
+        "max_inflight_requests": {
+          "exclusiveMinimum": 0,
+          "title": "Max Inflight Requests",
+          "type": "integer"
+        },
+        "max_rendered_input_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Rendered Input Tokens",
+          "type": "integer"
+        },
+        "request_timeout_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Request Timeout Ms",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "max_rendered_input_tokens",
+        "max_inflight_requests",
+        "request_timeout_ms"
+      ],
+      "title": "CustomerLimits",
+      "type": "object"
+    },
+    "CustomerSLO": {
+      "additionalProperties": false,
+      "properties": {
+        "minimum_eligible_requests": {
+          "default": 20,
+          "exclusiveMinimum": 0,
+          "title": "Minimum Eligible Requests",
+          "type": "integer"
+        },
+        "targets": {
+          "items": {
+            "$ref": "#/$defs/LatencyTarget"
+          },
+          "minItems": 1,
+          "title": "Targets",
+          "type": "array"
+        },
+        "window_s": {
+          "default": 300,
+          "exclusiveMinimum": 0,
+          "title": "Window S",
+          "type": "integer"
+        }
+      },
+      "required": [
+        "targets"
+      ],
+      "title": "CustomerSLO",
+      "type": "object"
+    },
+    "Generation": {
+      "additionalProperties": false,
+      "properties": {
+        "max_output_tokens": {
+          "exclusiveMinimum": 0,
+          "title": "Max Output Tokens",
+          "type": "integer"
+        },
+        "streaming": {
+          "default": false,
+          "title": "Streaming",
+          "type": "boolean"
+        },
+        "temperature": {
+          "default": 0.0,
+          "maximum": 2,
+          "minimum": 0,
+          "title": "Temperature",
+          "type": "number"
+        }
+      },
+      "required": [
+        "max_output_tokens"
+      ],
+      "title": "Generation",
+      "type": "object"
+    },
+    "LatencyTarget": {
+      "additionalProperties": false,
+      "properties": {
+        "metric": {
+          "enum": [
+            "completion_latency_ms",
+            "ttft_ms",
+            "tpot_ms",
+            "session_latency_ms"
+          ],
+          "title": "Metric",
+          "type": "string"
+        },
+        "minimum_attainment_fraction": {
+          "default": 0.95,
+          "exclusiveMinimum": 0,
+          "maximum": 1,
+          "minimum": 0,
+          "title": "Minimum Attainment Fraction",
+          "type": "number"
+        },
+        "threshold_ms": {
+          "exclusiveMinimum": 0,
+          "title": "Threshold Ms",
+          "type": "number"
+        }
+      },
+      "required": [
+        "metric",
+        "threshold_ms"
+      ],
+      "title": "LatencyTarget",
+      "type": "object"
+    },
+    "PromptTemplate": {
+      "additionalProperties": false,
+      "properties": {
+        "system": {
+          "minLength": 1,
+          "title": "System",
+          "type": "string"
+        },
+        "user": {
+          "minLength": 1,
+          "title": "User",
+          "type": "string"
+        }
+      },
+      "required": [
+        "system",
+        "user"
+      ],
+      "title": "PromptTemplate",
+      "type": "object"
+    },
+    "QualityConfig": {
+      "additionalProperties": false,
+      "properties": {
+        "evaluator": {
+          "enum": [
+            "jfleg_gleu",
+            "tutoring_reference_review",
+            "extraction_f1",
+            "hotpotqa_em_f1",
+            "not_evaluated"
+          ],
+          "title": "Evaluator",
+          "type": "string"
+        },
+        "notes": {
+          "minLength": 1,
+          "title": "Notes",
+          "type": "string"
+        }
+      },
+      "required": [
+        "evaluator",
+        "notes"
+      ],
+      "title": "QualityConfig",
+      "type": "object"
+    },
+    "TrafficAllowance": {
+      "additionalProperties": false,
+      "properties": {
+        "burst_per_second": {
+          "exclusiveMinimum": 0,
+          "title": "Burst Per Second",
+          "type": "number"
+        },
+        "max_burst_duration_s": {
+          "default": 60,
+          "exclusiveMinimum": 0,
+          "title": "Max Burst Duration S",
+          "type": "integer"
+        },
+        "sustained_per_second": {
+          "exclusiveMinimum": 0,
+          "title": "Sustained Per Second",
+          "type": "number"
+        },
+        "unit": {
+          "enum": [
+            "request",
+            "session"
+          ],
+          "title": "Unit",
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit",
+        "sustained_per_second",
+        "burst_per_second"
+      ],
+      "title": "TrafficAllowance",
+      "type": "object"
+    },
+    "Workload": {
+      "additionalProperties": false,
+      "properties": {
+        "dataset_ref": {
+          "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+          "title": "Dataset Ref",
+          "type": "string"
+        },
+        "interaction": {
+          "enum": [
+            "independent_requests",
+            "session"
+          ],
+          "title": "Interaction",
+          "type": "string"
+        },
+        "preserve_recorded_context": {
+          "default": false,
+          "title": "Preserve Recorded Context",
+          "type": "boolean"
+        },
+        "prompt_template": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/PromptTemplate"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "task": {
+          "enum": [
+            "sentence_correction",
+            "coding",
+            "tutoring",
+            "extraction",
+            "research"
+          ],
+          "title": "Task",
+          "type": "string"
+        }
+      },
+      "required": [
+        "task",
+        "dataset_ref",
+        "interaction"
+      ],
+      "title": "Workload",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/customer.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "generation": {
+      "$ref": "#/$defs/Generation"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "limits": {
+      "$ref": "#/$defs/CustomerLimits"
+    },
+    "model_alias": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Model Alias",
+      "type": "string"
+    },
+    "name": {
+      "minLength": 1,
+      "title": "Name",
+      "type": "string"
+    },
+    "notes": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Notes"
+    },
+    "quality": {
+      "$ref": "#/$defs/QualityConfig"
+    },
+    "reserved_concurrency": {
+      "default": 0,
+      "minimum": 0,
+      "title": "Reserved Concurrency",
+      "type": "integer"
+    },
+    "revision": {
+      "default": 1,
+      "exclusiveMinimum": 0,
+      "title": "Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "slo": {
+      "$ref": "#/$defs/CustomerSLO"
+    },
+    "tier": {
+      "enum": [
+        "dedicated",
+        "provisioned",
+        "best_effort"
+      ],
+      "title": "Tier",
+      "type": "string"
+    },
+    "traffic_allowance": {
+      "$ref": "#/$defs/TrafficAllowance"
+    },
+    "workload": {
+      "$ref": "#/$defs/Workload"
+    }
+  },
+  "required": [
+    "id",
+    "name",
+    "model_alias",
+    "tier",
+    "workload",
+    "generation",
+    "limits",
+    "traffic_allowance",
+    "slo",
+    "quality"
+  ],
+  "title": "CustomerSpec",
+  "type": "object"
+}

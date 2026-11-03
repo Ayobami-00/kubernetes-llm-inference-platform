@@ -1,0 +1,343 @@
+{
+  "created_at": "2026-11-03T12:00:00Z",
+  "error": null,
+  "execution_attempt": 1,
+  "finished_at": "2026-11-03T12:13:01Z",
+  "fixture": true,
+  "id": "fixture-writer-assist-completed-violating",
+  "result": {
+    "artifacts": {
+      "request-records": {
+        "sha256": null,
+        "uri": "fixture://runs/writer-assist/completed-violating/requests.jsonl"
+      }
+    },
+    "customer_requests": {
+      "writer-assist@1": {
+        "attempted": 200,
+        "cancelled": 0,
+        "completed": 196,
+        "eligible_for_slo": 200,
+        "failed": 1,
+        "not_sent": 0,
+        "offered": 200,
+        "rejected": 2,
+        "timed_out": 1
+      }
+    },
+    "invalid_reasons": [],
+    "measurements": [
+      {
+        "cached_input_tokens": 0,
+        "customer_ref": "writer-assist@1",
+        "input_tokens": 6400,
+        "latencies": {
+          "completion_latency_ms": {
+            "p50_ms": 400.0,
+            "p95_ms": 1500.0,
+            "p99_ms": 2000.0,
+            "sample_count": 196
+          }
+        },
+        "output_tokens": 3136
+      }
+    ],
+    "notes": "Synthetic test data; counts and latencies are illustrative, not seed-42 execution results.",
+    "quality": [
+      {
+        "customer_ref": "writer-assist@1",
+        "evaluator": "jfleg_gleu",
+        "notes": "Synthetic fixture: no quality evaluation has been executed.",
+        "scores": {},
+        "status": "not_evaluated"
+      }
+    ],
+    "requests": {
+      "attempted": 200,
+      "cancelled": 0,
+      "completed": 196,
+      "eligible_for_slo": 200,
+      "failed": 1,
+      "not_sent": 0,
+      "offered": 200,
+      "rejected": 2,
+      "timed_out": 1
+    },
+    "slo_assessments": [
+      {
+        "customer_ref": "writer-assist@1",
+        "metric": "completion_latency_ms",
+        "minimum_attainment_fraction": 0.95,
+        "minimum_eligible_requests": 100,
+        "threshold_ms": 1000.0,
+        "verdict": "violating",
+        "windows": [
+          {
+            "duration_s": 300,
+            "eligible_requests": 100,
+            "good_requests": 90,
+            "offset_s": 0,
+            "verdict": "violating"
+          },
+          {
+            "duration_s": 300,
+            "eligible_requests": 100,
+            "good_requests": 90,
+            "offset_s": 300,
+            "verdict": "violating"
+          }
+        ]
+      }
+    ],
+    "slo_verdict": "violating",
+    "validity": "valid"
+  },
+  "schema_version": "0.1",
+  "snapshot": {
+    "admission_schedule": null,
+    "bindings": [
+      {
+        "customer_ref": "writer-assist@1",
+        "deployment_id": "gec",
+        "serving_profile_ref": "gec-baseline@1",
+        "worker_group_ref": "latency-workers@1"
+      }
+    ],
+    "customers": [
+      {
+        "generation": {
+          "max_output_tokens": 128,
+          "streaming": false,
+          "temperature": 0.0
+        },
+        "id": "writer-assist",
+        "limits": {
+          "max_inflight_requests": 8,
+          "max_rendered_input_tokens": 512,
+          "request_timeout_ms": 2000
+        },
+        "model_alias": "gec-small",
+        "name": "WriterAssist",
+        "notes": "DRAFT experimental settings, not measured production behavior. Grammarly-like proactive sentence correction; public task proxy, not customer logs.",
+        "quality": {
+          "evaluator": "jfleg_gleu",
+          "notes": "Aggregate fluency evaluation against multiple references; not exact-match accuracy."
+        },
+        "reserved_concurrency": 0,
+        "revision": 1,
+        "schema_version": "0.1",
+        "slo": {
+          "minimum_eligible_requests": 100,
+          "targets": [
+            {
+              "metric": "completion_latency_ms",
+              "minimum_attainment_fraction": 0.95,
+              "threshold_ms": 1000.0
+            }
+          ],
+          "window_s": 300
+        },
+        "tier": "dedicated",
+        "traffic_allowance": {
+          "burst_per_second": 2.0,
+          "max_burst_duration_s": 60,
+          "sustained_per_second": 1.0,
+          "unit": "request"
+        },
+        "workload": {
+          "dataset_ref": "jfleg-test@1",
+          "interaction": "independent_requests",
+          "preserve_recorded_context": false,
+          "prompt_template": {
+            "system": "Correct grammar and improve fluency. Return only the corrected sentence.",
+            "user": "{text}"
+          },
+          "task": "sentence_correction"
+        }
+      }
+    ],
+    "datasets": [
+      {
+        "format": "custom_single_turn",
+        "id": "jfleg-dev",
+        "interaction": "independent_requests",
+        "limitations": [
+          "No keystroke timing or real Grammarly traffic.",
+          "Fluency edits are broader than minimal grammar edits."
+        ],
+        "notes": "Source manifest only: no data downloaded, converted, tokenized or benchmarked.",
+        "preparation": [
+          "Pair original source sentences with all four references.",
+          "Use only for unscored warmup.",
+          "Render the GEC prompt and record tokenizer, template hash, filtering and checksums."
+        ],
+        "prepared": null,
+        "references": "multiple_corrections",
+        "revision": 1,
+        "schema_version": "0.1",
+        "source": {
+          "filters": {},
+          "license": null,
+          "revision": null,
+          "subset": "dev",
+          "url": "https://github.com/keisks/jfleg"
+        },
+        "timing_provenance": "not_provided"
+      },
+      {
+        "format": "custom_single_turn",
+        "id": "jfleg-test",
+        "interaction": "independent_requests",
+        "limitations": [
+          "Public task proxy, not customer text or production length distribution."
+        ],
+        "notes": "Source manifest only: no data downloaded, converted, tokenized or benchmarked.",
+        "preparation": [
+          "Preserve source sentences and all four references.",
+          "Keep evaluation separate from development warmup.",
+          "Render the GEC prompt and record tokenizer, template hash, filtering and checksums."
+        ],
+        "prepared": null,
+        "references": "multiple_corrections",
+        "revision": 1,
+        "schema_version": "0.1",
+        "source": {
+          "filters": {},
+          "license": null,
+          "revision": null,
+          "subset": "test",
+          "url": "https://github.com/keisks/jfleg"
+        },
+        "timing_provenance": "not_provided"
+      }
+    ],
+    "inventory": null,
+    "scenario": {
+      "drain_timeout_s": 120,
+      "faults": [],
+      "id": "writer-assist-baseline",
+      "notes": "DRAFT deterministic experiment configuration; arrival rates are assumptions, not customer telemetry.",
+      "participants": [
+        "writer-assist@1"
+      ],
+      "phases": [
+        {
+          "arrivals": {
+            "writer-assist": {
+              "pattern": "poisson",
+              "per": "second",
+              "rate": 0.5,
+              "unit": "request"
+            }
+          },
+          "duration_s": 180,
+          "id": "steady"
+        },
+        {
+          "arrivals": {
+            "writer-assist": {
+              "pattern": "poisson",
+              "per": "second",
+              "rate": 1.5,
+              "unit": "request"
+            }
+          },
+          "duration_s": 60,
+          "id": "burst"
+        },
+        {
+          "arrivals": {
+            "writer-assist": {
+              "pattern": "poisson",
+              "per": "second",
+              "rate": 0.5,
+              "unit": "request"
+            }
+          },
+          "duration_s": 360,
+          "id": "recovery"
+        }
+      ],
+      "revision": 1,
+      "schema_version": "0.1",
+      "seed": 42,
+      "warmup": {
+        "datasets": {
+          "writer-assist": "jfleg-dev@1"
+        },
+        "duration_s": 60
+      }
+    },
+    "schema_version": "0.1",
+    "serving_profiles": [
+      {
+        "draft": true,
+        "engine": {
+          "backend": "vllm",
+          "dtype": "bfloat16",
+          "gpu_memory_utilization": 0.8,
+          "image": null,
+          "max_model_len": 768,
+          "max_num_seqs": 8,
+          "prefix_caching": false,
+          "speculative_decoding": null
+        },
+        "hardware": {
+          "gpu_model": "A10",
+          "min_vram_gib_per_gpu": 24.0,
+          "vendor": "nvidia"
+        },
+        "id": "gec-baseline",
+        "model": {
+          "alias": "gec-small",
+          "repository": "Qwen/Qwen3-4B",
+          "revision": null,
+          "tokenizer_revision": null
+        },
+        "notes": "Unvalidated model and hardware candidate; pins, compatibility and memory headroom require verification.",
+        "revision": 1,
+        "routing_policy": "load_aware",
+        "schema_version": "0.1",
+        "topology": {
+          "gpus_per_replica": 1,
+          "kind": "aggregated",
+          "pipeline_parallel_size": 1,
+          "replicas": 1,
+          "tensor_parallel_size": 1
+        },
+        "worker_class": "latency"
+      }
+    ],
+    "versions": {
+      "aiperf_version": null,
+      "evaluator_version": null,
+      "platform_versions": {},
+      "runner_image": null
+    },
+    "worker_groups": [
+      {
+        "desired_instances": 1,
+        "drain_timeout_s": 120,
+        "hardware": {
+          "gpu_count": 1,
+          "gpu_model": "A10",
+          "vendor": "nvidia",
+          "vram_gib_per_gpu": 24.0
+        },
+        "host_profile": "lambda-gpu-worker-v1",
+        "id": "latency-workers",
+        "instance_type": null,
+        "notes": "DRAFT hardware description. Resolve actual Lambda SKU, region and availability before allocation.",
+        "provider": "lambda",
+        "region": null,
+        "revision": 1,
+        "schema_version": "0.1",
+        "ttl_minutes": 90,
+        "worker_class": "latency"
+      }
+    ]
+  },
+  "stage": null,
+  "started_at": "2026-11-03T12:00:01Z",
+  "status": "completed"
+}
