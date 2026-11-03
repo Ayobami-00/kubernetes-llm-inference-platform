@@ -112,7 +112,7 @@ def monitoring_values() -> dict:
             "image",
             "quay.io/prometheus-operator/prometheus-config-reloader:v0.94.2",
         ),
-        (operator, "thanosImage", "quay.io/thanos/thanos:v0.42.4"),
+        (operator, "thanosImage", "quay.io/thanos/thanos:v0.42.5"),
         (
             values["prometheus"]["prometheusSpec"],
             "image",
@@ -150,7 +150,7 @@ def monitoring_values() -> dict:
         "digest": image("quay.io/prometheus/node-exporter:v1.12.1-distroless").split("@")[1],
     }
     prom = values["prometheus"]["prometheusSpec"]
-    prom["thanos"]["image"] = image("quay.io/thanos/thanos:v0.42.4")
+    prom["thanos"]["image"] = image("quay.io/thanos/thanos:v0.42.5")
     prom["thanos"]["objectStorageConfig"] = {
         "secret": {
             "type": "S3",
@@ -203,6 +203,15 @@ def check_render(documents: list[dict]) -> None:
 
     for doc in documents:
         visit(doc)
+        if (
+            doc.get("kind") in {"Role", "ClusterRole"}
+            and doc.get("metadata", {}).get("name") == "klip-monitoring-kube-state-metrics"
+            and any(
+                set(rule.get("resources", [])) & {"secrets", "configmaps", "*"}
+                for rule in doc.get("rules", [])
+            )
+        ):
+            raise ValueError("Object metrics must not read Secrets or ConfigMaps")
         if doc.get("type") == "kubernetes.io/service-account-token":
             raise ValueError("Non-expiring Kubernetes API token is forbidden")
         if doc.get("kind") in {"Deployment", "DaemonSet"}:
@@ -213,6 +222,26 @@ def check_render(documents: list[dict]) -> None:
                 pod.get("nodeSelector", {}).get(k) != v for k, v in PLACEMENT.items()
             ):
                 raise ValueError("Monitoring applications must use protected platform CPU workers")
+            if doc["kind"] == "DaemonSet":
+                if pod.get("automountServiceAccountToken") is not False or any(
+                    not mount.get("readOnly", False)
+                    for container in pod.get("containers", [])
+                    for mount in container.get("volumeMounts", [])
+                ):
+                    raise ValueError("Host metrics require no API token and read-only mounts")
+                disabled = {
+                    "netdev",
+                    "netstat",
+                    "sockstat",
+                    "conntrack",
+                    "ipvs",
+                    "arp",
+                    "netclass",
+                    "wifi",
+                }
+                arguments = set(pod["containers"][0].get("args", []))
+                if not {"--no-collector." + name for name in disabled} <= arguments:
+                    raise ValueError("Pod network counters must not impersonate host networking")
         if doc.get("kind") in {"Prometheus", "Alertmanager"}:
             spec = doc["spec"]
             if (

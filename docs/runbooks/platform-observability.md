@@ -122,9 +122,34 @@ compactor must enforce the declared 14-day metric retention. Scraping replicas
 alone do not establish a deduplicated query path. The initial render disables
 private etcd, controller-manager, scheduler and kube-proxy scraping until their
 authenticated endpoints are explicitly configured; do not present those views as
-healthy in the meantime. Image digests are resolved, but vulnerability review,
-network policies, Pod federation, CRD ownership, headroom and server-side checks
-remain mandatory before installation. The render command performs no deployment.
+healthy in the meantime. Image digests and a bounded runtime vulnerability review
+are recorded. Network policies, live Pod federation, CRD ownership, headroom and
+server-side checks remain mandatory before installation. The render command
+performs no deployment.
+
+The exact-image scans retain 36 High findings across node exporter,
+kube-state-metrics and the patched Thanos 0.42.5 runtime. No Critical findings were
+reported. `deploy/observability-risk-review.json` records every High package/version,
+the restricted runtime conditions and exact configuration hashes. Its seven-day
+expiry blocks new rollouts. It does not claim the dependencies are fixed or that
+source reachability analysis proves their safety. Replace with tested upstream
+fixes when available; any changed finding, image or runtime boundary needs a new
+review. Complete raw scans and source analysis are retained in the linked CI runs.
+
+Install the versioned namespace/network boundary first, then update the exact
+workload-identity webhook allowlist:
+
+```sh
+make platform-service-deploy SERVICE=klip-observability
+make platform-service-deploy SERVICE=klip-workload-identity
+```
+
+These commands do not install the monitoring applications. The boundary keeps
+metrics private, disables exporter access to Secrets/ConfigMaps and separates
+read-only host mounts from the restricted application namespace. Node exporter
+uses Pod networking; namespace-dependent network collectors are disabled rather
+than presenting Pod counters as host statistics. Use the host instrumentation
+and Cilium/Hubble sources for the actual host/network view.
 
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and

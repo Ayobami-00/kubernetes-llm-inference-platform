@@ -62,10 +62,38 @@ def test_webhook_only_reads_accounts_and_has_fail_closed_exact_account_scope():
     assert "has(object.spec.serviceAccountName)" in expression
     assert "request.namespace == 'kube-system'" in expression
     assert "request.namespace == 'platform-data'" in expression
+    assert "request.namespace == 'observability'" in expression
+    for account in (
+        "klip-prometheus",
+        "klip-thanos-store",
+        "klip-thanos-compactor",
+        "klip-loki",
+        "klip-tempo",
+        "klip-alertmanager",
+    ):
+        assert "'" + account + "'" in expression
     assert "ebs-csi-controller-sa" in expression and "efs-csi-node-sa" in expression
     pod = next(x for x in items if x["kind"] == "Deployment")["spec"]["template"]["spec"]
     assert pod["securityContext"]["runAsNonRoot"]
     assert "--in-cluster=false" in pod["containers"][0]["command"]
+
+
+def test_telemetry_boundary_separates_host_mounts_and_has_no_public_service():
+    documents = resources("klip-observability")
+    namespaces = {d["metadata"]["name"]: d for d in documents if d["kind"] == "Namespace"}
+    key = "pod-security.kubernetes.io/enforce"
+    assert namespaces["observability"]["metadata"]["labels"][key] == "restricted"
+    assert namespaces["observability-node-agents"]["metadata"]["labels"][key] == "privileged"
+    deny = [d for d in documents if d["kind"] == "NetworkPolicy"]
+    assert len(deny) == 2
+    assert all(d["spec"] == {"podSelector": {}, "policyTypes": ["Ingress", "Egress"]} for d in deny)
+    host = next(d for d in documents if d["metadata"]["name"] == "host-metrics")
+    assert "egress" not in host["spec"]
+    assert host["spec"]["ingress"][0]["fromEndpoints"][0]["matchLabels"] == {
+        "k8s:io.kubernetes.pod.namespace": "observability",
+        "app.kubernetes.io/name": "prometheus",
+    }
+    assert not any(d["kind"] in {"Service", "Ingress", "Gateway", "Deployment"} for d in documents)
 
 
 def test_static_efs_driver_cannot_mutate_nodes_or_create_access_points():
@@ -105,6 +133,7 @@ def test_nonreviewed_roles_and_releases_fail_before_deployment():
         "cloudnative-pg",
         "plugin-barman-cloud",
         "klip-image-pull",
+        "klip-observability",
     }
     assert len(pins["images"]) >= 9
 

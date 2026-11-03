@@ -39,6 +39,16 @@ def test_monitoring_uses_rotating_credentials_and_separate_scoped_roles():
     )
     assert not values["prometheus-node-exporter"]["hostNetwork"]
     assert not values["prometheus-node-exporter"]["hostPID"]
+    assert values["kube-state-metrics"]["collectorsExclude"] == ["secrets", "configmaps"]
+    assert values["prometheusOperator"]["namespaces"] == {
+        "releaseNamespace": True,
+        "additional": ["observability-node-agents"],
+    }
+    assert prom["arbitraryFSAccessThroughSMs"] == {"deny": True}
+    assert all(
+        c["env"] == [{"name": "AWS_EC2_METADATA_DISABLED", "value": "true"}]
+        for c in prom["containers"]
+    )
 
 
 @pytest.mark.parametrize(
@@ -50,6 +60,15 @@ def test_monitoring_uses_rotating_credentials_and_separate_scoped_roles():
         {"kind": "ConfigMap", "data": {"image": "quay.io/thanos/thanos:latest"}},
         {"kind": "Deployment", "spec": {"args": ["--prometheus-config-reloader=example:latest"]}},
         {"kind": "Prometheus", "spec": {"replicas": 1, "nodeSelector": release.PLACEMENT}},
+        {
+            "kind": "ClusterRole",
+            "metadata": {"name": "klip-monitoring-kube-state-metrics"},
+            "rules": [{"resources": ["secrets"], "verbs": ["list", "watch"]}],
+        },
+        {
+            "kind": "DaemonSet",
+            "spec": {"template": {"spec": {"automountServiceAccountToken": True}}},
+        },
     ],
 )
 def test_monitoring_rejects_unsafe_rendered_defaults(document):

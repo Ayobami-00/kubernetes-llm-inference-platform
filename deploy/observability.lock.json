@@ -78,12 +78,13 @@
       "digest": "sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016",
       "platform": "linux/amd64"
     },
-    "quay.io/thanos/thanos:v0.42.4": {
-      "digest": "sha256:ce7e48cbbaec82cb3b4eb1c348f90de92976edcd4148dc9a0f1394cc43e09422",
+    "quay.io/thanos/thanos:v0.42.5": {
+      "digest": "sha256:a13aade5af3866e40d0f01c17750ad4decbb500fdb6a37a54b8348d4dfa09f49",
       "platform": "linux/amd64"
     }
   },
   "limitations": [
+    "The Thanos runtime overrides chart 0.48.0's appVersion with patch 0.42.5; the chart archive remains unchanged.",
     "Only monitoring runtime images are pinned so far; other chart pins are reviewed archives, not deployable releases.",
     "Upstream manifest identity has been verified; runtime vulnerability/compatibility acceptance remains required before live installation."
   ]

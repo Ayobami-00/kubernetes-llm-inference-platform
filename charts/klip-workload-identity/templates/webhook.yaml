@@ -187,4 +187,5 @@ webhooks:
         expression: >-
           has(object.spec.serviceAccountName) && ((request.namespace == 'kube-system' && object.spec.serviceAccountName in ['efs-csi-node-sa', 'ebs-csi-controller-sa']) ||
           (request.namespace == 'platform-data' && object.spec.serviceAccountName in ['klip-db', 'klip-db-restore']) ||
+          (request.namespace == 'observability' && object.spec.serviceAccountName in ['klip-prometheus', 'klip-thanos-store', 'klip-thanos-compactor', 'klip-loki', 'klip-tempo', 'klip-alertmanager']) ||
           (request.namespace == 'platform-identity-tests' && object.spec.serviceAccountName == 'identity-probe'))

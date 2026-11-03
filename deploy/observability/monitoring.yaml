@@ -22,6 +22,9 @@ defaultRules:
     kubeSchedulerRecording: false
     kubeProxy: false
 prometheusOperator:
+  namespaces:
+    releaseNamespace: true
+    additional: [observability-node-agents]
   nodeSelector:
     klip.dev.node-restriction.kubernetes.io/platform: 'true'
   resources:
@@ -57,10 +60,22 @@ prometheus:
     retentionSize: 15GB
     disableCompaction: true
     enableAdminAPI: false
+    arbitraryFSAccessThroughSMs: {deny: true}
+    overrideHonorLabels: true
+    enforcedSampleLimit: 50000
+    enforcedTargetLimit: 500
+    enforcedLabelLimit: 100
+    enforcedLabelNameLengthLimit: 200
+    enforcedLabelValueLengthLimit: 2048
     scrapeInterval: 30s
     scrapeTimeout: 10s
     evaluationInterval: 30s
     logFormat: json
+    containers:
+      - name: prometheus
+        env: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
+      - name: thanos-sidecar
+        env: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
     nodeSelector:
       klip.dev.node-restriction.kubernetes.io/platform: 'true'
     podAntiAffinity: hard
@@ -91,6 +106,9 @@ alertmanager:
     retention: 120h
     automountServiceAccountToken: false
     logFormat: json
+    containers:
+      - name: alertmanager
+        env: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
     nodeSelector:
       klip.dev.node-restriction.kubernetes.io/platform: 'true'
     podAntiAffinity: hard
@@ -128,6 +146,7 @@ kube-state-metrics:
   # Single recoverable exporter; no experimental auto-sharding or duplicated
   # Kubernetes object series. Two Prometheus instances scrape this same source.
   replicas: 1
+  collectorsExclude: [secrets, configmaps]
   nodeSelector:
     klip.dev.node-restriction.kubernetes.io/platform: 'true'
   resources:
@@ -138,6 +157,19 @@ prometheus-node-exporter:
   hostNetwork: false
   hostPID: false
   hostIPC: false
+  # Network namespace collectors would describe the Pod rather than the host.
+  # Host network/WireGuard metrics require the separate host instrumentation.
+  extraArgs:
+    - --no-collector.netdev
+    - --no-collector.netstat
+    - --no-collector.sockstat
+    - --no-collector.conntrack
+    - --no-collector.ipvs
+    - --no-collector.arp
+    - --no-collector.netclass
+    - --no-collector.wifi
+    - --collector.filesystem.mount-points-exclude=^/(dev|proc|sys|run/containerd/.+|var/lib/docker/.+|var/lib/kubelet/.+)($|/)
+    - --collector.filesystem.fs-types-exclude=^(autofs|binfmt_misc|bpf|cgroup2?|configfs|debugfs|devpts|devtmpfs|fusectl|hugetlbfs|iso9660|mqueue|nsfs|overlay|proc|procfs|pstore|rpc_pipefs|securityfs|selinuxfs|squashfs|sysfs|tracefs|erofs)$
   containerSecurityContext:
     allowPrivilegeEscalation: false
     readOnlyRootFilesystem: true

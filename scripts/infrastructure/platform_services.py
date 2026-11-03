@@ -30,6 +30,7 @@ RELEASES = {
     "cloudnative-pg": "cnpg-system",
     "plugin-barman-cloud": "cnpg-system",
     "klip-image-pull": "klip",
+    "klip-observability": "kube-system",
 }
 PLACEMENT = {"klip.dev.node-restriction.kubernetes.io/platform": "true"}
 
@@ -104,6 +105,8 @@ def digest(image: str) -> str:
 def values_for(release: str, *, storage: dict | None = None) -> dict:
     if release not in RELEASES:
         raise ValueError("Unreviewed service release")
+    if release == "klip-observability":
+        return {}
     if release == "klip-image-pull":
         from common import CONFIG
 
@@ -238,7 +241,8 @@ def values_for(release: str, *, storage: dict | None = None) -> dict:
 def chart_path(release: str):
     return (
         ROOT / "charts" / release
-        if release in {"klip-workload-identity", "klip-storage", "klip-image-pull"}
+        if release
+        in {"klip-workload-identity", "klip-storage", "klip-image-pull", "klip-observability"}
         else CACHE / release
     )
 
@@ -305,6 +309,21 @@ def deploy(release: str) -> dict:
             raise ValueError("All three protected platform identities must be Ready before rollout")
     if len(expected) != 3:
         raise ValueError("Three independently protected platform hosts are required")
+    if release == "klip-observability":
+        for namespace in ("observability", "observability-node-agents"):
+            existing = kubectl(
+                "get", "namespace", namespace, "--ignore-not-found", "-o", "json"
+            ).strip()
+            if existing:
+                metadata = json.loads(existing)["metadata"]
+                if (
+                    metadata.get("labels", {}).get("klip.dev/managed-by") != "klip-observability"
+                    or metadata.get("annotations", {}).get("meta.helm.sh/release-name")
+                    != "klip-observability"
+                    or metadata.get("annotations", {}).get("meta.helm.sh/release-namespace")
+                    != "kube-system"
+                ):
+                    raise ValueError("Refuse to adopt an existing unowned telemetry namespace")
     storage = None
     if release in {"aws-efs-csi-driver", "aws-ebs-csi-driver", "klip-storage"}:
         from platform_storage import verify_storage
