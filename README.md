@@ -176,6 +176,8 @@ identities and saved-plan digests. Private credentials, recovery state and repor
 - [State recovery](docs/runbooks/terraform-state.md)
 - [Inference origin updates](docs/runbooks/inference-dns.md)
 - [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
+- [Retained platform storage](docs/runbooks/platform-storage.md)
+- [Certificate, projected-token and CSI add-ons](docs/runbooks/platform-services.md)
 - [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)
 - [Live foundation acceptance and Ansible handoff](docs/runbooks/aws-foundation-acceptance.md)
 - [Live Kubernetes acceptance and cleanup](docs/runbooks/kubernetes-acceptance.md)

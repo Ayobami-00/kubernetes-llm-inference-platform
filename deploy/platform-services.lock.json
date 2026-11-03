@@ -6,7 +6,11 @@
     "cloudnative_pg_chart": "0.29.1",
     "barman_cloud_plugin": "0.15.1",
     "barman_cloud_chart": "0.8.1",
-    "validation": "Upstream support matrix and CRD schemas checked; live acceptance pending"
+    "validation": "Upstream support matrix and CRD schemas checked; live acceptance pending",
+    "cert_manager": "1.21.3",
+    "pod_identity_webhook": "0.6.19",
+    "efs_csi_driver": "3.5.4",
+    "efs_csi_chart": "4.5.4"
   },
   "schemas": {
     "postgresql.cnpg.io/v1/Cluster": {
@@ -32,6 +36,58 @@
       "platform": "linux/amd64",
       "verification": "Digest pulled from the official public ECR repository; actual binary version and architecture checked",
       "source": "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-docker.html"
+    }
+  },
+  "charts": {
+    "cert-manager": {
+      "version": "v1.21.3",
+      "oci": "oci://quay.io/jetstack/charts/cert-manager@sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
+      "file": "cert-manager-v1.21.3.tgz",
+      "sha256": "9ec67938b2981d8b333af61b3fcf53e26b4f6f5deb7ccda3de4ea116bb373a17"
+    },
+    "aws-efs-csi-driver": {
+      "version": "4.5.4",
+      "url": "https://github.com/kubernetes-sigs/aws-efs-csi-driver/releases/download/helm-chart-aws-efs-csi-driver-4.5.4/aws-efs-csi-driver-4.5.4.tgz",
+      "file": "aws-efs-csi-driver-4.5.4.tgz",
+      "sha256": "c729759ad46c51459eff0d4a99c66cc43a68f4b574db55b63d6eec1f0b3a1ce7"
+    }
+  },
+  "images": {
+    "public.ecr.aws/csi-components/csi-node-driver-registrar:v2.18.0-eksbuild.4": {
+      "digest": "sha256:8e2963eb049ce7a8a5526e1ff4043f6f10d7a5b430ad12b4c12e192bbbab48dc",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/livenessprobe:v2.20.0-eksbuild.4": {
+      "digest": "sha256:f93b5659a585096828647f5604cc2983eb8c0149743ac102dc8d07c7d77b2bbb",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/efs-csi-driver/amazon/aws-efs-csi-driver:v3.5.4": {
+      "digest": "sha256:97762ca60697c6f1eda0e7f62183659a74260f9997462467bea7e5aa3aa82832",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/eks/amazon-eks-pod-identity-webhook:v0.6.19": {
+      "digest": "sha256:160ec19c2222016fa28db5e5269b233368ac788ed2d76479a2730cabff3cf693",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-acmesolver:v1.21.3": {
+      "digest": "sha256:c8c1225bb2fe8ab37a330b77f0d8c2ee6a41210fcb54fc07ca606ab9a022b8b7",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-cainjector:v1.21.3": {
+      "digest": "sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-controller:v1.21.3": {
+      "digest": "sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-startupapicheck:v1.21.3": {
+      "digest": "sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-webhook:v1.21.3": {
+      "digest": "sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458",
+      "platform": "linux/amd64"
     }
   }
 }

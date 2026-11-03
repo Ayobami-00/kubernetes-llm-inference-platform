@@ -228,7 +228,7 @@ def verify_storage() -> dict:
             "exact_workload_roles": True,
             "automatic_efs_backup_enabled": True,
         },
-        "not_yet_verified": [
+        "not_covered_by_this_check": [
             "CSI mounts",
             "database WAL archiving",
             "successful backup recovery points",

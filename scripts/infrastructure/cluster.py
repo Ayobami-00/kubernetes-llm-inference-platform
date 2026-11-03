@@ -158,6 +158,50 @@ finally:
         return json.loads(self.run(["sudo", "python3", "/usr/local/sbin/klip-node", action]))
 
 
+def delete_owned_resource(path: str, uid: str) -> None:
+    """Delete a test namespace/Job with an API-side UID precondition, never by name alone."""
+    if not re.fullmatch(
+        r"/(?:api/v1/namespaces/[a-z0-9-]+|apis/batch/v1/namespaces/[a-z0-9-]+/jobs/[a-z0-9-]+)",
+        path,
+    ) or not re.fullmatch(r"[a-f0-9-]{36}", uid):
+        raise ValueError("Invalid UID-guarded cleanup target")
+    program = r"""
+import base64, http.client, json, ssl, subprocess, sys, tempfile
+from pathlib import Path
+from urllib.parse import urlsplit
+request = json.loads(sys.stdin.read())
+config = json.loads(subprocess.check_output([
+    'kubectl', '--kubeconfig=/etc/kubernetes/admin.conf', 'config', 'view', '--raw', '-o', 'json'
+]))
+with tempfile.TemporaryDirectory() as folder:
+    root = Path(folder)
+    cluster = config['clusters'][0]['cluster']
+    user = config['users'][0]['user']
+    for key, field in [('ca', 'certificate-authority-data'),
+                       ('cert', 'client-certificate-data'), ('key', 'client-key-data')]:
+        (root/key).write_bytes(base64.b64decode((cluster if key == 'ca' else user)[field]))
+    context = ssl.create_default_context(cafile=str(root/'ca'))
+    context.load_cert_chain(str(root/'cert'), str(root/'key'))
+    endpoint = urlsplit(cluster['server'])
+    if endpoint.scheme != 'https' or endpoint.username or endpoint.password:
+        raise ValueError('Invalid API endpoint')
+    connection = http.client.HTTPSConnection(
+        endpoint.hostname, endpoint.port or 443, context=context, timeout=10
+    )
+    body = {'apiVersion': 'v1', 'kind': 'DeleteOptions', 'propagationPolicy': 'Foreground',
+            'preconditions': {'uid': request['uid']}}
+    connection.request('DELETE', request['path'], json.dumps(body),
+                       {'Content-Type': 'application/json'})
+    response = connection.getresponse()
+    response.read()
+    if response.status not in (200, 202, 404):
+        raise RuntimeError('UID-guarded cleanup failed: ' + str(response.status))
+"""
+    Host(load_hosts()["cp-01"]).run(
+        ["sudo", "python3", "-c", program], data=json.dumps({"path": path, "uid": uid}), secret=True
+    )
+
+
 def load_hosts() -> dict[str, dict]:
     inventory = yaml.safe_load((FOLDER / "inventory.yaml").read_text())
     result = {}
@@ -792,6 +836,8 @@ def main() -> None:
             "verify-platform",
             "activate-identity",
             "verify-federation",
+            "verify-injection",
+            "verify-storage",
         ],
     )
     parser.add_argument("--registry", type=Path)
@@ -863,10 +909,14 @@ def main() -> None:
         from issuer_transition import activate
 
         result = activate()
-    elif args.command == "verify-federation":
+    elif args.command == "verify-storage":
+        from storage_acceptance import verify as verify_storage
+
+        result = verify_storage()
+    elif args.command in {"verify-federation", "verify-injection"}:
         from federation_probe import verify_federation
 
-        result = verify_federation()
+        result = verify_federation(injected=args.command == "verify-injection")
     else:
         from cluster_workers import operate_worker
 

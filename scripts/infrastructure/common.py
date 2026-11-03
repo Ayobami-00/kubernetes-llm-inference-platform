@@ -210,7 +210,7 @@ def source_digest() -> str:
         and (path.suffix in {".tf", ".json"} or path.name == ".terraform.lock.hcl")
     )
     paths += sorted((ROOT / "scripts/infrastructure").glob("*.py"))
-    for folder in (ROOT / "infra/ansible", ROOT / "deploy"):
+    for folder in (ROOT / "infra/ansible", ROOT / "deploy", ROOT / "charts"):
         paths += sorted(path for path in folder.rglob("*") if path.is_file())
     digest = hashlib.sha256()
     for path in paths:

@@ -136,3 +136,44 @@ def test_live_iam_drift_is_rejected_before_projecting_any_credentials(drift):
     else:
         with pytest.raises(ValueError):
             verify_probe_policy(aws, allocation)
+
+
+def test_injection_proof_starts_without_manually_supplied_credentials_or_token():
+    from federation_probe import verify_injected_pod
+
+    pod = document(injected=True)["spec"]["template"]
+    spec = pod["spec"]
+    container = spec["containers"][0]
+    env = {v["name"] for v in container["env"]}
+    assert not {"AWS_ROLE_ARN", "AWS_WEB_IDENTITY_TOKEN_FILE"} & env
+    assert [v["name"] for v in spec["volumes"]] == ["scratch"]
+    with pytest.raises(ValueError, match="environment"):
+        verify_injected_pod(pod, "fixture-role")
+    container["env"] += [
+        {"name": "AWS_ROLE_ARN", "value": "fixture-role"},
+        {
+            "name": "AWS_WEB_IDENTITY_TOKEN_FILE",
+            "value": "/var/run/secrets/eks.amazonaws.com/serviceaccount/token",
+        },
+    ]
+    container["volumeMounts"].append({"name": "aws-iam-token", "readOnly": True})
+    spec["volumes"].append(
+        {
+            "name": "aws-iam-token",
+            "projected": {
+                "sources": [
+                    {
+                        "serviceAccountToken": {
+                            "audience": "sts.amazonaws.com",
+                            "expirationSeconds": 3600,
+                            "path": "token",
+                        }
+                    }
+                ]
+            },
+        }
+    )
+    verify_injected_pod(pod, "fixture-role")
+    spec["volumes"][-1]["projected"]["sources"][0]["serviceAccountToken"]["audience"] = "wrong"
+    with pytest.raises(ValueError, match="projection"):
+        verify_injected_pod(pod, "fixture-role")

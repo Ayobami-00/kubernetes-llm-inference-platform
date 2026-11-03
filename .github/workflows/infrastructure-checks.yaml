@@ -44,6 +44,8 @@ jobs:
       - run: uv sync --locked --group infrastructure --all-packages
       - run: make infra-tools
       - run: uv run --locked --group infrastructure python scripts/infrastructure/platform_artifacts.py install
+      - name: Fetch checksum-locked service charts
+        run: uv run --locked --group infrastructure python scripts/infrastructure/platform_services.py fetch
       - run: make infra-check
       - name: Validate HA database charts against pinned upstream schemas
         run: uv run --locked --group infrastructure python scripts/infrastructure/platform_checks.py --fetch-schemas

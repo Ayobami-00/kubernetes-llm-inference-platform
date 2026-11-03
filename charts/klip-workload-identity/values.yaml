@@ -1,0 +1,8 @@
+image: ""
+region: eu-west-2
+replicas: 2
+nodeSelector:
+  klip.dev.node-restriction.kubernetes.io/platform: "true"
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: "1", memory: 256Mi}

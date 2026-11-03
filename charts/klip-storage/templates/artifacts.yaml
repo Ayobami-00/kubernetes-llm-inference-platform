@@ -1,0 +1,42 @@
+{{- if or (not (regexMatch "^fs-[a-f0-9]{17}$" .Values.fileSystemId)) (not (regexMatch "^fsap-[a-f0-9]{17}$" .Values.accessPointId)) }}
+{{- fail "Supply verified retained filesystem and access-point identities" }}
+{{- end }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: klip-artifacts
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  capacity: {storage: {{ .Values.advertisedCapacity }}}
+  volumeMode: Filesystem
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef:
+    name: klip-artifacts
+    namespace: {{ .Release.Namespace }}
+  mountOptions: [tls, iam]
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: {{ .Values.fileSystemId }}::{{ .Values.accessPointId }}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: klip.dev.node-restriction.kubernetes.io/platform
+              operator: In
+              values: ["true"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: klip-artifacts
+  annotations:
+    helm.sh/resource-policy: keep
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: ""
+  volumeName: klip-artifacts
+  resources:
+    requests: {storage: {{ .Values.advertisedCapacity }}}

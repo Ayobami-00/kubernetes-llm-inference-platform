@@ -177,3 +177,16 @@ def test_operator_artifacts_are_private(tmp_path):
     write_private(path, {"account_id": CONFIG["account_id"]})
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_source_identity_includes_local_helm_templates(tmp_path, monkeypatch):
+    import common
+
+    chart = tmp_path / "charts/fixture/templates/platform.yaml"
+    chart.parent.mkdir(parents=True)
+    chart.write_text("kind: ServiceAccount\n")
+    monkeypatch.setattr(common, "ROOT", tmp_path)
+    monkeypatch.setattr(common, "TERRAFORM", tmp_path / "infra/terraform")
+    original = common.source_digest()
+    chart.write_text("kind: ClusterRole\n")
+    assert common.source_digest() != original

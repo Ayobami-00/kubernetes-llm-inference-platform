@@ -151,3 +151,18 @@ storage-access-apply:
 
 storage-verify:
 	$(PYTHON) scripts/infrastructure/platform_storage.py
+
+.PHONY: platform-services-fetch platform-service-deploy
+platform-services-fetch:
+	$(PYTHON) scripts/infrastructure/platform_services.py fetch
+
+platform-service-deploy:
+	@test -n "$(SERVICE)" || (echo 'Set SERVICE to a reviewed static release'; exit 1)
+	$(PYTHON) scripts/infrastructure/platform_services.py deploy --release "$(SERVICE)"
+
+.PHONY: identity-verify-injection cluster-verify-storage
+identity-verify-injection:
+	$(PYTHON) scripts/infrastructure/cluster.py verify-injection
+
+cluster-verify-storage:
+	$(PYTHON) scripts/infrastructure/cluster.py verify-storage

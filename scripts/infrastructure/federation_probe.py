@@ -109,6 +109,7 @@ def job_document(
     audience: str,
     allow: bool,
     node: str | None = None,
+    injected: bool = False,
 ) -> dict:
     if role != f"arn:aws:iam::{CONFIG['account_id']}:role/{CONFIG['project']}/klip-identity-probe":
         raise ValueError("Only the metadata-only canary role may be tested")
@@ -129,7 +130,7 @@ def job_document(
         "HOME": "/tmp",
         "KLIP_PROBE_BUCKET": bucket,
     }
-    return {
+    document = {
         "apiVersion": "batch/v1",
         "kind": "Job",
         "metadata": {"name": name, "namespace": namespace},
@@ -201,9 +202,47 @@ def job_document(
         },
     }
 
+    if injected:
+        if not allow or namespace != NAMESPACE or service_account != SERVICE_ACCOUNT:
+            raise ValueError("Injection proof uses only the exact allowed canary identity")
+        pod = document["spec"]["template"]["spec"]
+        pod["volumes"] = [v for v in pod["volumes"] if v["name"] != "token"]
+        container = pod["containers"][0]
+        container["env"] = [
+            v
+            for v in container["env"]
+            if v["name"] not in {"AWS_ROLE_ARN", "AWS_WEB_IDENTITY_TOKEN_FILE"}
+        ]
+        container["volumeMounts"] = [v for v in container["volumeMounts"] if v["name"] != "token"]
+    return document
 
-def verify_federation() -> dict:
-    from cluster import FOLDER, Host, kubectl, load_hosts
+
+def verify_injected_pod(pod: dict, role: str) -> None:
+    expected_path = "/var/run/secrets/eks.amazonaws.com/serviceaccount/token"
+    container = pod["spec"]["containers"][0]
+    env = {item["name"]: item.get("value") for item in container["env"]}
+    if env.get("AWS_ROLE_ARN") != role or env.get("AWS_WEB_IDENTITY_TOKEN_FILE") != expected_path:
+        raise ValueError("Actual Pod did not receive the expected web-identity environment")
+    volume = next((v for v in pod["spec"]["volumes"] if v["name"] == "aws-iam-token"), {})
+    tokens = [
+        s["serviceAccountToken"]
+        for s in volume.get("projected", {}).get("sources", [])
+        if "serviceAccountToken" in s
+    ]
+    if len(tokens) != 1 or tokens[0] != {
+        "audience": "sts.amazonaws.com",
+        "expirationSeconds": 3600,
+        "path": "token",
+    }:
+        raise ValueError("Actual Pod is missing the bounded STS token projection")
+    if not any(
+        m["name"] == "aws-iam-token" and m.get("readOnly") for m in container["volumeMounts"]
+    ):
+        raise ValueError("Actual injected token mount is missing or writable")
+
+
+def verify_federation(*, injected=False) -> dict:
+    from cluster import FOLDER, Host, delete_owned_resource, kubectl, load_hosts
 
     aws = Aws(PROFILES["bootstrap"])
     aws.preflight("identity")
@@ -237,6 +276,12 @@ def verify_federation() -> dict:
         if actual["issuer"] != allocation["issuer"]:
             raise ValueError("A live API server no longer advertises the selected issuer")
     verify_probe_policy(aws, allocation)
+    if injected:
+        hook = json.loads(
+            kubectl("get", "mutatingwebhookconfiguration", "klip-workload-identity", "-o", "json")
+        )
+        if not all(h["clientConfig"].get("caBundle") for h in hook["webhooks"]):
+            raise ValueError("The token webhook CA has not been published")
     cp = Host(hosts["cp-01"])
     command = [
         "sudo",
@@ -252,6 +297,7 @@ def verify_federation() -> dict:
         "status": "running",
         "started_at": utc_now(),
         "image": probe_image(),
+        "credential_projection": "webhook" if injected else "explicit",
         "source_sha256": source_digest(),
         "cases": {},
     }
@@ -259,7 +305,9 @@ def verify_federation() -> dict:
 
     def save():
         write_private(folder / "observation.json", report)
-        write_private(FOLDER / "federation-probe.json", report)
+        write_private(
+            FOLDER / ("injection-probe.json" if injected else "federation-probe.json"), report
+        )
 
     def create(document):
         return json.loads(
@@ -292,7 +340,22 @@ def verify_federation() -> dict:
                     {
                         "apiVersion": "v1",
                         "kind": "ServiceAccount",
-                        "metadata": {"name": account, "namespace": namespace},
+                        "metadata": {
+                            "name": account,
+                            "namespace": namespace,
+                            **(
+                                {
+                                    "annotations": {
+                                        "eks.amazonaws.com/role-arn": allocation["probe_role_arn"],
+                                        "eks.amazonaws.com/token-expiration": "3600",
+                                    }
+                                }
+                                if injected
+                                and namespace == NAMESPACE
+                                and account == SERVICE_ACCOUNT
+                                else {}
+                            ),
+                        },
                         "automountServiceAccountToken": False,
                     }
                 )
@@ -316,6 +379,7 @@ def verify_federation() -> dict:
                 audience,
                 allow,
                 node,
+                injected=injected and allow,
             )
             write_private(folder / (case + ".job.json"), document)
             created = create(document)
@@ -347,6 +411,15 @@ def verify_federation() -> dict:
             ):
                 raise ValueError("Federation canary failed; inspect its sanitized private report")
             if allow:
+                if injected:
+                    pods = json.loads(
+                        kubectl(
+                            "-n", namespace, "get", "pods", "-l", "job-name=" + name, "-o", "json"
+                        )
+                    )["items"]
+                    if len(pods) != 1:
+                        raise ValueError("Expected exactly one injected canary Pod")
+                    verify_injected_pod(pods[0], allocation["probe_role_arn"])
                 match = re.search(r'"Arn"\s*:\s*"([^"]+)"', logs)
                 if (
                     not match
@@ -381,7 +454,7 @@ def verify_federation() -> dict:
                 current = json.loads(kubectl("get", "namespace", namespace, "-o", "json"))
                 if current["metadata"]["uid"] != uid:
                     raise ValueError("Federation namespace ownership changed; cleanup refused")
-                kubectl("delete", "namespace", namespace, "--wait=false")
+                delete_owned_resource("/api/v1/namespaces/" + namespace, uid)
                 wait_until(
                     lambda namespace=namespace: (
                         not kubectl(

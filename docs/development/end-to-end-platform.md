@@ -8,7 +8,7 @@ rendering or a successful stub run does not satisfy a live gate.
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers live and joined; storage, management and PostgreSQL rollout pending |
+| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers and retained RWX artifacts live; management, database and recovery tests pending |
 | Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
 | GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
@@ -153,3 +153,29 @@ Database initialization/recovery templates validate against the pinned CRDs in b
 Secret and projected-token modes. Local verification passed 479 Python tests (17
 optional skips), four new Terraform mock cases, both storage lint checks, all 19
 schemas and Ruff/formatting. Application/database rollout remains pending.
+
+
+cert-manager 1.21.3 is deployed with six Ready Pods (two per component) spread over
+protected CPU hosts. The upstream AWS token webhook 0.6.19 has two replicas and a
+cert-manager-issued certificate, with fail-closed admission limited to explicit
+storage/database/test accounts. Six injection/SDK cases passed, including all three
+workers and wrong identity/audience denials; test namespaces were removed. Credential
+renewal over a token/session expiry remains pending.
+
+The pinned EFS CSI 3.5.4 node plugin registered on all three CPU workers. Terraform
+continues to own its static access point; the unused controller and its RBAC are
+excluded through a bounded Helm post-renderer. Tests use Helm's real post-rendering
+path, including the non-hook CSI registration setting. The retained `klip-artifacts`
+claim is Bound with TLS/IAM and CPU-only affinity. Seven real canary Jobs passed:
+three non-root writes, three readers checking every worker's file, and exact canary
+data cleanup. Job cleanup used API-side UID preconditions and was confirmed.
+This establishes mounted RWX behavior, not database backup/restore or service failover.
+The next dependencies are topology-aware EBS CSI, CloudNativePG/Barman deployment,
+real archive/restore and management rollout. No Lambda GPU has been allocated.
+
+
+The add-on/mount checkpoint passes 494 root Python tests (17 optional skips), all
+19 generated schemas, both database bootstrap/identity render paths and Ruff/formatting.
+Infrastructure CI fetches checksum-locked service charts before renderer tests, without
+cloud credentials. Source fingerprints now include local Helm templates as well as
+Terraform, Ansible, deployment configuration and operator code.
