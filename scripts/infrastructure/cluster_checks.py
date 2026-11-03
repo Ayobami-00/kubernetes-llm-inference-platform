@@ -20,13 +20,21 @@ def render_role_templates() -> None:
     variables = {
         "klip_node": {"role": "control_plane", "backup_recipient": "age1example"},
         "inventory_hostname": "cp-01",
-        "item": "example",
+        "item": {"item": "/example/path", "stat": {"exists": False}},
         "klip_repository": str(ROOT),
         "klip_peer_registry": "/example/peers.json",
         "klip_ca_bundle": "/example/ca.crt",
         "klip_firewall_file": "/example/firewall.rules",
         "klip_recovery_key_verified": True,
         "klip_runtime_images": {"stdout_lines": ["registry.k8s.io/pause:3.11"]},
+        "klip_image_credentials_install_paths": [
+            "/opt/klip/image-credentials/ecr-credential-provider"
+        ],
+        "klip_image_credentials_originals": {"results": []},
+        "klip_image_credentials_backup": {"path": "/tmp/example"},
+        "klip_image_credentials_binary": "/example/verified-binary",
+        "klip_image_credentials_provider_yaml": "apiVersion: kubelet.config.k8s.io/v1\n",
+        "index": 0,
     }
     templar = Templar(variables=variables)
 

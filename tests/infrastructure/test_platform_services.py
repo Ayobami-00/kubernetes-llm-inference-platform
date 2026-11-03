@@ -104,6 +104,7 @@ def test_nonreviewed_roles_and_releases_fail_before_deployment():
         "klip-storage",
         "cloudnative-pg",
         "plugin-barman-cloud",
+        "klip-image-pull",
     }
     assert len(pins["images"]) >= 9
 

@@ -29,6 +29,7 @@ RELEASES = {
     "klip-storage": "klip",
     "cloudnative-pg": "cnpg-system",
     "plugin-barman-cloud": "cnpg-system",
+    "klip-image-pull": "klip",
 }
 PLACEMENT = {"klip.dev.node-restriction.kubernetes.io/platform": "true"}
 
@@ -103,6 +104,13 @@ def digest(image: str) -> str:
 def values_for(release: str, *, storage: dict | None = None) -> dict:
     if release not in RELEASES:
         raise ValueError("Unreviewed service release")
+    if release == "klip-image-pull":
+        from common import CONFIG
+
+        return {
+            "roleArn": f"arn:aws:iam::{CONFIG['account_id']}:role/"
+            f"{CONFIG['project']}/klip-images-pull"
+        }
     if release in {"cloudnative-pg", "plugin-barman-cloud"}:
         from database_services import values_for_operator
 
@@ -230,7 +238,7 @@ def values_for(release: str, *, storage: dict | None = None) -> dict:
 def chart_path(release: str):
     return (
         ROOT / "charts" / release
-        if release in {"klip-workload-identity", "klip-storage"}
+        if release in {"klip-workload-identity", "klip-storage", "klip-image-pull"}
         else CACHE / release
     )
 

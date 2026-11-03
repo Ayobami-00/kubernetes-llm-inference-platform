@@ -244,3 +244,21 @@ and a hosted-Linux test-user mismatch reading private runner artifacts. The grap
 now uses separate canvas lifetimes and never saves historical layout preferences;
 the integration harness reads artifacts through the image's actual non-root user.
 Those real browser/Job checks must pass again before application deployment.
+
+All four private CI images were published with digest/scan receipts. Their first
+base-image scans contained critical findings, so application deployment is held
+while maintained pinned replacements are built and rescanned. No latency/SLO or
+production-readiness claim follows from publication. The upstream Pod-bound ECR
+helper has separately been installed on all three CPU workers through the encoded,
+reviewed rolling Ansible workflow. Each host's original kubeadm/configuration
+hashes were preserved, node UIDs remained unchanged and database/node health checks
+passed between updates. Private-pull authentication/denial acceptance and actual
+management application rollout remain outstanding. Offline checks now pass 548
+tests (17 optional skips); no GPU has been allocated.
+
+The complete offline infrastructure command also passed with those 548 tests,
+Ansible/Helm validation, Terraform validation/mock plans/lint and all 19 schemas.
+The namespace-only pull-audience release is installed. At source `9567a39`, private
+publication, contract CI, infrastructure CI and every management CI job (including
+the previously failing browser navigation) are green. Actual runner-Job integration
+CI is still running; patched-base rebuilds require their own results.

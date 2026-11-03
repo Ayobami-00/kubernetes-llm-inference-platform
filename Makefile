@@ -87,6 +87,14 @@ infra-registry-apply:
 registry-verify:
 	$(PYTHON) scripts/infrastructure/platform_registry.py
 
+.PHONY: image-credentials-prepare image-credentials-apply
+image-credentials-prepare:
+	$(PYTHON) scripts/infrastructure/image_credentials.py prepare
+
+image-credentials-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed host rollout digest'; exit 1)
+	$(PYTHON) scripts/infrastructure/image_credentials.py apply --approve-plan "$(PLAN_SHA)"
+
 image-tools-build:
 	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
 	$(PYTHON) scripts/infrastructure/image_tools.py --operation "$(OPERATION)"

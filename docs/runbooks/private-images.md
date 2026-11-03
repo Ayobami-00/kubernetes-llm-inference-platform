@@ -69,11 +69,43 @@ cleanup. A transfer retry reads the same compiled bytes; it never recompiles or
 creates a replacement attempt. The first live build passed upstream tests and
 produced a 14,315,646-byte executable with confirmed cleanup.
 
-Host installation and actual positive/negative image pulls still require live
-verification before management deployment. Disable metadata fallback in the
+Host installation has passed live verification on all three CPU workers. Actual
+positive/negative image pulls still require verification before management deployment.
+Disable metadata fallback in the
 provider, match only the project registry paths, require the role annotation and
 use token-scoped credential caching. Keep ordinary CI independent of live cluster
 resources and this opt-in source build.
+
+The encoded rolling installation checks all three protected node UIDs, fresh node
+leases and the healthy three-instance database before every host. It refuses
+unknown kubelet units/drop-ins, disabled Pod-token support, links and writable
+configuration. It installs the verified binary, exact three-repository match and
+token-scoped cache, with metadata and shared credential-file fallback disabled.
+The unit appends a dedicated argument variable and preserves kubeadm flags,
+resource reservations and user arguments. Ansible keeps private rollback copies,
+checks the local health endpoint and restores the previous files on installation
+failure. A later cluster-level failure stops further hosts and retains evidence.
+Control-plane kubelets are excluded. A failed rollout requires explicit inspection
+and a fresh preparation; it never silently continues on another host.
+
+```sh
+make image-credentials-prepare
+make image-credentials-apply PLAN_SHA=<reviewed-host-plan-digest>
+make platform-service-deploy RELEASE=klip-image-pull
+```
+
+Review the complete private `cluster/image-credentials/plan.json` before applying.
+Host plans bind source, binary checksum, original configurations and exact node
+identities; changed inputs require a new plan. The separate pull-audience release
+must exist before pulling private images. Installation/readiness alone does not
+prove authentication: run actual positive and wrong-identity pulls with
+`imagePullPolicy: Always`, including on hosts that have cached the image.
+
+The first rolling application completed on 2026-11-03 at 18:27:55 UTC. All three
+unchanged node identities had the frozen executable checksum and configuration;
+kubelet configuration, kubeadm flags and user argument files matched their
+pre-install hashes. Database/node checks passed between updates. No control-plane
+kubelet was changed. This evidence is separate from actual private-pull acceptance.
 
 ## CI publication
 
@@ -110,6 +142,17 @@ combined checks before choosing deployment pins. Download receipts into retained
 operator evidence as well as the 90-day CI artifact store. An unfinished or
 unsupported scan fails the publishing check. Images are never automatically
 deployed by the publishing workflow.
+
+The first CI publication (`9567a39`) succeeded for all four components. Its scans
+found critical base-package issues, so those images were held back from application
+deployment: backend 6, web 26, runner 8 and stub 8 critical findings. The follow-up
+recipes pin maintained Python 3.12.16 / Nginx 1.30.6 images; rebuilding, scanning and
+the combined execution/browser checks must verify those replacements before they
+are selected for deployment. Historical tags/findings remain available for audit.
+See the vendor [OpenSSL](https://security-tracker.debian.org/tracker/CVE-2026-75803),
+[Perl](https://security-tracker.debian.org/tracker/CVE-2026-42496) and
+[Nginx](https://nginx.org/en/security_advisories.html) advisories. A version upgrade
+alone does not establish that every finding has been resolved.
 
 Clean-checkout CI also exercises the OCI chart fetch. Helm may choose a filename
 different from the lock's cache name when pulling by digest. The fetcher downloads
