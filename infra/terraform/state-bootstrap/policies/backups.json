@@ -1,0 +1,75 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadWriteAdditionalState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/cluster-backups/terraform.tfstate",
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/network-probe/terraform.tfstate"
+      ]
+    },
+    {
+      "Sid": "LockAdditionalState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/cluster-backups/terraform.tfstate.tflock",
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/network-probe/terraform.tfstate.tflock"
+      ]
+    },
+    {
+      "Sid": "CreateRecoveryBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:CreateBucket"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-backups-127811062476-eu-west-2"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "s3:LocationConstraint": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "ConfigureRecoveryBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:Get*",
+        "s3:ListBucket",
+        "s3:ListBucketVersions",
+        "s3:PutBucketVersioning",
+        "s3:PutEncryptionConfiguration",
+        "s3:PutBucketPublicAccessBlock",
+        "s3:PutBucketOwnershipControls",
+        "s3:PutBucketPolicy",
+        "s3:PutBucketTagging",
+        "s3:PutLifecycleConfiguration"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-backups-127811062476-eu-west-2"
+      ]
+    },
+    {
+      "Sid": "ReadRecoveryBundles",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:GetObjectVersion"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-backups-127811062476-eu-west-2/clusters/klip/*"
+      ]
+    }
+  ]
+}

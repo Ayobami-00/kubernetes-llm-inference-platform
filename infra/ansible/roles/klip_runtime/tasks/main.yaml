@@ -1,0 +1,113 @@
+---
+- name: Create package signing directory
+  ansible.builtin.file:
+    path: /etc/apt/keyrings
+    state: directory
+    mode: '0755'
+- name: Fetch the Kubernetes minor repository signing key
+  ansible.builtin.copy:
+    src: "{{ klip_repository }}/artifacts/platform/kubernetes-release-key"
+    dest: /etc/apt/keyrings/klip-kubernetes.asc
+    mode: '0644'
+- name: Configure the signed Kubernetes repository
+  ansible.builtin.copy:
+    dest: /etc/apt/sources.list.d/klip-kubernetes.sources
+    mode: '0644'
+    content: |
+      Types: deb
+      URIs: https://pkgs.k8s.io/core:/stable:/v1.36/deb/
+      Suites: /
+      Signed-By: /etc/apt/keyrings/klip-kubernetes.asc
+- name: Install exact Kubernetes packages
+  ansible.builtin.apt:
+    name:
+      - kubelet=1.36.5-1.1
+      - kubeadm=1.36.5-1.1
+      - kubectl=1.36.5-1.1
+      - cri-tools=1.36.0-1.1
+      - kubernetes-cni=1.9.1-1.1
+    state: present
+    update_cache: true
+- name: Hold Kubernetes packages until a reviewed upgrade
+  ansible.builtin.dpkg_selections:
+    name: '{{ item }}'
+    selection: hold
+  loop: [kubelet, kubeadm, kubectl, cri-tools, kubernetes-cni]
+- name: Create pinned runtime directory
+  ansible.builtin.file:
+    path: /opt/klip/containerd-2.4.2
+    state: directory
+    mode: '0755'
+- name: Unpack verified containerd release
+  ansible.builtin.unarchive:
+    src: '{{ klip_repository }}/artifacts/platform/containerd-linux-amd64'
+    dest: /opt/klip/containerd-2.4.2
+    creates: /opt/klip/containerd-2.4.2/bin/containerd
+- name: Select the pinned containerd binary
+  ansible.builtin.file:
+    src: /opt/klip/containerd-2.4.2/bin/{{ item }}
+    dest: /usr/local/bin/{{ item }}
+    state: link
+  loop: [containerd, containerd-shim-runc-v2, ctr]
+- name: Install verified runc binary
+  ansible.builtin.copy:
+    src: '{{ klip_repository }}/artifacts/platform/runc-linux-amd64'
+    dest: /usr/local/sbin/runc
+    mode: '0755'
+- name: Discover the sandbox image from pinned kubeadm
+  ansible.builtin.command: kubeadm config images list --kubernetes-version v1.36.5
+  register: klip_runtime_images
+  changed_when: false
+- name: Create runtime configuration directory
+  ansible.builtin.file:
+    path: /etc/containerd
+    state: directory
+    mode: '0755'
+- name: Configure containerd CRI and systemd cgroups
+  ansible.builtin.copy:
+    dest: /etc/containerd/config.toml
+    mode: '0644'
+    content: |
+      version = 3
+      [plugins.'io.containerd.cri.v1.images'.pinned_images]
+        sandbox = "{{ klip_runtime_images.stdout_lines | select('search', '/pause:') | first }}"
+      [plugins.'io.containerd.cri.v1.runtime'.containerd]
+        default_runtime_name = "runc"
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc]
+        runtime_type = "io.containerd.runc.v2"
+      [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+        SystemdCgroup = true
+        BinaryName = "/usr/local/sbin/runc"
+  notify: Restart containerd
+- name: Install runtime service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/containerd.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=containerd
+      After=network.target
+      [Service]
+      ExecStart=/usr/local/bin/containerd
+      Delegate=yes
+      KillMode=process
+      Restart=always
+      RestartSec=5
+      LimitNOFILE=1048576
+      TasksMax=infinity
+      [Install]
+      WantedBy=multi-user.target
+  notify: Restart containerd
+- name: Configure crictl endpoint
+  ansible.builtin.copy:
+    dest: /etc/crictl.yaml
+    content: 'runtime-endpoint: unix:///run/containerd/containerd.sock'
+    mode: '0644'
+- name: Enable the runtime
+  ansible.builtin.systemd_service:
+    name: containerd
+    enabled: true
+    state: started
+    daemon_reload: true
+- name: Apply pending runtime configuration before bootstrap
+  ansible.builtin.meta: flush_handlers

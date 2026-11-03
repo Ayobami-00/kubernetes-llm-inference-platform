@@ -1,0 +1,204 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadRegionalFoundationMetadata",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:DescribeAddresses",
+        "ec2:DescribeAddressesAttribute",
+        "ec2:DescribeAvailabilityZones",
+        "ec2:DescribeImages",
+        "ec2:DescribeInstanceCreditSpecifications",
+        "ec2:DescribeInstanceStatus",
+        "ec2:DescribeInstanceTypes",
+        "ec2:DescribeInstances",
+        "ec2:DescribeInternetGateways",
+        "ec2:DescribeKeyPairs",
+        "ec2:DescribeNetworkInterfaces",
+        "ec2:DescribeRouteTables",
+        "ec2:DescribeSecurityGroupRules",
+        "ec2:DescribeSecurityGroups",
+        "ec2:DescribeSubnets",
+        "ec2:DescribeTags",
+        "ec2:DescribeVolumes",
+        "ec2:DescribeVolumesModifications",
+        "ec2:DescribeVpcAttribute",
+        "ec2:DescribeVpcs",
+        "ec2:DescribeIamInstanceProfileAssociations",
+        "ec2:DescribeInstanceTypeOfferings",
+        "ssm:DescribeInstanceInformation"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AllocateAddress",
+        "ec2:CreateInternetGateway",
+        "ec2:CreateRouteTable",
+        "ec2:CreateSecurityGroup",
+        "ec2:CreateSubnet",
+        "ec2:CreateVpc"
+      ],
+      "Resource": [
+        "*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "CreateWithinOwnedVpc",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateSubnet",
+        "ec2:CreateRouteTable",
+        "ec2:CreateSecurityGroup"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:vpc/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedSecurityGroupRules",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:security-group-rule/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOwnedNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:AssociateAddress",
+        "ec2:DisassociateAddress",
+        "ec2:ReleaseAddress",
+        "ec2:AttachInternetGateway",
+        "ec2:DetachInternetGateway",
+        "ec2:DeleteInternetGateway",
+        "ec2:AssociateRouteTable",
+        "ec2:DisassociateRouteTable",
+        "ec2:ReplaceRouteTableAssociation",
+        "ec2:CreateRoute",
+        "ec2:ReplaceRoute",
+        "ec2:DeleteRoute",
+        "ec2:DeleteRouteTable",
+        "ec2:AuthorizeSecurityGroupIngress",
+        "ec2:AuthorizeSecurityGroupEgress",
+        "ec2:RevokeSecurityGroupIngress",
+        "ec2:RevokeSecurityGroupEgress",
+        "ec2:ModifySecurityGroupRules",
+        "ec2:DeleteSecurityGroup",
+        "ec2:ModifySubnetAttribute",
+        "ec2:DeleteSubnet",
+        "ec2:ModifyVpcAttribute",
+        "ec2:DeleteVpc"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:vpc/*",
+        "arn:aws:ec2:eu-west-2:127811062476:subnet/*",
+        "arn:aws:ec2:eu-west-2:127811062476:internet-gateway/*",
+        "arn:aws:ec2:eu-west-2:127811062476:route-table/*",
+        "arn:aws:ec2:eu-west-2:127811062476:security-group/*",
+        "arn:aws:ec2:eu-west-2:127811062476:security-group-rule/*",
+        "arn:aws:ec2:eu-west-2:127811062476:elastic-ip/*",
+        "arn:aws:ec2:eu-west-2:127811062476:instance/*",
+        "arn:aws:ec2:eu-west-2:127811062476:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "TagDuringApprovedCreation",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:CreateAction": [
+            "AllocateAddress",
+            "CreateInternetGateway",
+            "CreateRouteTable",
+            "CreateSecurityGroup",
+            "CreateSubnet",
+            "CreateVpc",
+            "RunInstances",
+            "CreateVolume",
+            "CreateNetworkInterface",
+            "ImportKeyPair",
+            "AuthorizeSecurityGroupIngress",
+            "AuthorizeSecurityGroupEgress"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "UpdateOwnedTags",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateTags",
+        "ec2:DeleteTags"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        },
+        "StringEqualsIfExists": {
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "PreserveOwnershipTag",
+      "Effect": "Deny",
+      "Action": "ec2:DeleteTags",
+      "Resource": "arn:aws:ec2:eu-west-2:127811062476:*",
+      "Condition": {
+        "ForAnyValue:StringEquals": {
+          "aws:TagKeys": "Project"
+        }
+      }
+    }
+  ]
+}

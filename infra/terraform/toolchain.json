@@ -1,0 +1,18 @@
+{
+  "terraform": {
+    "version": "1.17.1",
+    "sha256": {
+      "darwin_arm64": "b1ecb3fe0d0a0290c1ab6f83d967d43f25da05d0b671ee0fb355252268dce95a",
+      "linux_amd64": "4638628058e71a55212b1c563712eac03b902128f40740f3dc8174df12135061"
+    }
+  },
+  "aws_provider": "6.71.0",
+  "tflint": {
+    "version": "0.64.0",
+    "sha256": {
+      "darwin_arm64": "2496e9cb3d24992d553b45e7c87a0fdc9449ca975233876247a9bfeda857e6c0",
+      "linux_amd64": "cca9d13e2e1d7a2c627af60ff899a3c9b74212899416aeb96ec764d2ef954537"
+    }
+  },
+  "tflint_aws_ruleset": "0.49.0"
+}

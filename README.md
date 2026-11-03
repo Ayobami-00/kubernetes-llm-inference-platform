@@ -95,6 +95,7 @@ deployment readiness.
 - [Customer defaults and scenario mappings](configs/customers/README.md)
 - [Dataset provenance and preparation boundaries](datasets/README.md)
 - [Runtime fixtures and schema conventions](contracts/README.md)
+- [AWS access bootstrap and API DNS decisions](docs/runbooks/aws-access.md)
 
 Author configurations under `configs/` and source manifests under `datasets/manifests/`. Generate
 JSON Schemas from the Python models; do not edit the exported schemas by hand:
@@ -128,3 +129,50 @@ Management integration handoffs, Kubernetes Jobs and immutable imports are descr
 the isolated kind proof and explicit release workflow are in the
 [deployment guide](docs/development/management-deployment.md). Real cloud mutations and benchmark
 execution remain blocked until their downstream readiness requirements are satisfied.
+
+## AWS foundation
+
+Stream B's Terraform foundation provides three continuously running CPU hosts in London for the
+self-managed Kubernetes cluster. It includes native S3 state locking, imported access-bootstrap
+IAM, a private API NLB, dedicated etcd disks and a separately authorized inference DNS root.
+Ansible host preparation, direct WireGuard peers, guarded kubeadm bootstrap, Cilium/Hubble,
+metrics-server, encrypted etcd backups and generic worker operations are implemented as a
+separate rollout. [Live cluster acceptance](docs/runbooks/kubernetes-acceptance.md) passed,
+including external API gateway failover, snapshot restore and generic worker join/removal.
+Terraform does not provision Lambda GPU VMs.
+
+```bash
+make infra-tools
+make infra-check
+make infra-profiles
+make infra-bootstrap-plan
+make infra-preview
+make infra-dns-preview ORIGINS_FILE=infra/terraform/environments/inference-dns/origins.example.tfvars.json
+```
+
+Preview plans cannot be applied. Review the [provisioning workflow](docs/runbooks/aws-foundation.md)
+and its cost estimate before authorizing live creation. All mutable commands use explicit AWS
+identities and saved-plan digests. Private credentials, recovery state and reports stay outside Git.
+
+- [Foundation architecture and addressing](docs/architecture/aws-foundation.md)
+- [State recovery](docs/runbooks/terraform-state.md)
+- [Inference origin updates](docs/runbooks/inference-dns.md)
+- [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
+- [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)
+- [Live foundation acceptance and Ansible handoff](docs/runbooks/aws-foundation-acceptance.md)
+- [Live Kubernetes acceptance and cleanup](docs/runbooks/kubernetes-acceptance.md)
+
+## CPU cluster bootstrap
+
+```bash
+make cluster-tools
+make cluster-check
+make cluster-preflight
+```
+
+Review the [cluster rollout](docs/runbooks/cluster-bootstrap.md) before applying host changes.
+The [network architecture](docs/architecture/kubernetes-bootstrap.md),
+[backup recovery workflow](docs/runbooks/cluster-recovery.md) and
+[worker operation interface for C](docs/runbooks/worker-host-operations.md) describe ownership,
+credential boundaries and later GPU integration. Local validation is distinct from live
+Kubernetes acceptance; no readiness is inferred from Terraform allocations.

@@ -1,0 +1,7 @@
+---
+- name: Schedule encrypted recovery bundles
+  hosts: control_plane
+  become: true
+  serial: 1
+  roles:
+    - klip_backup

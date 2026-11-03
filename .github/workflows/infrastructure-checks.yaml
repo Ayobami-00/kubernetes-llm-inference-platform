@@ -1,0 +1,45 @@
+name: Infrastructure checks
+
+on:
+  push:
+    paths:
+      - 'infra/**'
+      - 'deploy/**'
+      - 'scripts/infrastructure/**'
+      - 'tests/infrastructure/**'
+      - '.github/workflows/infrastructure-checks.yaml'
+      - '.tflint.hcl'
+      - '.terraform-version'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Makefile'
+  pull_request:
+    paths:
+      - 'infra/**'
+      - 'deploy/**'
+      - 'scripts/infrastructure/**'
+      - 'tests/infrastructure/**'
+      - '.github/workflows/infrastructure-checks.yaml'
+      - '.tflint.hcl'
+      - '.terraform-version'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - 'Makefile'
+
+permissions:
+  contents: read
+
+jobs:
+  offline-infrastructure:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with:
+          enable-cache: true
+          python-version: '3.12'
+      - run: uv sync --locked --group infrastructure --all-packages
+      - run: make infra-tools
+      - run: uv run --locked --group infrastructure python scripts/infrastructure/platform_artifacts.py install
+      - run: make infra-check

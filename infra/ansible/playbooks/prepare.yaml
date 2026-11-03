@@ -1,0 +1,10 @@
+---
+- name: Prepare verified hosts without initializing Kubernetes
+  hosts: all
+  become: true
+  serial: 1
+  roles:
+    - klip_base
+    - role: klip_storage
+      when: klip_node.role == 'control_plane'
+    - klip_runtime

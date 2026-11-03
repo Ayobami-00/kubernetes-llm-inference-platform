@@ -1,0 +1,13 @@
+age: 1.3.2
+ansible-core: 2.21.6
+ansible-lint: 26.10.1
+cilium: 1.20.4
+containerd: 2.4.2
+helm: 3.22.1
+helmfile: 1.8.2
+hubble: 1.20.2
+kubernetes: 1.36.5
+metadata-guard-chart: 0.1.1
+metrics-server-chart: 3.14.0
+runc: 1.5.2
+session-manager-plugin: 1.2.896.0

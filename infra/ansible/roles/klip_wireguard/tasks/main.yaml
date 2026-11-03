@@ -1,0 +1,81 @@
+---
+- name: Write versioned public peer registry
+  ansible.builtin.copy:
+    src: '{{ klip_peer_registry }}'
+    dest: /etc/klip/peers.next.json
+    mode: '0600'
+- name: Reconcile peers while preserving gateway selection
+  ansible.builtin.command: python3 /usr/local/sbin/klip-node mesh
+  changed_when: false
+- name: Enable persistent WireGuard interface
+  ansible.builtin.systemd_service:
+    name: wg-quick@wg0
+    enabled: true
+- name: Install scoped firewall rules
+  ansible.builtin.copy:
+    src: '{{ klip_firewall_file }}'
+    dest: /etc/klip/firewall.rules
+    mode: '0600'
+- name: Install firewall service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/klip-firewall.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=KLIP scoped host firewall
+      After=network-pre.target
+      Before=kubelet.service
+      [Service]
+      Type=oneshot
+      ExecStart=/usr/bin/python3 /usr/local/sbin/klip-node firewall
+      RemainAfterExit=yes
+      [Install]
+      WantedBy=multi-user.target
+- name: Apply dedicated firewall chains
+  ansible.builtin.systemd_service:
+    name: klip-firewall
+    state: restarted
+    enabled: true
+    daemon_reload: true
+- name: Install API route helper timer
+  when: klip_node.role != 'control_plane'
+  block:
+    - name: Install public cluster CA for gateway probes
+      ansible.builtin.copy:
+        src: '{{ klip_ca_bundle }}'
+        dest: /etc/klip/ca.crt
+        mode: '0644'
+    - name: Install route helper service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/klip-api-route.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=KLIP private API gateway selection
+          After=wg-quick@wg0.service
+          [Service]
+          Type=oneshot
+          ExecStart=/usr/bin/python3 /usr/local/sbin/klip-node route
+          TimeoutStartSec=10
+    - name: Install route helper timer
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/klip-api-route.timer
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=Probe private API gateways every five seconds
+          [Timer]
+          OnBootSec=5s
+          OnUnitInactiveSec=5s
+          AccuracySec=1s
+          [Install]
+          WantedBy=timers.target
+    - name: Select initial healthy API gateway
+      ansible.builtin.command: python3 /usr/local/sbin/klip-node route
+      changed_when: false
+    - name: Enable API route timer
+      ansible.builtin.systemd_service:
+        name: klip-api-route.timer
+        state: started
+        enabled: true
+        daemon_reload: true

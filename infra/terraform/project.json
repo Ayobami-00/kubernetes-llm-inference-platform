@@ -1,0 +1,26 @@
+{
+  "account_id": "127811062476",
+  "region": "eu-west-2",
+  "project": "kubernetes-llm-inference-platform",
+  "cluster_id": "klip",
+  "environment": "lab",
+  "source_user": "kubernetes-llm-inference-platform",
+  "state_bucket": "klip-tfstate-127811062476-eu-west-2",
+  "hosted_zone_id": "Z06158312NEW6IHHPH5XV",
+  "domain": "klip-lab.click",
+  "inference_hostname": "inference.klip-lab.click",
+  "ami_id": "ami-057b46c043e81dcf4",
+  "ami_owner": "099720109477",
+  "instance_type": "m7i.large",
+  "vpc_cidr": "10.40.0.0/16",
+  "wireguard_cidr": "10.200.0.0/24",
+  "pod_cidr": "10.244.0.0/16",
+  "service_cidr": "10.96.0.0/12",
+  "worker_wireguard_range": ["10.200.0.64", "10.200.0.254"],
+  "ssh_credential_ref": "credential://klip/foundation-ssh",
+  "nodes": {
+    "cp-01": {"availability_zone": "eu-west-2a", "public_subnet_cidr": "10.40.0.0/24", "private_ip": "10.40.0.10", "api_subnet_cidr": "10.40.16.0/24", "api_ip": "10.40.16.10", "wireguard_ip": "10.200.0.11"},
+    "cp-02": {"availability_zone": "eu-west-2b", "public_subnet_cidr": "10.40.1.0/24", "private_ip": "10.40.1.10", "api_subnet_cidr": "10.40.17.0/24", "api_ip": "10.40.17.10", "wireguard_ip": "10.200.0.12"},
+    "cp-03": {"availability_zone": "eu-west-2c", "public_subnet_cidr": "10.40.2.0/24", "private_ip": "10.40.2.10", "api_subnet_cidr": "10.40.18.0/24", "api_ip": "10.40.18.10", "wireguard_ip": "10.200.0.13"}
+  }
+}
