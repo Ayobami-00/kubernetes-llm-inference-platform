@@ -59,11 +59,15 @@ def validate_allocation(document: dict) -> dict:
     }
     for name, node in document["nodes"].items():
         expected = platform["nodes"][name]
-        if set(node) != fields or any(
+        if set(node) not in (fields, fields | {"instance_type"}) or any(
             node[key] != expected[key]
             for key in ("availability_zone", "private_ip", "wireguard_ip")
         ):
             raise ValueError("Platform allocation differs from its reviewed slot")
+        if not re.fullmatch(
+            r"[a-z][a-z0-9]*\.[a-z0-9]+", node.get("instance_type", document["instance_type"])
+        ):
+            raise ValueError("Invalid observed platform instance type")
         if node["labels"] != {
             "klip.dev/node-role": "platform",
             "topology.kubernetes.io/zone": expected["availability_zone"],
@@ -100,7 +104,7 @@ def verify_instances(allocation: dict, instances: list, interfaces: list, volume
         checks = (
             instance.get("State", {}).get("Name") == "running",
             instance.get("ImageId") == CONFIG["ami_id"],
-            instance.get("InstanceType") == allocation["instance_type"],
+            instance.get("InstanceType") == node.get("instance_type", allocation["instance_type"]),
             instance.get("PrivateIpAddress") == node["private_ip"],
             instance.get("PublicIpAddress") == node["public_ip"],
             instance.get("Placement", {}).get("AvailabilityZone") == node["availability_zone"],
@@ -357,7 +361,7 @@ def join_platform() -> dict:
             patch = placement_patch(
                 identity,
                 observed,
-                {**node["labels"], **cloud_metadata_labels(allocation, instances)},
+                {**node["labels"], **cloud_metadata_labels(allocation, instances, name)},
             )
             cluster.kubectl("patch", "node", name, "--type=json", "-p", json.dumps(patch))
             observations[name] = {
@@ -412,7 +416,7 @@ def verify_restricted_kubelet(host, name: str) -> None:
     raise ValueError("Kubelet could assign a protected node label")
 
 
-def cloud_metadata_labels(allocation: dict, instances: list) -> dict:
+def cloud_metadata_labels(allocation: dict, instances: list, node_name: str | None = None) -> dict:
     """Supply the metadata required by EBS from authenticated AWS observations."""
     indexed = {item["InstanceId"]: item for item in instances}
     if set(indexed) != {node["instance_id"] for node in allocation["nodes"].values()}:
@@ -421,15 +425,29 @@ def cloud_metadata_labels(allocation: dict, instances: list) -> dict:
         actual = indexed[node["instance_id"]]
         tags = {t["Key"]: t["Value"] for t in actual.get("Tags", [])}
         if (
-            actual.get("InstanceType") != allocation["instance_type"]
+            actual.get("InstanceType") != node.get("instance_type", allocation["instance_type"])
             or actual.get("State", {}).get("Name") != "running"
             or actual.get("Placement", {}).get("AvailabilityZone") != node["availability_zone"]
             or tags.get("Project") != CONFIG["project"]
             or tags.get("Node") != name
         ):
             raise ValueError("Live platform metadata differs from its reviewed allocation")
+    if node_name is None:
+        sizes = {
+            n.get("instance_type", allocation["instance_type"])
+            for n in allocation["nodes"].values()
+        }
+        if len(sizes) != 1:
+            raise ValueError("Mixed maintenance sizes require an explicit node for metadata labels")
+        instance_type = next(iter(sizes))
+    else:
+        if node_name not in allocation["nodes"]:
+            raise ValueError("Unknown platform node for metadata labels")
+        instance_type = allocation["nodes"][node_name].get(
+            "instance_type", allocation["instance_type"]
+        )
     return {
-        "node.kubernetes.io/instance-type": allocation["instance_type"],
+        "node.kubernetes.io/instance-type": instance_type,
         "topology.kubernetes.io/region": CONFIG["region"],
     }
 

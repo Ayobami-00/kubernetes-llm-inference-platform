@@ -77,3 +77,16 @@ def test_ambiguous_notification_is_not_automatically_retried(tmp_path, monkeypat
 def test_notification_identity_is_path_safe(operation):
     with pytest.raises(ValueError):
         observability.send_test(operation)
+
+
+def test_receipt_acknowledgment_requires_submission_and_never_republishes(tmp_path, monkeypatch):
+    _, aws = setup_notification(tmp_path, monkeypatch)
+    observability.send_test("123456abcdef")
+    confirmed = observability.acknowledge_receipt("123456abcdef")
+    assert confirmed["recipient_receipt_verified"] and confirmed["receipt_confirmed_at"]
+    assert observability.acknowledge_receipt("123456abcdef") == confirmed
+    assert aws.call.call_count == 1
+    path = tmp_path / "notification-123456abcdef.json"
+    path.write_text(json.dumps({**confirmed, "state": "submission_pending"}))
+    with pytest.raises(ValueError, match="submitted"):
+        observability.acknowledge_receipt("123456abcdef")

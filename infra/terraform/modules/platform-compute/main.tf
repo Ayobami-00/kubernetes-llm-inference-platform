@@ -1,4 +1,8 @@
 locals {
+  cpu_profiles = {
+    "m7i.xlarge"  = { core_count = 2, threads_per_core = 2 }
+    "m7i.2xlarge" = { core_count = 4, threads_per_core = 2 }
+  }
   egress = {
     http      = { protocol = "tcp", port = 80 }
     https     = { protocol = "tcp", port = 443 }
@@ -98,10 +102,16 @@ resource "aws_instance" "node" {
   for_each                = var.nodes
   ami                     = var.ami_id
   availability_zone       = each.value.availability_zone
-  instance_type           = var.instance_type
+  instance_type           = coalesce(each.value.instance_type, var.instance_type)
   iam_instance_profile    = aws_iam_instance_profile.platform.name
   key_name                = aws_key_pair.platform.key_name
   disable_api_termination = var.deletion_protection
+  # EC2 preserves supported old CPU options across a type change. Explicit
+  # profiles ensure an eight-vCPU worker actually exposes all eight vCPUs.
+  cpu_options {
+    core_count       = local.cpu_profiles[coalesce(each.value.instance_type, var.instance_type)].core_count
+    threads_per_core = local.cpu_profiles[coalesce(each.value.instance_type, var.instance_type)].threads_per_core
+  }
   primary_network_interface {
     network_interface_id = aws_network_interface.node[each.key].id
   }

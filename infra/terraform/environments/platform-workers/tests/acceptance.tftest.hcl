@@ -29,9 +29,26 @@ variables {
 run "separate_worker_allocation" {
   command = plan
   assert {
-    condition     = output.platform_manifest.cluster_id == "klip" && output.platform_manifest.instance_type == "m7i.xlarge" && length(output.platform_manifest.nodes) == 3
+    condition     = output.platform_manifest.cluster_id == "klip" && output.platform_manifest.instance_type == "m7i.2xlarge" && length(output.platform_manifest.nodes) == 3
     error_message = "The additional allocation must preserve project identity and three worker slots."
   }
+}
+
+run "rolling_sizes_are_truthful" {
+  command = plan
+  variables {
+    instance_type_overrides = { platform-02 = "m7i.xlarge", platform-03 = "m7i.xlarge" }
+  }
+  assert {
+    condition     = output.platform_manifest.nodes["platform-01"].instance_type == "m7i.2xlarge" && output.platform_manifest.nodes["platform-02"].instance_type == "m7i.xlarge" && output.platform_manifest.nodes["platform-03"].instance_type == "m7i.xlarge"
+    error_message = "Partial maintenance must preserve and accurately report other workers' original sizes."
+  }
+}
+
+run "reject_non_platform_maintenance" {
+  command = plan
+  variables { instance_type_overrides = { cp-01 = "m7i.2xlarge" } }
+  expect_failures = [var.instance_type_overrides]
 }
 
 run "reject_foreign_foundation" {

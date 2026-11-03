@@ -256,9 +256,31 @@ def send_test(operation: str) -> dict:
         return record
 
 
+def acknowledge_receipt(operation: str) -> dict:
+    """Record the user's explicit inbox acknowledgment; never publish a message."""
+    if not re.fullmatch(r"[a-f0-9]{12}", operation):
+        raise ValueError("Use the existing 12-character notification operation")
+    with (folder() / "notifications.lock").open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX)
+        path = folder() / f"notification-{operation}.json"
+        record = json.loads(path.read_text())
+        if record.get("operation") != operation or record.get("state") != "sns_accepted":
+            raise ValueError("Only a submitted notification can have confirmed receipt")
+        if not record.get("recipient_receipt_verified"):
+            record.update(
+                recipient_receipt_verified=True,
+                receipt_confirmed_at=utc_now(),
+                receipt_evidence="User explicitly confirmed receiving this delivery test in chat",
+            )
+            write_private(path, record)
+        return record
+
+
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["cost", "verify", "test-notification"])
+    parser.add_argument(
+        "command", choices=["cost", "verify", "test-notification", "acknowledge-receipt"]
+    )
     parser.add_argument("--operation")
     args = parser.parse_args()
     if args.command == "cost":
@@ -266,8 +288,10 @@ def main():
         write_private(folder() / "cost.json", value)
     elif args.command == "verify":
         value = verify()
-    else:
+    elif args.command == "test-notification":
         value = send_test(args.operation or "")
+    else:
+        value = acknowledge_receipt(args.operation or "")
     print(json.dumps(value, indent=2))
 
 

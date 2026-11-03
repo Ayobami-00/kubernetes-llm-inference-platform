@@ -9,6 +9,7 @@ variable "nodes" {
     subnet_id         = string
     private_ip        = string
     wireguard_ip      = string
+    instance_type     = optional(string)
   }))
   validation {
     condition     = alltrue([for name in keys(var.nodes) : can(regex("^platform-0[123]$", name))])

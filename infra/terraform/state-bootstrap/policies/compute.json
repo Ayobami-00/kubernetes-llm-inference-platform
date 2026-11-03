@@ -118,6 +118,29 @@
       }
     },
     {
+      "Sid": "ResizeOwnedPlatformCpu",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:ModifyInstanceCpuOptions"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:instance/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform",
+          "ec2:ResourceTag/Cluster": "klip",
+          "ec2:ResourceTag/Environment": "lab",
+          "ec2:ResourceTag/Node": [
+            "platform-01",
+            "platform-02",
+            "platform-03"
+          ]
+        }
+      }
+    },
+    {
       "Sid": "ManageOwnedCompute",
       "Effect": "Allow",
       "Action": [

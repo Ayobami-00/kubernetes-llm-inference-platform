@@ -388,3 +388,22 @@ The user reported email confirmation, but the fresh AWS query still reports
 `PendingConfirmation`; the delivery-test command correctly stopped before
 publishing. The unsent test identity is `6ab3c19d8f20`. It may be retried only
 after AWS confirms the destination; no receipt or alert-delivery pass is recorded.
+
+The subscription is now confirmed in AWS. The one delivery test `6ab3c19d8f20`
+was accepted at 20:38:56 UTC and the recipient explicitly acknowledged receipt;
+the acknowledgment was retained at 20:44:40 UTC. This proves the tested SNS email
+path only, not Alertmanager workload delivery or actual outage detection.
+
+Live request accounting including native sidecars found 4.9 CPU/8.19 GiB already
+reserved on the platform workers. Full telemetry plus one runner forecasts 9.86
+CPU, exceeding the old seven-CPU single-worker-loss capacity. A versioned upgrade
+to three m7i.2xlarge workers is prepared, with at least 15 CPU/58 GiB remaining
+after one loss. Its incremental compute estimate is $510.49/month, within the
+authorized persistent tier envelope. No worker has been resized yet.
+
+The scoped CPU-options deployer permission is applied from a reviewed one-policy
+plan; an actual worker dry run succeeded and the authoritative control-plane dry
+run was denied. Fresh backup `d1f7a82c4e90` and post-backup WAL were verified at
+20:55:22 UTC. The maintenance workflow preserves per-node allocation truth during
+rollout, respects PDBs and drains the selected ALB target before restart. Planned
+maintenance will not replace the separate unplanned host-loss test.

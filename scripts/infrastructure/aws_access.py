@@ -243,6 +243,17 @@ def build_documents(
             StringEquals=regional,
         ),
         allow(
+            "ResizeOwnedPlatformCpu",
+            ["ec2:ModifyInstanceCpuOptions"],
+            [f"{ec2}:instance/*"],
+            StringEquals={
+                **owned,
+                "ec2:ResourceTag/Cluster": "klip",
+                "ec2:ResourceTag/Environment": "lab",
+                "ec2:ResourceTag/Node": ["platform-01", "platform-02", "platform-03"],
+            },
+        ),
+        allow(
             "ManageOwnedCompute",
             [
                 "ec2:StartInstances",

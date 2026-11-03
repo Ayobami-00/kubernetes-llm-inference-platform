@@ -153,6 +153,18 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
+.PHONY: platform-resize-prepare platform-resize-apply platform-resize-observe
+platform-resize-prepare:
+	@test -n "$(NODE)" -a -n "$(BACKUP_OPERATION)" || (echo 'Set NODE and a verified BACKUP_OPERATION'; exit 1)
+	$(PYTHON) scripts/infrastructure/platform_resize.py prepare --node "$(NODE)" --backup-operation "$(BACKUP_OPERATION)"
+
+platform-resize-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set the exact reviewed PLAN_SHA'; exit 1)
+	$(PYTHON) scripts/infrastructure/platform_resize.py apply --approve-plan "$(PLAN_SHA)"
+
+platform-resize-observe:
+	$(PYTHON) scripts/infrastructure/platform_resize.py observe
+
 .PHONY: management-verify-renewal
 management-verify-renewal:
 	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)

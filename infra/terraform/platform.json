@@ -1,6 +1,6 @@
 {
   "schema_version": "klip-platform-capacity.v1",
-  "instance_type": "m7i.xlarge",
+  "instance_type": "m7i.2xlarge",
   "root_volume_gib": 80,
   "nodes": {
     "platform-01": {"foundation_slot": "cp-01", "availability_zone": "eu-west-2a", "private_ip": "10.40.0.20", "wireguard_ip": "10.200.0.64"},

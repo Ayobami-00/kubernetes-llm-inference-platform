@@ -6,6 +6,7 @@ output "nodes" {
   description = "Allocation only; no Kubernetes, storage or application readiness is implied."
   value = { for name, node in var.nodes : name => {
     instance_id       = aws_instance.node[name].id
+    instance_type     = aws_instance.node[name].instance_type
     availability_zone = node.availability_zone
     private_ip        = node.private_ip
     public_ip         = aws_eip.node[name].public_ip

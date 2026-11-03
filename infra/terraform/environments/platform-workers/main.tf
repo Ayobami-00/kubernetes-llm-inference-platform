@@ -27,6 +27,15 @@ variable "deletion_protection" {
   type        = bool
   default     = true
 }
+variable "instance_type_overrides" {
+  description = "Reviewed rolling-maintenance sizes. Empty rebuilds every worker at the versioned default; node outputs always report their actual planned sizes."
+  type        = map(string)
+  default     = {}
+  validation {
+    condition     = alltrue([for name, size in var.instance_type_overrides : contains(["platform-01", "platform-02", "platform-03"], name) && can(regex("^[a-z][a-z0-9]*\\.[a-z0-9]+$", size))])
+    error_message = "Maintenance overrides may name only the three persistent platform slots and explicit instance types."
+  }
+}
 
 resource "terraform_data" "foundation_identity" {
   input = local.foundation.cluster_id
@@ -57,6 +66,7 @@ module "compute" {
     subnet_id         = local.foundation.network.cpu_subnet_ids[node.foundation_slot]
     private_ip        = node.private_ip
     wireguard_ip      = node.wireguard_ip
+    instance_type     = lookup(var.instance_type_overrides, name, local.platform.instance_type)
   } }
   depends_on = [terraform_data.foundation_identity]
 }

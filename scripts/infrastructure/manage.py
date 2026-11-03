@@ -109,6 +109,7 @@ def create_plan(
     phase: str = "apply",
     teardown: dict | None = None,
     allow_origin_removal: bool = False,
+    platform_overrides: dict[str, str] | None = None,
 ) -> dict:
     if root == "bootstrap" and preview:
         raise ValueError("Bootstrap's local first-use plan is real; omit --preview")
@@ -123,6 +124,10 @@ def create_plan(
         raise ValueError("Origin removal applies only to the DNS root")
     validate_configuration(CONFIG)
     values = input_values(root, origins_file, deletion_protection=phase == "apply")
+    if platform_overrides is not None:
+        if root != "platform" or phase != "apply" or not isinstance(platform_overrides, dict):
+            raise ValueError("Instance-type overrides apply only to platform maintenance plans")
+        values["instance_type_overrides"] = platform_overrides
     initialize(root, preview=preview)
     profile = PROFILES["bootstrap"] if preview else PROFILES[root]
     identity = Aws(profile).preflight("bootstrap" if preview else root)
@@ -255,8 +260,10 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
         )
     if root == "platform" and receipt["phase"] == "apply":
         from platform_capacity import ensure_capacity
+        from platform_resize import verify_for_apply
 
         document = json.loads(tf(root, "show", "-json", receipt["plan_path"]))
+        verify_for_apply(receipt, document)
         evidence = ensure_capacity(Aws(PROFILES[root]), document)
         write_private(Path(receipt["plan_path"]).with_suffix(".capacity.json"), evidence)
     if teardown:

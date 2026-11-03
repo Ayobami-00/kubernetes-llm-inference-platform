@@ -61,7 +61,7 @@ def live_resources(platform_allocation):
                 "InstanceId": node["instance_id"],
                 "State": {"Name": "running"},
                 "ImageId": CONFIG["ami_id"],
-                "InstanceType": "m7i.xlarge",
+                "InstanceType": platform_allocation["instance_type"],
                 "PrivateIpAddress": node["private_ip"],
                 "PublicIpAddress": node["public_ip"],
                 "Placement": {"AvailabilityZone": node["availability_zone"]},
@@ -502,7 +502,7 @@ def test_protected_label_probe_rejects_network_errors_and_permitted_self_labels(
 def test_cloud_metadata_requires_real_reviewed_instances(platform_allocation, live_resources):
     labels = workers.cloud_metadata_labels(platform_allocation, live_resources[0])
     assert labels == {
-        "node.kubernetes.io/instance-type": "m7i.xlarge",
+        "node.kubernetes.io/instance-type": platform_allocation["instance_type"],
         "topology.kubernetes.io/region": "eu-west-2",
     }
     live_resources[0][0]["InstanceType"] = "m7i.large"
@@ -510,3 +510,22 @@ def test_cloud_metadata_requires_real_reviewed_instances(platform_allocation, li
         workers.cloud_metadata_labels(platform_allocation, live_resources[0])
     with pytest.raises(ValueError, match="exactly"):
         workers.cloud_metadata_labels(platform_allocation, [])
+
+
+def test_mixed_maintenance_inventory_preserves_per_node_sizes(platform_allocation, live_resources):
+    value = copy.deepcopy(platform_allocation)
+    for name, item in value["nodes"].items():
+        item["instance_type"] = value["instance_type"] if name == "platform-01" else "m7i.xlarge"
+    for instance in live_resources[0]:
+        name = next(t["Value"] for t in instance["Tags"] if t["Key"] == "Node")
+        instance["InstanceType"] = value["nodes"][name]["instance_type"]
+    workers.validate_allocation(value)
+    workers.verify_instances(value, *live_resources)
+    with pytest.raises(ValueError, match="explicit node"):
+        workers.cloud_metadata_labels(value, live_resources[0])
+    assert (
+        workers.cloud_metadata_labels(value, live_resources[0], "platform-02")[
+            "node.kubernetes.io/instance-type"
+        ]
+        == "m7i.xlarge"
+    )
