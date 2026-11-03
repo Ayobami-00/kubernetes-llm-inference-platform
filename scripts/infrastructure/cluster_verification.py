@@ -24,6 +24,23 @@ def ready_node(node: dict, provider_id: str, address: str) -> None:
         raise ValueError("Node InternalIP is not its WireGuard assignment")
 
 
+def foundation_nodes(observed: list[dict], hosts: dict) -> dict:
+    """Keep the CPU-foundation proof scoped to etcd hosts when known workers are present."""
+    nodes = {item["metadata"]["name"]: item for item in observed}
+    expected = set(CONFIG["nodes"])
+    if len(nodes) != len(observed) or not expected.issubset(nodes):
+        raise ValueError("Missing or duplicate foundation Kubernetes nodes")
+    for name in set(nodes) - expected:
+        config = hosts.get(name, {}).get("klip_node", {})
+        if (
+            config.get("role") != "worker"
+            or nodes[name]["spec"].get("providerID", "").split("/")[-1] != config.get("instance_id")
+            or "node-role.kubernetes.io/control-plane" in nodes[name]["metadata"].get("labels", {})
+        ):
+            raise ValueError("Unknown or incompatible worker in the foundation observation")
+    return {name: nodes[name] for name in sorted(expected)}
+
+
 def verify_wireguard(hosts: dict) -> None:
     from cluster import Host
 
@@ -72,9 +89,7 @@ def verify_cluster(hosts: dict, kubectl) -> tuple[dict, list[dict]]:
     } or not all(item["TargetHealth"]["State"] == "healthy" for item in targets):
         raise ValueError("All three API NLB backends must be healthy")
     observed = json.loads(kubectl("get", "nodes", "-o", "json"))["items"]
-    nodes = {item["metadata"]["name"]: item for item in observed}
-    if set(nodes) != {"cp-01", "cp-02", "cp-03"}:
-        raise ValueError("Final shared inventory requires exactly the three foundation CPU nodes")
+    nodes = foundation_nodes(observed, hosts)
     cilium = json.loads(
         kubectl("-n", "kube-system", "get", "pods", "-l", "k8s-app=cilium", "-o", "json")
     )["items"]
@@ -84,7 +99,7 @@ def verify_cluster(hosts: dict, kubectl) -> tuple[dict, list[dict]]:
         if all(item.get("ready") for item in pod["status"].get("containerStatuses", []))
         and pod["status"].get("containerStatuses")
     }
-    if cilium_ready != set(nodes):
+    if not set(nodes).issubset(cilium_ready):
         raise ValueError("Cilium is not ready on every CPU node")
     health = Host(hosts["cp-01"]).agent("etcd")
     if (

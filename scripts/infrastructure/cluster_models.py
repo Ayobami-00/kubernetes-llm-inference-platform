@@ -68,6 +68,8 @@ class WorkerRequest(ContractModel):
     operation_id: Slug
     deadline: Timestamp
     provider: Literal["lambda", "aws"]
+    availability_zone: str | None = Field(default=None, pattern=r"^[a-z]{2}-[a-z]+-[0-9][a-z]$")
+    quarantine: bool = False
     provider_instance_id: NonEmpty
     node_name: Slug
     node_uid: NonEmpty | None = None
@@ -82,6 +84,8 @@ class WorkerRequest(ContractModel):
 
     @model_validator(mode="after")
     def restricted_input(self) -> Self:
+        if self.provider != "aws" and self.availability_zone is not None:
+            raise ValueError("AWS availability-zone metadata cannot describe a Lambda worker")
         if self.node_name.startswith("cp-"):
             raise ValueError("Worker operations cannot target control-plane nodes")
         for ref in (self.access_ref, self.join_ref):

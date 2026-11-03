@@ -119,6 +119,10 @@ def kubeadm_documents(
     }
     local = {"advertiseAddress": config["wireguard_ip"], "bindPort": 6443}
     if join:
+        if config.get("quarantine"):
+            node["taints"] = [
+                {"key": "klip.dev/bootstrap", "value": "true", "effect": "NoSchedule"}
+            ]
         if not control_plane and config["name"] == "network-probe":
             node["taints"] = [
                 {"key": "klip.io/acceptance-only", "value": "true", "effect": "NoSchedule"}

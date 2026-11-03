@@ -19,13 +19,15 @@ rendering or a successful stub run does not satisfy a live gate.
 | Expansion | Sequential A100 profiles, separate mixed capacity, all scenarios and failure campaign | Pending |
 
 The additional CPU allocation is defined in a separate `platform` Terraform root;
-see the [worker allocation runbook](../runbooks/platform-workers.md). Its live preview
-contains only creates; no added CPU or GPU instance has been launched yet. The Lambda
+see the [worker allocation runbook](../runbooks/platform-workers.md). Its reviewed live
+plan was applied on 3 November 2026: three CPU workers, no control-plane mutations.
+Trusted host preparation and joining are in progress; allocation is not readiness. The Lambda
 credential is configured at the existing ignored secret path and read-only API checks
 confirmed A10 capacity and a plain Ubuntu image. Those observations are not reservations.
-The regional IP quota is five while the planned layout needs six. An automatic-only
-increase to eight is pending; no support case was created. Live application of the
-worker plan rechecks quota/usage before any paid mutation.
+The automatic-only regional IP increase to eight was approved; no support case was
+created. Immediately before application, the operator verified three existing plus
+three additional IPs against eight, and six existing plus twelve additional vCPUs
+against 32. No GPU has been allocated.
 
 Start with one A10. Shared/CodeAgent testing later uses one 8×A100 **80 GB** VM
 sequentially; simultaneous mixed scenarios require additional authorized capacity. A single
@@ -60,6 +62,10 @@ registry, DNS integration and rebuild target. Keep the existing private API and 
 boundaries. The management backend must not receive the foundation write identity.
 
 ## Evidence and remaining work
+
+The initial [availability policy](../architecture/platform-availability.md) records
+recovery objectives, durability tradeoffs and the retained-state rebuild boundary.
+Its targets remain unproven until the corresponding live tests pass.
 
 Keep live verification bundles under ignored artifact/operational storage, containing
 source commit, frozen inputs, pins, preparation hashes, actual inventory, schedule,

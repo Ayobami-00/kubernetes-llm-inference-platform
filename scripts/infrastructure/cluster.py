@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from cluster_config import kubeadm_documents, write_ansible_inputs
@@ -154,6 +155,7 @@ def ansible(
     inventory: Path | None = None,
     extra: dict | None = None,
     limit: str | None = None,
+    log_path: Path | None = None,
 ) -> None:
     arguments = [
         str(ROOT / ".venv/bin/ansible-playbook"),
@@ -169,18 +171,29 @@ def ansible(
         arguments += ["--extra-vars", "@" + str(extra_file)]
     env = environment(PROFILES["foundation"])
     env["ANSIBLE_CONFIG"] = str(ROOT / "infra/ansible/ansible.cfg")
-    result = subprocess.run(
-        arguments,
-        cwd=ROOT / "infra/ansible",
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=operation_timeout(1200),
-    )
-    write_private(FOLDER / f"{playbook}.log", result.stdout + result.stderr)
+    destination = log_path or FOLDER / f"{playbook}.log"
+    try:
+        result = subprocess.run(
+            arguments,
+            cwd=ROOT / "infra/ansible",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=operation_timeout(1200),
+        )
+    except subprocess.TimeoutExpired as error:
+
+        def decoded(value):
+            return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
+
+        write_private(destination, decoded(error.stdout) + decoded(error.stderr))
+        raise RuntimeError(
+            f"Ansible {playbook} timed out; inspect private log {destination}"
+        ) from None
+    write_private(destination, result.stdout + result.stderr)
     if result.returncode:
-        raise RuntimeError(f"Ansible {playbook} failed; inspect private cluster/{playbook}.log")
+        raise RuntimeError(f"Ansible {playbook} failed; inspect private log {destination}")
 
 
 def preflight() -> dict:
@@ -472,6 +485,27 @@ def tunnel(host: str = "cp-01"):
                 process.kill()
 
 
+def release_arguments(release: str) -> str:
+    arguments = "--skip-crds"
+    if release == "cilium":
+        observation = FoundationObservation.model_validate_json(
+            (state_home() / "reports/foundation.json").read_text()
+        )
+        api = observation.allocation.api
+        endpoint = urlparse(str(api.endpoint))
+        if (
+            endpoint.scheme != "https"
+            or endpoint.port != 6443
+            or endpoint.hostname != api.dns_name
+            or endpoint.username
+            or endpoint.password
+            or not re.fullmatch(r"[a-z0-9.-]+", endpoint.hostname or "")
+        ):
+            raise ValueError("Cilium requires the verified private foundation API endpoint")
+        arguments += f" --set-string=k8sServiceHost={endpoint.hostname} --set=k8sServicePort=6443"
+    return arguments
+
+
 def deploy() -> dict:
     kubeconfigs()
     with tunnel():
@@ -512,7 +546,7 @@ def deploy() -> dict:
                     "name=" + release,
                     "sync",
                     "--args",
-                    "--skip-crds",
+                    release_arguments(release),
                 ],
                 timeout=900,
             )
@@ -553,6 +587,29 @@ def deploy() -> dict:
         ),
     )
     return {"deployed": True}
+
+
+def sync_release(release: str) -> dict:
+    if release not in {"cilium", "metadata-guard", "metrics-server"}:
+        raise ValueError("Only a reviewed static platform release can be reconciled")
+    kubeconfigs()
+    with tunnel():
+        checked(
+            [
+                tool("helmfile"),
+                "--file",
+                str(ROOT / "deploy/helmfile.yaml"),
+                "--kubeconfig",
+                str(FOLDER / "operator.conf"),
+                "--selector",
+                "name=" + release,
+                "sync",
+                "--args",
+                release_arguments(release),
+            ],
+            timeout=900,
+        )
+    return {"release": release, "reconciled": True}
 
 
 def approve_serving_csrs() -> dict:
@@ -714,10 +771,13 @@ def main() -> None:
             "worker-remove",
             "probe-register",
             "probe-cleanup",
+            "platform-join",
+            "sync-release",
         ],
     )
     parser.add_argument("--registry", type=Path)
     parser.add_argument("--request", type=Path)
+    parser.add_argument("--release", choices=["cilium", "metadata-guard", "metrics-server"])
     parser.add_argument("--copy", type=Path)
     parser.add_argument("--confirm-independent-custody", action="store_true")
     args = parser.parse_args()
@@ -766,6 +826,12 @@ def main() -> None:
         from cluster_acceptance import acceptance
 
         result = acceptance()
+    elif args.command == "platform-join":
+        from platform_workers import join_platform
+
+        result = join_platform()
+    elif args.command == "sync-release":
+        result = sync_release(args.release)
     else:
         from cluster_workers import operate_worker
 

@@ -17,6 +17,9 @@ Lambda SSH access additionally requires explicit executor public /32 sources;
 there is no broad public SSH rule. AWS CPU/probe administration stays SSM-only.
 The Lambda provider must permit the initial SSH connection from those sources.
 B installs a matching host restriction so later reconciliation remains reachable.
+AWS requests may include a verified `availability_zone`, which is preserved in the
+kubelet provider ID. `quarantine: true` registers new nodes with the bootstrap
+`NoSchedule` taint. Only the trusted caller removes that taint after its checks.
 
 Resolve access aliases from the executor's private cluster/credential-references.json.
 Each entry contains ansible_host, ansible_user, ansible_ssh_private_key_file and
@@ -31,6 +34,8 @@ Prepare returns the host's public WireGuard key. C allocates a reserved .64-.254
 address, publishes a complete klip-peers.v1 registry at the next revision, and invokes
 mesh reconciliation before join. Peers use direct /32 paths. Registry updates reject
 stale revisions, duplicate identities/keys/addresses and changes to fixed CPU slots.
+Persistent platform workers reserve `.64` through `.66`; dynamic GPU allocation
+starts at `.67` and must also consult the current registry and durable reservations.
 The API prefixes move independently under the host route-helper lock.
 Address reconciliation removes an obsolete IPv4 assignment before re-establishing
 the registry's sole address. This also handles Linux removing secondary addresses

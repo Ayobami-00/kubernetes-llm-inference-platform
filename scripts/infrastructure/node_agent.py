@@ -84,22 +84,13 @@ def imds(path: str) -> str:
     return opener.open(request, timeout=3).read().decode()
 
 
-def preflight(config: dict) -> dict:
-    if config["provider"] == "aws":
-        identity = json.loads(imds("dynamic/instance-identity/document"))
-        for field, expected in (
-            ("instanceId", config["instance_id"]),
-            ("accountId", config["account_id"]),
-            ("region", config["region"]),
-        ):
-            if identity[field] != expected:
-                raise ValueError(f"Host identity mismatch: {field}")
-    addresses = json.loads(command("ip", "-j", "address", "show"))
+def validate_host_networks(config: dict, addresses: list[dict]) -> None:
     protected = [
         ipaddress.ip_network(config[key]) for key in ("pod_cidr", "service_cidr", "wireguard_cidr")
     ]
-    if config["role"] != "control_plane":
-        protected += [ipaddress.ip_network(config["vpc_cidr"])]
+    vpc = ipaddress.ip_network(config["vpc_cidr"])
+    if config["role"] != "control_plane" and config["provider"] != "aws":
+        protected += [vpc]
     for interface in addresses:
         if interface["ifname"].startswith(("lo", "wg0", "cilium", "lxc", "veth")):
             continue
@@ -110,6 +101,25 @@ def preflight(config: dict) -> dict:
                 )
                 if any(actual.overlaps(network) for network in protected):
                     raise ValueError(f"Host network overlaps cluster allocation: {actual}")
+                if actual.overlaps(vpc) and not actual.subnet_of(vpc):
+                    raise ValueError("Host network covers more than the project VPC")
+
+
+def preflight(config: dict) -> dict:
+    if config["provider"] == "aws":
+        identity = json.loads(imds("dynamic/instance-identity/document"))
+        expected_identity = {
+            "instanceId": config["instance_id"],
+            "accountId": config["account_id"],
+            "region": config["region"],
+            "privateIp": config["private_ip"],
+        }
+        if config.get("availability_zone", "external") != "external":
+            expected_identity["availabilityZone"] = config["availability_zone"]
+        for field, expected in expected_identity.items():
+            if identity.get(field) != expected:
+                raise ValueError(f"Host identity mismatch: {field}")
+    validate_host_networks(config, json.loads(command("ip", "-j", "address", "show")))
     if shutil.disk_usage("/").free < 5 * 1024**3:
         raise ValueError("Root filesystem has less than 5 GiB free")
     if command("timedatectl", "show", "--property=NTPSynchronized", "--value") != "yes":

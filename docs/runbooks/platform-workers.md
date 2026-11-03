@@ -11,9 +11,10 @@ and WireGuard addresses `.64` through `.66`. These addresses are reserved; the G
 allocator must exclude them, including before the hosts become Ready. Persistent
 workers are not Lambda worker groups and have no GPU lease.
 
-This root is implemented and passes provider-mock checks. Host rollout, storage,
-identity, application HA and recovery gates remain pending. An allocation output
-does not claim joined or healthy Kubernetes workers.
+This root was applied on 3 November 2026 after a reviewed create-only plan and live
+quota checks. Host rollout is in progress. Storage, scoped workload identity,
+application HA and recovery gates remain pending. An allocation output does not
+claim joined or healthy Kubernetes workers.
 
 ## Cost and authority
 
@@ -30,8 +31,8 @@ artifacts, not copied into a deployment pin or customer SLO.
 
 The regional quota check found five Elastic IPs and 32 Standard on-demand vCPUs.
 The proposed total needs six IPs and 18 vCPUs. An automatic-only IP quota increase
-to eight was requested; no support case was authorized or created. Wait for the
-effective quota to increase before applying. The operator independently rechecks
+to eight was approved and effective before application; no support case was
+authorized or created. The operator independently rechecks
 current regional usage and additional plan requirements immediately before apply,
 so an approved plan alone cannot bypass missing quota.
 
@@ -59,16 +60,44 @@ make infra-bootstrap-plan
 make infra-bootstrap-apply PLAN_SHA=<reviewed-bootstrap-digest>
 make infra-platform-plan
 make infra-platform-apply PLAN_SHA=<reviewed-live-platform-digest>
+make cluster-platform-join
 ```
 
 Review saved plans against the exact project account, state and source digest. The
 normal operator rejects deletions/replacements and never applies a preview plan.
 The live root uses native S3 locking in its own state key.
 
-After allocation, use B's versioned worker prepare/mesh/join interface. Verify EC2
-identity/AZ, trusted host access, WireGuard, kubelet certificates, Cilium, labels and
-resource reservations before enabling platform workloads. Apply topology labels from
-verified observations. These hosts have no etcd volume and join as workers.
+`cluster-platform-join` holds the operator lock and reuses B's versioned host
+prepare/mesh/join interface. It verifies live EC2 identity, addresses, security,
+volumes and AZ before establishing pinned SSM-backed SSH access. Changed host keys
+fail closed. Join credentials live only in private short-lived files and are
+revoked after use, including failed joins.
+
+New nodes start with `klip.dev/bootstrap=true:NoSchedule`. Cilium tolerates this
+taint so networking can initialize; application placement waits for actual
+Kubernetes/Cilium readiness, kubelet serving certificates, API gateway routes and
+resource reservations. The final label/taint patch includes a Kubernetes UID
+precondition and preserves unrelated taints. These hosts have no etcd volume and
+join as workers. The per-node receipt is private `cluster/platform-workers.json`;
+requests, operation status and logs remain under private `cluster/operations/`.
+
+If the CPU-era Cilium release lacks the bootstrap toleration, reconcile the
+versioned Helm values before retrying the worker command:
+
+```sh
+uv run --locked --group infrastructure python scripts/infrastructure/cluster.py sync-release --release cilium
+make cluster-platform-join
+```
+
+Static release reconciliation holds the same operator lock. Cilium's rolling
+strategy permits at most one unavailable agent. The operator derives Cilium's
+`k8sServiceHost`/port from the validated foundation's private API load balancer;
+agent initialization must not depend on the ClusterIP Service path it helps serve.
+This runtime Helm input is regenerated after rebuild, not hardcoded to an old NLB.
+Explicit retries recheck identities
+and reconcile existing membership; they never run kubeadm reset or initialize etcd.
+Foundation verification continues to report only its three control-plane hosts
+when known worker identities are also present; worker readiness is a separate proof.
 
 ## Teardown boundary
 
