@@ -146,6 +146,14 @@ management-verify-postgresql-recovery:
 	@test -n "$(OPERATION)" -a -n "$(BACKUP_OPERATION)" || (echo 'Set OPERATION and the completed BACKUP_OPERATION'; exit 1)
 	node scripts/management/public_read_smoke.mjs --fail-primary "$(OPERATION)" --backup-operation "$(BACKUP_OPERATION)"
 
+.PHONY: database-tuning-prepare database-tuning-apply
+database-tuning-prepare:
+	$(PYTHON) scripts/infrastructure/database_tuning.py prepare
+
+database-tuning-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the exact reviewed database tuning digest'; exit 1)
+	$(PYTHON) scripts/infrastructure/database_tuning.py apply --approve-plan "$(PLAN_SHA)"
+
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
 	$(PYTHON) scripts/infrastructure/image_credentials.py prepare

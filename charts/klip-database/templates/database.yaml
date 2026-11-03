@@ -38,6 +38,7 @@ spec:
   enableSuperuserAccess: false
   enablePDB: true
   failoverDelay: 30
+  smartShutdownTimeout: {{ .Values.smartShutdownTimeout }}
   primaryUpdateStrategy: supervised
   primaryUpdateMethod: switchover
   affinity:

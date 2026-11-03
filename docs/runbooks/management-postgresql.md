@@ -44,6 +44,35 @@ identities and incomplete probe evidence require inspection. This is an isolated
 primary-Pod loss, not a CPU-host, disk-loss, network-partition or workload-delivery
 test. Run those separately, after all replicas and archival health recover.
 
+### Pooled connections and shutdown policy
+
+The first live primary-loss test (`f1d820c7369a`) retained all 128 sampled
+authenticated reads, but automatic promotion took about 184 seconds and missed
+the 120-second objective. The original incomplete probe record remains intact.
+Later reconciliation verified both markers, three Ready instances, the same
+database system identifier, timeline 2 and successful WAL archival. It does not
+retroactively manufacture a passing timer for that first test.
+
+The operator default allows a 180-second smart shutdown while existing pooled
+connections stay open. The chart now explicitly allows five seconds before fast
+shutdown. This disconnects remaining clients and rolls back unfinished transactions;
+required synchronous replication, failover quorum and checkpoint/fast-shutdown
+limits remain unchanged. This follows the supported
+[instance-manager shutdown behavior](https://cloudnative-pg.io/docs/1.30/instance_manager/).
+Successful acknowledgements must still survive the repeated failure test.
+
+```sh
+make database-tuning-prepare
+make database-tuning-apply PLAN_SHA=<reviewed-digest>
+```
+
+The encoded upgrade compares the installed and desired Helm manifests and permits
+only `Cluster.spec.smartShutdownTimeout=5`. It binds the release revision, manifest,
+values, full live spec and database/host identities, then reconciles through the
+owning Helm release. Bootstrap, images, storage, identities and quorum changes are
+rejected. Verify unchanged Pod UIDs and repeat the original 120-second fault test
+under a new operation identity; retain both outcomes.
+
 The CNPG controller has two replicas. The pinned Barman manager intentionally has
 one recoverable replica: its leader-gated gRPC server and health-only readiness
 probe do not support advertising a standby as a healthy plugin endpoint. Database

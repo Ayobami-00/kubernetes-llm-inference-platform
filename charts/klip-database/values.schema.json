@@ -5,6 +5,7 @@
   "properties": {
     "imageName": {"type": "string"},
     "instances": {"type": "integer", "const": 3},
+    "smartShutdownTimeout": {"type": "integer", "minimum": 0, "maximum": 30},
     "storage": {"$ref": "#/definitions/storage"},
     "walStorage": {"$ref": "#/definitions/storage"},
     "nodeSelector": {

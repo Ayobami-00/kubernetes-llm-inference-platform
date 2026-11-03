@@ -203,6 +203,7 @@ def test_postgres_has_independent_storage_synchronous_replication_and_external_b
     assert spec["instances"] == 3
     assert spec["affinity"]["podAntiAffinityType"] == "required"
     assert spec["enableSuperuserAccess"] is False
+    assert spec["smartShutdownTimeout"] == 5
     assert spec["storage"]["size"] == "40Gi"
     assert spec["walStorage"]["size"] == "20Gi"
     assert spec["postgresql"]["synchronous"] == {
