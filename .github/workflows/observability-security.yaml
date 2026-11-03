@@ -134,6 +134,11 @@ jobs:
             revision: 4ffeda2ef866b0fef372849825a803296483b336
             go: '1.26.6'
             package: '.'
+          - name: thanos-0.42.5
+            repository: thanos-io/thanos
+            revision: 4f05efeeadbacdc6552d68ef0850b40317109b4f
+            go: '1.27.3'
+            package: './cmd/thanos'
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with:
