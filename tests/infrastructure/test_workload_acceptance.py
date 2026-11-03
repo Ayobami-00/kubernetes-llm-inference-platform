@@ -6,9 +6,14 @@ import json
 import pytest
 import workload_acceptance as acceptance
 import yaml
+from common import ROOT
 from image_release import guard_workloads
 
 
+@pytest.mark.skipif(
+    not (ROOT / "artifacts/tools/bin/helm").is_file(),
+    reason="Requires pinned Helm; exercised by infrastructure CI after tool installation",
+)
 def test_stub_chart_is_private_and_rejects_unpinned_images():
     documents = list(
         yaml.safe_load_all(acceptance.render_stub("example.invalid/stub@sha256:" + "a" * 64))
