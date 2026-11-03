@@ -14,6 +14,7 @@ and module retains the same signed AWS provider lock for both platforms.
 | `environments/workload-identity` | Retained public signing metadata and exact OIDC provider |
 | `environments/platform-storage` | Retained encrypted artifacts/archives and workload IAM roles |
 | `environments/platform-storage-access` | Replaceable AZ-local mounts and CPU-only NFS rules |
+| `environments/platform-observability` | Retained telemetry buckets, exact workload roles and independent readiness alarm/email |
 | `modules/network` | VPC, subnets, routes and separate security-group rules |
 | `modules/control-plane-compute` | Stable ENIs/EIPs, instances, volumes and SSM node identity |
 | `modules/api-endpoint` | Internal TCP load balancing |

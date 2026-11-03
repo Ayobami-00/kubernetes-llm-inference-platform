@@ -1,0 +1,17 @@
+{
+  "schema_version": "klip-observability.v1",
+  "namespace": "observability",
+  "global_monitoring_region": "us-east-1",
+  "management_health_path": "/health/ready",
+  "health_check_regions": ["eu-west-1", "us-east-1", "ap-southeast-1"],
+  "retention_days": {"metrics": 14, "logs": 30, "traces": 7},
+  "noncurrent_version_days": 7,
+  "service_accounts": {
+    "prometheus": {"name": "klip-prometheus", "bucket": "metrics", "access": "write"},
+    "thanos-store": {"name": "klip-thanos-store", "bucket": "metrics", "access": "read"},
+    "thanos-compactor": {"name": "klip-thanos-compactor", "bucket": "metrics", "access": "compact"},
+    "loki": {"name": "klip-loki", "bucket": "logs", "access": "compact"},
+    "tempo": {"name": "klip-tempo", "bucket": "traces", "access": "compact"},
+    "alertmanager": {"name": "klip-alertmanager", "bucket": null, "access": "notify"}
+  }
+}

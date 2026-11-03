@@ -46,6 +46,10 @@ def plan_changes(document: dict) -> list[dict]:
 
 
 def input_values(root: str, origins_file: Path | None, deletion_protection: bool = True) -> dict:
+    if root == "observability":
+        from observability import receiver
+
+        return {"alert_email": receiver()["endpoint"]}
     if root == "frontend":
         from management_frontend import publish_requested, validate_activation
 
@@ -108,7 +112,10 @@ def create_plan(
 ) -> dict:
     if root == "bootstrap" and preview:
         raise ValueError("Bootstrap's local first-use plan is real; omit --preview")
-    if root in {"identity", "storage", "storage-access", "registry", "frontend"} and preview:
+    if (
+        root in {"identity", "storage", "storage-access", "registry", "frontend", "observability"}
+        and preview
+    ):
         raise ValueError(
             "Retained identity/storage uses a real administrator-owned saved plan; omit --preview"
         )

@@ -128,6 +128,24 @@ management-frontend-activate:
 management-frontend-deactivate:
 	$(PYTHON) scripts/infrastructure/management_frontend.py deactivate
 
+.PHONY: observability-cost observability-plan observability-apply observability-verify observability-test-notification
+observability-cost:
+	$(PYTHON) scripts/infrastructure/observability.py cost
+
+observability-plan:
+	$(OPERATOR) plan --root observability
+
+observability-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed telemetry Terraform plan digest'; exit 1)
+	$(OPERATOR) apply --root observability --approve-plan "$(PLAN_SHA)"
+
+observability-verify:
+	$(PYTHON) scripts/infrastructure/observability.py verify
+
+observability-test-notification:
+	@test -n "$(OPERATION)" || (echo 'Set a unique 12-hex OPERATION for this notification'; exit 1)
+	$(PYTHON) scripts/infrastructure/observability.py test-notification --operation "$(OPERATION)"
+
 .PHONY: management-verify-renewal
 management-verify-renewal:
 	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
