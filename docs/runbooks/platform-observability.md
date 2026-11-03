@@ -115,6 +115,10 @@ mounts and no host PID namespace. These agents require their own narrowly
 privileged namespace for host mounts; do not relax the main observability namespace.
 The values request 43 GiB of retained gp3 storage. These are rendered requirements,
 not allocated volumes or a complete one-host-loss capacity proof.
+The live AWS Pricing review on 2026-11-03 reports $0.0928/GB-month for London gp3:
+43 GiB adds approximately $3.99/month, excluding snapshots, transfer and tax.
+Retention continues billing after workload removal until the explicit storage
+cleanup procedure resolves those volumes.
 
 Prometheus keeps six hours locally and uploads blocks through Thanos sidecars.
 The later Thanos Query release must deduplicate on `prometheus_replica` and the
@@ -150,6 +154,25 @@ read-only host mounts from the restricted application namespace. Node exporter
 uses Pod networking; namespace-dependent network collectors are disabled rather
 than presenting Pod counters as host statistics. Use the host instrumentation
 and Cilium/Hubble sources for the actual host/network view.
+
+Prepare the application release using the directory containing the exact reviewed
+CI `summary.json` and raw image reports, then apply its saved identity:
+
+```sh
+make monitoring-prepare SECURITY_DIRECTORY=<downloaded-reviewed-scan-directory>
+make monitoring-apply PLAN_SHA=<exact-prepared-monitoring-sha256>
+make monitoring-observe
+```
+
+Preparation verifies actual worker capacity, deployed policies/admission, live IAM
+trust/inline-policy equality and complete CRD ownership. Apply rechecks these
+conditions, verifies the plan digest and source, and re-extracts checked archives.
+The ten operator CRDs have a separate retained owner; existing unowned schemas
+are not adopted or overwritten. New versions require explicit schema review.
+Server-side validation precedes the atomic Helm application release. An
+interrupted install is retained for inspection and never automatically replayed
+under its original identity. Replica readiness is an installation observation;
+scrape/ingestion/query, denied-access and retention/failure acceptance are separate.
 
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and

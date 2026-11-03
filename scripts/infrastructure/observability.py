@@ -95,6 +95,52 @@ def cost() -> dict:
     }
 
 
+def verify_roles() -> dict:
+    """Live IAM must match the applied, retained Terraform role documents exactly."""
+    allocation = manifest()
+    state = json.loads(tf("observability", "show", "-json"))["values"]["root_module"]["resources"]
+    roles = {r["values"]["arn"]: r["values"] for r in state if r["type"] == "aws_iam_role"}
+    policies = {
+        r["values"]["role"]: r["values"] for r in state if r["type"] == "aws_iam_role_policy"
+    }
+    aws = Aws("kubernetes-llm-bootstrap")
+    aws.preflight("observability")
+    verified = {}
+    for component, subject in allocation["service_accounts"].items():
+        expected = roles[subject["role_arn"]]
+        name = expected["name"]
+        actual = aws.call("iam", "get-role", "--role-name", name)["Role"]
+        attached = aws.call("iam", "list-attached-role-policies", "--role-name", name)[
+            "AttachedPolicies"
+        ]
+        inline = aws.call("iam", "list-role-policies", "--role-name", name)["PolicyNames"]
+        policy = policies[name]
+        observed = aws.call(
+            "iam", "get-role-policy", "--role-name", name, "--policy-name", policy["name"]
+        )["PolicyDocument"]
+        if (
+            actual["Arn"] != subject["role_arn"]
+            or actual["MaxSessionDuration"] != 3600
+            or actual["AssumeRolePolicyDocument"] != json.loads(expected["assume_role_policy"])
+            or attached
+            or inline != [policy["name"]]
+            or observed != json.loads(policy["policy"])
+        ):
+            raise ValueError("Telemetry IAM trust or permissions drifted: " + component)
+        verified[component] = {
+            "role_arn": actual["Arn"],
+            "service_account": subject["name"],
+            "policy_sha256": hashlib.sha256(
+                json.dumps(observed, sort_keys=True).encode()
+            ).hexdigest(),
+        }
+    if len(verified) != 6 or len(roles) != 6 or len(policies) != 6:
+        raise ValueError("Exactly six scoped telemetry roles/policies are required")
+    result = {"verified_at": utc_now(), "roles": verified}
+    write_private(folder() / "role-verification.json", result)
+    return result
+
+
 def verify() -> dict:
     allocation = manifest()
     aws = Aws("kubernetes-llm-bootstrap")

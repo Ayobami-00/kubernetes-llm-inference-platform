@@ -153,6 +153,18 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
+.PHONY: monitoring-prepare monitoring-apply monitoring-observe
+monitoring-prepare:
+	@test -n "$(SECURITY_DIRECTORY)" || (echo 'Set SECURITY_DIRECTORY to the reviewed CI image-scan directory'; exit 1)
+	$(PYTHON) scripts/infrastructure/monitoring_runtime.py prepare --security-directory "$(SECURITY_DIRECTORY)"
+
+monitoring-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set the exact prepared monitoring PLAN_SHA'; exit 1)
+	$(PYTHON) scripts/infrastructure/monitoring_runtime.py apply --approve-plan "$(PLAN_SHA)"
+
+monitoring-observe:
+	$(PYTHON) scripts/infrastructure/monitoring_runtime.py observe
+
 .PHONY: platform-resize-prepare platform-resize-apply platform-resize-observe platform-resize-verify
 platform-resize-prepare:
 	@test -n "$(NODE)" -a -n "$(BACKUP_OPERATION)" || (echo 'Set NODE and a verified BACKUP_OPERATION'; exit 1)
