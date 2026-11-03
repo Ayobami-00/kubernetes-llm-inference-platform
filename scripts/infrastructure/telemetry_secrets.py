@@ -170,6 +170,85 @@ def operate(action):
     return receipt
 
 
+def stage_local(action="stage-local"):
+    """Keep recovery on the operator machine; this path makes no cloud/network call."""
+    from cluster import FOLDER, checked
+
+    custody = key_custody(FOLDER)
+    folder = state_home() / "cluster/observability/grafana"
+    path = state_home() / "credentials/grafana.json"
+    receipt_path = folder / "local-secret-custody.json"
+    encrypted_path = folder / "local-credentials.age"
+    if not receipt_path.exists():
+        if action != "stage-local":
+            raise ValueError("A retained local credential receipt is required")
+        payload = {
+            "schema_version": "klip-grafana-secret.v1",
+            "account_id": CONFIG["account_id"],
+            "cluster_id": CONFIG["cluster_id"],
+            "created_at": utc_now(),
+            "credential": json.loads(path.read_text()),
+        }
+        validate(payload)
+        recipient = checked(
+            [tool("age-keygen"), "-y", str(FOLDER / "backup-identity.txt")], secret=True
+        ).strip()
+        encrypted = checked(
+            [tool("age"), "--armor", "--recipient", recipient],
+            data=json.dumps(payload),
+            secret=True,
+        )
+        write_private(encrypted_path, encrypted)
+        receipt = {
+            "schema_version": "klip-grafana-local-secret-custody.v1",
+            "account_id": CONFIG["account_id"],
+            "cluster_id": CONFIG["cluster_id"],
+            "created_at": payload["created_at"],
+            "sha256": hashlib.sha256(encrypted_path.read_bytes()).hexdigest(),
+            "recovery_identity_sha256": custody["sha256"],
+            "backup_scope": "operator-local-only",
+            "cloud_upload": "not-performed; separate explicit approval required",
+            "limitations": (
+                "No independent remote credential copy; operator disk loss is not covered"
+            ),
+        }
+        write_private(receipt_path, receipt)
+    receipt = json.loads(receipt_path.read_text())
+    if (
+        receipt["account_id"] != CONFIG["account_id"]
+        or receipt["cluster_id"] != CONFIG["cluster_id"]
+        or receipt["recovery_identity_sha256"] != custody["sha256"]
+        or hashlib.sha256(encrypted_path.read_bytes()).hexdigest() != receipt["sha256"]
+    ):
+        raise ValueError("Local credential recovery identity or ciphertext changed")
+    recovered = validate(
+        json.loads(
+            checked(
+                [
+                    tool("age"),
+                    "--decrypt",
+                    "--identity",
+                    str(FOLDER / "backup-identity.txt"),
+                    str(encrypted_path),
+                ],
+                secret=True,
+            )
+        )
+    )
+    if action == "restore-local" and not path.exists():
+        write_private(path, recovered)
+    if not hmac.compare_digest(
+        json.dumps(recovered, sort_keys=True),
+        json.dumps(json.loads(path.read_text()), sort_keys=True),
+    ):
+        raise ValueError(
+            "Recovered credentials differ; local recovery never overwrites an identity"
+        )
+    receipt.update(verified_at=utc_now(), decrypted_credential_matches=True)
+    write_private(receipt_path, receipt)
+    return receipt
+
+
 if __name__ == "__main__":
     import argparse
     import fcntl
@@ -177,8 +256,14 @@ if __name__ == "__main__":
     from cluster import FOLDER
 
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["backup", "verify", "restore"])
+    parser.add_argument(
+        "command",
+        choices=["backup", "verify", "restore", "stage-local", "verify-local", "restore-local"],
+    )
     args = parser.parse_args()
     with (FOLDER / "operator.lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
-        print(json.dumps(operate(args.command), indent=2))
+        result = (
+            stage_local(args.command) if args.command.endswith("-local") else operate(args.command)
+        )
+        print(json.dumps(result, indent=2))

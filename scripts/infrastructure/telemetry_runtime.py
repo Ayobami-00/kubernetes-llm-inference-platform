@@ -287,9 +287,9 @@ def apply(approval):
             if plan["runtime_credentials_sha256"] != sha(credentials()):
                 raise ValueError("Grafana credential custody changed after planning")
             active["database"] = initialize()
-            from telemetry_secrets import operate
+            from telemetry_secrets import stage_local
 
-            active["secret_custody"] = operate("backup")
+            active["secret_custody"] = stage_local()
 
         from observability_release import validate_pod_admission
 

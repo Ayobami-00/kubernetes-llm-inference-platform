@@ -271,10 +271,18 @@ and Tempo seven days. This adds 50 GiB of retained gp3 (about $4.64/month at the
 reviewed London rate), plus object-storage, requests and transfer usage. Grafana
 metadata uses an isolated `grafana` database/role on the existing CNPG cluster;
 it has no separate SQLite volume. Its shared encryption key and credentials are
-retained outside the cluster and age-encrypted into a version-bound S3 recovery
-object. `telemetry_secrets.py verify` downloads/decrypts that exact object and
-compares its contents without displaying them. `restore` refuses to overwrite a
-different local identity. Preserve its custody receipt and independent age key.
+retained on the operator machine outside the cluster, with an age-encrypted local
+recovery copy and a verified independent age-key copy. The private deployment
+uses `telemetry_secrets.py stage-local`; it makes no cloud upload. `verify-local`
+and `restore-local` validate the exact ciphertext and refuse to overwrite a
+different identity. Operator disk loss is not covered by this local copy.
+
+Automatic approval review rejected uploading the newly generated Grafana
+credentials to `klip-database-127811062476-eu-west-2`, despite verified private
+account ownership, encryption and recovery requirements. The cloud backup
+procedure remains implemented but requires separate explicit user approval for
+that payload/destination before invocation. It is not part of automatic Grafana
+installation. Do not claim independent remote credential recovery until it passes.
 
 Use the exact candidate scan artifacts from workflow `41731963265` to prepare
 these releases. `deploy/telemetry-risk-review.json` records the still-unfixed
