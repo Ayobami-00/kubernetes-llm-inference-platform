@@ -20,6 +20,23 @@ platform-check:
 platform-schema-fetch:
 	$(PYTHON) scripts/infrastructure/platform_checks.py --fetch-schemas
 
+.PHONY: identity-collect identity-plan identity-apply identity-verify-public identity-activate
+identity-collect:
+	$(PYTHON) scripts/infrastructure/workload_identity.py collect
+
+identity-plan:
+	$(OPERATOR) plan --root identity
+
+identity-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed identity plan digest'; exit 1)
+	$(OPERATOR) apply --root identity --approve-plan "$(PLAN_SHA)"
+
+identity-verify-public:
+	$(PYTHON) scripts/infrastructure/workload_identity.py verify-public
+
+identity-activate:
+	$(PYTHON) scripts/infrastructure/cluster.py activate-identity
+
 .PHONY: infra-platform-preview infra-platform-plan infra-platform-apply cluster-platform-join cluster-verify-platform
 infra-platform-preview:
 	$(OPERATOR) plan --root platform --preview

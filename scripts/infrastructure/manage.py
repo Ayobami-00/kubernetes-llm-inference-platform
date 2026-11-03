@@ -73,6 +73,10 @@ def input_values(root: str, origins_file: Path | None, deletion_protection: bool
         return values
     if root == "bootstrap":
         return {"adopt_existing_access": True}
+    if root == "identity":
+        from workload_identity import signing_input
+
+        return {"signing_jwks": signing_input()}
     if root == "platform":
         from configuration import validate_platform_configuration
 
@@ -97,6 +101,10 @@ def create_plan(
 ) -> dict:
     if root == "bootstrap" and preview:
         raise ValueError("Bootstrap's local first-use plan is real; omit --preview")
+    if root == "identity" and preview:
+        raise ValueError(
+            "Retained identity uses a real administrator-owned saved plan; omit --preview"
+        )
     if allow_origin_removal and root != "dns":
         raise ValueError("Origin removal applies only to the DNS root")
     validate_configuration(CONFIG)
@@ -216,6 +224,12 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
     if (receipt["phase"] in {"unprotect", "destroy"}) != teardown:
         raise ValueError("Use the explicit destroy command for teardown plans")
     Aws(PROFILES[root]).preflight(root)
+    if root == "identity" and receipt["phase"] == "apply":
+        from workload_identity import verify_signers_for_apply
+
+        verify_signers_for_apply(
+            json.loads(Path(receipt["variables_path"]).read_text())["signing_jwks"]
+        )
     if root == "platform" and receipt["phase"] == "apply":
         from platform_capacity import ensure_capacity
 

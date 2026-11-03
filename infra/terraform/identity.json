@@ -1,0 +1,7 @@
+{
+  "schema_version": "klip-workload-identity.v1",
+  "issuer_hostname": "oidc.klip-lab.click",
+  "audience": "sts.amazonaws.com",
+  "legacy_issuer": "https://kubernetes.default.svc.cluster.local",
+  "token_expiration_seconds": 3600
+}

@@ -102,6 +102,9 @@ def firewall(config: dict) -> str:
 def kubeadm_documents(
     config: dict, *, join: dict | None = None, control_plane: bool = True
 ) -> list[dict]:
+    from issuer_transition import settings
+    from workload_identity import configuration
+
     node = {
         "name": config["name"],
         "criSocket": "unix:///run/containerd/containerd.sock",
@@ -166,7 +169,8 @@ def kubeadm_documents(
                     "10.200.0.13",
                 ],
                 "extraArgs": [
-                    {"name": "encryption-provider-config", "value": "/etc/klip/encryption.yaml"}
+                    {"name": "encryption-provider-config", "value": "/etc/klip/encryption.yaml"},
+                    *settings("https://" + configuration()["issuer_hostname"]),
                 ],
                 "extraVolumes": [
                     {

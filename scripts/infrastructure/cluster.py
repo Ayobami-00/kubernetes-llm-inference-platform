@@ -136,11 +136,21 @@ from pathlib import Path
 import os, sys, tempfile
 p = Path(sys.argv[1])
 p.parent.mkdir(parents=True, exist_ok=True)
-fd, temporary = tempfile.mkstemp(dir=p.parent)
-with os.fdopen(fd, 'w') as stream:
-    stream.write(sys.stdin.read())
-os.chmod(temporary, 0o600)
-os.replace(temporary, p)
+fd, temporary = tempfile.mkstemp(prefix='.' + p.name + '.', dir=p.parent)
+try:
+    with os.fdopen(fd, 'w') as stream:
+        stream.write(sys.stdin.read())
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, p)
+    directory = os.open(p.parent, os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+finally:
+    Path(temporary).unlink(missing_ok=True)
 """
         self.run(["sudo", "python3", "-c", program, path], data=data, secret=True)
 
@@ -779,6 +789,7 @@ def main() -> None:
             "platform-join",
             "sync-release",
             "verify-platform",
+            "activate-identity",
         ],
     )
     parser.add_argument("--registry", type=Path)
@@ -842,6 +853,10 @@ def main() -> None:
         from platform_acceptance import verify_platform
 
         result = verify_platform()
+    elif args.command == "activate-identity":
+        from issuer_transition import activate
+
+        result = activate()
     else:
         from cluster_workers import operate_worker
 

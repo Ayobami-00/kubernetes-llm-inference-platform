@@ -106,3 +106,17 @@ workers. Its isolated test namespace was deleted and cleanup confirmed. The fina
 Cilium release includes the generated private API endpoint. Operator tunnels use
 dedicated, pinned SSH-over-SSM sessions, retain Kubernetes CA/SNI verification and
 bind loopback only. The final local Python run passed 448 tests with 17 optional skips.
+
+The retained [workload identity foundation](../runbooks/workload-identity.md) was then
+applied through an exact, create-only administrator-owned plan. Public HTTPS discovery
+and signing keys at `https://oidc.klip-lab.click` match the verified public signer on
+all three control planes, and the IAM provider is restricted to the STS audience.
+Its origin bucket remains private and contains only two public metadata objects.
+No workload permissions are granted by this publication alone.
+
+The key-preserving, two-phase API issuer transition is implemented with token canaries,
+per-node recovery copies and kubeadm configuration updates; live activation remains
+pending. Exact workload roles, token projection, CSI, durable storage and database
+rollout remain subsequent steps. Local verification passed 460 Python tests (17 optional
+skips), the identity root's two provider-mock cases, Terraform validation, TFLint and
+Ruff/formatting. The workspace declares the public-key verification dependency explicitly.

@@ -22,6 +22,7 @@ ROOTS = {
     "backups": TERRAFORM / "environments/cluster-backups",
     "probe": TERRAFORM / "environments/network-probe",
     "platform": TERRAFORM / "environments/platform-workers",
+    "identity": TERRAFORM / "environments/workload-identity",
 }
 STATE_KEYS = {
     "bootstrap": "state-bootstrap/terraform.tfstate",
@@ -30,6 +31,7 @@ STATE_KEYS = {
     "backups": "cluster-backups/terraform.tfstate",
     "probe": "network-probe/terraform.tfstate",
     "platform": "platform-workers/terraform.tfstate",
+    "identity": "workload-identity/terraform.tfstate",
 }
 PROFILES = {
     "bootstrap": "kubernetes-llm-bootstrap",
@@ -38,6 +40,7 @@ PROFILES = {
     "backups": "kubernetes-llm-foundation",
     "probe": "kubernetes-llm-foundation",
     "platform": "kubernetes-llm-foundation",
+    "identity": "kubernetes-llm-bootstrap",
 }
 
 
@@ -160,7 +163,7 @@ class Aws:
         identity = self.call("sts", "get-caller-identity")
         if identity["Account"] != CONFIG["account_id"]:
             raise ValueError("Wrong AWS account; refusing to proceed")
-        if root == "bootstrap":
+        if root in {"bootstrap", "identity"}:
             expected = f"arn:aws:iam::{CONFIG['account_id']}:user/{CONFIG['source_user']}"
             valid = identity["Arn"] == expected
         else:
