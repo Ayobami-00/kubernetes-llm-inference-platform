@@ -101,13 +101,13 @@ export function RunDetails({ run }: { run: Run }) {
               <strong>{m.customer_ref}</strong>
               <div className="inline-metrics">
                 <span>
-                  Input <b>{m.input_tokens.toLocaleString()}</b>
+                  Input <b>{m.input_tokens?.toLocaleString() ?? 'Unknown'}</b>
                 </span>
                 <span>
-                  Cached <b>{m.cached_input_tokens.toLocaleString()}</b>
+                  Cached <b>{m.cached_input_tokens?.toLocaleString() ?? 'Unknown'}</b>
                 </span>
                 <span>
-                  Output <b>{m.output_tokens.toLocaleString()}</b>
+                  Output <b>{m.output_tokens?.toLocaleString() ?? 'Unknown'}</b>
                 </span>
               </div>
               {Object.entries(m.latencies || {}).map(([metric, value]) => (

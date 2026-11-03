@@ -1,12 +1,15 @@
 schema_version: '0.1'
 id: exgentic-code
 revision: 1
-notes: 'Source manifest only: no data downloaded, converted, tokenized or benchmarked.'
+notes: >-
+  Source manifest; prepared artifacts are recorded separately. The project owner confirmed on
+  2026-11-03 that CDLA-Permissive-2.0 applies to this pinned Exgentic v2 revision. This is a
+  project-confirmed declaration; the upstream Hugging Face license field was unset when checked.
 source:
   url: https://huggingface.co/datasets/Exgentic/agent-llm-traces-v2
   revision: 4b8ad4ab198438e5a170f9171c19c6a2cf7c1814
   subset: SWE-bench coding sessions
-  license: null
+  license: CDLA-Permissive-2.0
   filters:
     benchmark: swebench
 format: exgentic_snapshot
@@ -19,7 +22,7 @@ preparation:
 - Filter unsupported rendered contexts and report exclusion counts; never silently truncate.
 - Preserve session identities and response-dependent ordering without executing tools.
 limitations:
-- The source revision is the documented AIPerf v0.13.0 default; preparation has not run.
+- The source revision is the documented AIPerf v0.13.0 default; prepared artifacts are versioned separately.
 - No tools execute and live responses do not change later recorded contexts.
 - Replay cannot measure SWE-bench resolution rate or complete agent quality.
 prepared: null

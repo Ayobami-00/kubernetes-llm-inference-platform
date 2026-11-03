@@ -1,8 +1,11 @@
 # Dataset manifests
 
-This directory contains six source manifests, not benchmark payloads. No corpus has been downloaded,
-converted, filtered or tokenized. `prepared` stays `null` until preparation produces an artifact with
-an actual checksum, record count, tokenizer revision, prompt-template digest and rendered-input bound.
+This directory contains six authored source manifests, not benchmark payloads. Their `prepared`
+fields remain `null`; Stream A creates separate prepared manifests with real checksums, record
+counts, tokenizer revisions, template digests and input bounds under ignored cache storage.
+
+See the [workload guide](../docs/development/workloads.md#public-preparation) for bounded public
+preparation, separate synthetic corpora, upstream license evidence and CPU-only smoke runs.
 Unknown source revisions or licenses also remain `null` rather than being fabricated.
 
 | Manifest | Public source | Intended role |

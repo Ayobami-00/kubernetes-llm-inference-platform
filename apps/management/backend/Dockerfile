@@ -4,6 +4,9 @@ COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 COPY packages/platform-contracts packages/platform-contracts
+COPY packages/slo-evaluator packages/slo-evaluator
+COPY workload-runner workload-runner
+COPY dev/inference-stub dev/inference-stub
 COPY apps/management/backend apps/management/backend
 RUN uv sync --locked --all-packages --no-dev
 COPY configs configs

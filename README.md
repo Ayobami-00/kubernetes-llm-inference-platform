@@ -46,6 +46,17 @@ All traffic, SLO and hardware settings are experimental defaults. The source man
 prepared datasets, and the runtime fixtures contain synthetic measurements. No cloud resources,
 inference services, dataset preparation, or benchmark execution are implemented by this layer.
 
+## Workload execution
+
+Stream A implements public/synthetic preparation, immutable planning, AIPerf 0.13.0 execution,
+request/session measurement, SLO and task-quality evaluation, cancellation and reports for all five
+profiles and seven scenarios. Local runs use an OpenAI-compatible CPU stub and are explicitly
+synthetic/emulated. Live benchmarking keeps strict artifact, version and readiness preflight.
+
+Start with the [workload development guide](docs/development/workloads.md),
+[management integration notes](docs/development/workload-integration.md), and
+[recovery runbook](docs/runbooks/workload-recovery.md).
+
 ### Install and verify
 
 Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the

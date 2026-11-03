@@ -1,0 +1,32 @@
+name: Workload execution
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  cpu-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {python-version: '3.12', enable-cache: true}
+      - run: uv sync --locked --all-packages --all-extras
+      - run: uv run --locked --all-packages --all-extras pytest
+      - run: uv run --locked --all-packages --all-extras pytest workload-runner/tests/test_aiperf_integration.py
+        env:
+          RUN_AIPERF_INTEGRATION: '1'
+      - run: bash scripts/check-generated.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workload-test-diagnostics
+          path: /tmp/pytest-of-*/pytest-*/**/execution/
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f workload-runner/Dockerfile -t workload-runner:test .
+      - run: docker run --rm workload-runner:test --help
+      - run: docker build -f dev/inference-stub/Dockerfile -t inference-stub:test .
+      - run: docker run --rm inference-stub:test --help

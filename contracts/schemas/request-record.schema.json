@@ -1,0 +1,306 @@
+{
+  "$defs": {
+    "JsonValue": {}
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/request-record.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "actual_send_offset_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Actual Send Offset Ms"
+    },
+    "cached_input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Cached Input Tokens"
+    },
+    "complete_output": {
+      "default": false,
+      "title": "Complete Output",
+      "type": "boolean"
+    },
+    "completed_offset_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Completed Offset Ms"
+    },
+    "customer_ref": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+      "title": "Customer Ref",
+      "type": "string"
+    },
+    "eligible_for_slo": {
+      "default": false,
+      "title": "Eligible For Slo",
+      "type": "boolean"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Error"
+    },
+    "finish_reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Finish Reason"
+    },
+    "http_status": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Http Status"
+    },
+    "input_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Input Tokens"
+    },
+    "latency_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Latency Ms"
+    },
+    "outcome": {
+      "enum": [
+        "completed",
+        "rejected",
+        "failed",
+        "timed_out",
+        "cancelled",
+        "not_sent"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "output_text": {
+      "anyOf": [
+        {
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Text"
+    },
+    "output_tokens": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "integer"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Output Tokens"
+    },
+    "phase": {
+      "enum": [
+        "warmup",
+        "measurement",
+        "drain"
+      ],
+      "title": "Phase",
+      "type": "string"
+    },
+    "request_id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Request Id",
+      "type": "string"
+    },
+    "run_id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Run Id",
+      "type": "string"
+    },
+    "scheduled_offset_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Scheduled Offset Ms"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "sent_at": {
+      "anyOf": [
+        {
+          "format": "date-time",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Sent At"
+    },
+    "session_id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Session Id",
+      "type": "string"
+    },
+    "source_entry_id": {
+      "minLength": 1,
+      "title": "Source Entry Id",
+      "type": "string"
+    },
+    "timing_source": {
+      "default": "aiperf_monotonic",
+      "enum": [
+        "aiperf_monotonic",
+        "unavailable"
+      ],
+      "title": "Timing Source",
+      "type": "string"
+    },
+    "token_count_source": {
+      "default": "unavailable",
+      "enum": [
+        "server",
+        "tokenizer",
+        "emulated",
+        "unavailable"
+      ],
+      "title": "Token Count Source",
+      "type": "string"
+    },
+    "tool_calls": {
+      "default": [],
+      "items": {
+        "additionalProperties": {
+          "$ref": "#/$defs/JsonValue"
+        },
+        "type": "object"
+      },
+      "title": "Tool Calls",
+      "type": "array"
+    },
+    "tpot_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Tpot Ms"
+    },
+    "ttft_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Ttft Ms"
+    },
+    "turn_index": {
+      "minimum": 0,
+      "title": "Turn Index",
+      "type": "integer"
+    },
+    "warmup_cohort": {
+      "title": "Warmup Cohort",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "run_id",
+    "request_id",
+    "customer_ref",
+    "source_entry_id",
+    "session_id",
+    "turn_index",
+    "warmup_cohort",
+    "phase",
+    "outcome"
+  ],
+  "title": "RequestRecord",
+  "type": "object"
+}

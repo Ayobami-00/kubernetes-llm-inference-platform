@@ -1,0 +1,224 @@
+{
+  "$defs": {
+    "Artifact": {
+      "additionalProperties": false,
+      "properties": {
+        "sha256": {
+          "anyOf": [
+            {
+              "pattern": "^[a-f0-9]{64}$",
+              "type": "string"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null,
+          "title": "Sha256"
+        },
+        "uri": {
+          "pattern": "^[a-z][a-z0-9+.-]*://\\S+$",
+          "title": "Uri",
+          "type": "string"
+        }
+      },
+      "required": [
+        "uri"
+      ],
+      "title": "Artifact",
+      "type": "object"
+    },
+    "JsonValue": {}
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/preparation-manifest.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adaptations": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "propertyNames": {
+        "minLength": 1
+      },
+      "title": "Adaptations",
+      "type": "object"
+    },
+    "artifact": {
+      "$ref": "#/$defs/Artifact"
+    },
+    "customer_ref": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+      "title": "Customer Ref",
+      "type": "string"
+    },
+    "data_kind": {
+      "enum": [
+        "public",
+        "synthetic"
+      ],
+      "title": "Data Kind",
+      "type": "string"
+    },
+    "downloaded_bytes": {
+      "minimum": 0,
+      "title": "Downloaded Bytes",
+      "type": "integer"
+    },
+    "entry_count": {
+      "exclusiveMinimum": 0,
+      "title": "Entry Count",
+      "type": "integer"
+    },
+    "exclusions": {
+      "additionalProperties": {
+        "minimum": 0,
+        "type": "integer"
+      },
+      "propertyNames": {
+        "minLength": 1
+      },
+      "title": "Exclusions",
+      "type": "object"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "license_evidence": {
+      "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "License Evidence",
+      "type": "object"
+    },
+    "licenses": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Licenses",
+      "type": "object"
+    },
+    "max_rendered_input_tokens": {
+      "minimum": 0,
+      "title": "Max Rendered Input Tokens",
+      "type": "integer"
+    },
+    "prompt_template_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Prompt Template Sha256",
+      "type": "string"
+    },
+    "scanned": {
+      "minimum": 0,
+      "title": "Scanned",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "selection": {
+      "additionalProperties": {
+        "$ref": "#/$defs/JsonValue"
+      },
+      "title": "Selection",
+      "type": "object"
+    },
+    "source_manifest_refs": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+        "type": "string"
+      },
+      "minItems": 1,
+      "title": "Source Manifest Refs",
+      "type": "array"
+    },
+    "source_revisions": {
+      "additionalProperties": {
+        "anyOf": [
+          {
+            "minLength": 1,
+            "type": "string"
+          },
+          {
+            "type": "null"
+          }
+        ]
+      },
+      "title": "Source Revisions",
+      "type": "object"
+    },
+    "source_urls": {
+      "additionalProperties": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Source Urls",
+      "type": "object"
+    },
+    "token_accounting": {
+      "enum": [
+        "model_tokenizer",
+        "emulated"
+      ],
+      "title": "Token Accounting",
+      "type": "string"
+    },
+    "tokenizer_id": {
+      "minLength": 1,
+      "title": "Tokenizer Id",
+      "type": "string"
+    },
+    "tokenizer_revision": {
+      "minLength": 1,
+      "title": "Tokenizer Revision",
+      "type": "string"
+    },
+    "transform_version": {
+      "minLength": 1,
+      "title": "Transform Version",
+      "type": "string"
+    },
+    "warmup_count": {
+      "minimum": 0,
+      "title": "Warmup Count",
+      "type": "integer"
+    }
+  },
+  "required": [
+    "id",
+    "customer_ref",
+    "source_manifest_refs",
+    "data_kind",
+    "source_revisions",
+    "source_urls",
+    "licenses",
+    "transform_version",
+    "tokenizer_id",
+    "tokenizer_revision",
+    "token_accounting",
+    "prompt_template_sha256",
+    "artifact",
+    "entry_count",
+    "warmup_count",
+    "max_rendered_input_tokens",
+    "scanned",
+    "downloaded_bytes"
+  ],
+  "title": "PreparationManifest",
+  "type": "object"
+}

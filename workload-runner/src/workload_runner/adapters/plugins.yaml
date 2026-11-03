@@ -1,0 +1,19 @@
+schema_version: "1.0"
+custom_dataset_loader:
+  raw_payload:
+    class: workload_runner.adapters.plugins:PlatformLoader
+    priority: 100
+    description: Bounded platform conversation loader using AIPerf native timing.
+transport:
+  http:
+    class: workload_runner.adapters.plugins:PlatformHTTP
+    priority: 100
+    description: Native AIPerf HTTP with platform limits and observation hooks.
+    metadata:
+      transport_type: http
+      url_schemes: [http, https]
+timing_strategy:
+  fixed_schedule:
+    class: workload_runner.adapters.plugins:PlatformSchedule
+    priority: 100
+    description: Native fixed schedule with an exported monotonic origin.

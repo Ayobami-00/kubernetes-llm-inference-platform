@@ -1,0 +1,12 @@
+[project]
+name = "inference-stub"
+version = "0.1.0"
+requires-python = ">=3.12"
+dependencies = ["fastapi>=0.115,<1", "uvicorn>=0.34,<1"]
+
+[project.scripts]
+inference-stub = "inference_stub.app:main"
+
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"

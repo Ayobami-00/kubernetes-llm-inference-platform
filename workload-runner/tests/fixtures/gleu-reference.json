@@ -1,0 +1,24 @@
+{
+  "source_url": "https://raw.githubusercontent.com/keisks/jfleg/ee06ff806a208aba815ac45313f4e750a48330a5/eval/gleu.py",
+  "source_sha256": "b8bf3605b3c23a899734b406855dcfd8404ec7d8aa84cdfb25114439e5af9c29",
+  "examples": [
+    [
+      "a b c d e",
+      "a b x d e",
+      [
+        "a b x d e",
+        "a b y d e"
+      ]
+    ],
+    [
+      "one two three four five six",
+      "one two three four",
+      [
+        "one two three four five six",
+        "one two three four six"
+      ]
+    ]
+  ],
+  "expected_corpus_gleu": 0.635886,
+  "tolerance": 1e-06
+}

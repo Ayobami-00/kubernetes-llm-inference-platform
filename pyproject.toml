@@ -8,13 +8,13 @@ dependencies = []
 package = false
 
 [tool.uv.workspace]
-members = ["packages/platform-contracts", "apps/management/backend"]
+members = ["packages/platform-contracts", "apps/management/backend", "packages/slo-evaluator", "workload-runner", "dev/inference-stub"]
 
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1", "jsonschema>=4,<5"]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/platform-contracts/tests"]
+testpaths = ["packages/platform-contracts/tests", "packages/slo-evaluator/tests", "workload-runner/tests", "dev/inference-stub/tests"]
 
 [tool.ruff]
 target-version = "py312"

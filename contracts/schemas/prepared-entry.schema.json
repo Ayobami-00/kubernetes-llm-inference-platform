@@ -1,0 +1,143 @@
+{
+  "$defs": {
+    "JsonValue": {},
+    "PreparedTurn": {
+      "additionalProperties": false,
+      "properties": {
+        "adaptations": {
+          "default": [],
+          "items": {
+            "minLength": 1,
+            "type": "string"
+          },
+          "title": "Adaptations",
+          "type": "array"
+        },
+        "controls": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Controls",
+          "type": "object"
+        },
+        "delay_ms": {
+          "default": 0.0,
+          "minimum": 0,
+          "title": "Delay Ms",
+          "type": "number"
+        },
+        "input_tokens": {
+          "minimum": 0,
+          "title": "Input Tokens",
+          "type": "integer"
+        },
+        "messages": {
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "minItems": 1,
+          "title": "Messages",
+          "type": "array"
+        },
+        "references": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "References",
+          "type": "object"
+        },
+        "source_controls": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Source Controls",
+          "type": "object"
+        },
+        "source_tools": {
+          "default": [],
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Source Tools",
+          "type": "array"
+        },
+        "tools": {
+          "default": [],
+          "items": {
+            "additionalProperties": {
+              "$ref": "#/$defs/JsonValue"
+            },
+            "type": "object"
+          },
+          "title": "Tools",
+          "type": "array"
+        }
+      },
+      "required": [
+        "messages",
+        "input_tokens"
+      ],
+      "title": "PreparedTurn",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/prepared-entry.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "adaptations": {
+      "default": [],
+      "items": {
+        "minLength": 1,
+        "type": "string"
+      },
+      "title": "Adaptations",
+      "type": "array"
+    },
+    "context_mode": {
+      "default": "recorded",
+      "enum": [
+        "recorded",
+        "live"
+      ],
+      "title": "Context Mode",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "source_id": {
+      "minLength": 1,
+      "title": "Source Id",
+      "type": "string"
+    },
+    "turns": {
+      "items": {
+        "$ref": "#/$defs/PreparedTurn"
+      },
+      "minItems": 1,
+      "title": "Turns",
+      "type": "array"
+    },
+    "warmup": {
+      "default": false,
+      "title": "Warmup",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "source_id",
+    "turns"
+  ],
+  "title": "PreparedEntry",
+  "type": "object"
+}

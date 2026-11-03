@@ -338,12 +338,18 @@ function Workspace() {
       `${n.label} ${n.subtitle}`.toLowerCase().includes(search.toLowerCase()),
     ) || [];
   const title = navigation.find((n) => n.path === pathname)?.label || 'Topology';
+  const tokenMeasurements = runs.data?.flatMap((r) => r.run.result?.measurements ?? []) ?? [];
+  const unknownTokens = tokenMeasurements.some(
+    (m) => m.input_tokens == null || m.output_tokens == null,
+  );
   const tokens =
     runs.data?.reduce(
       (sum, r) =>
         sum +
-        (r.run.result?.measurements?.reduce((t, m) => t + m.input_tokens + m.output_tokens, 0) ||
-          0),
+        (r.run.result?.measurements?.reduce(
+          (t, m) => t + (m.input_tokens ?? 0) + (m.output_tokens ?? 0),
+          0,
+        ) || 0),
       0,
     ) || 0;
   return (
@@ -528,7 +534,9 @@ function Workspace() {
               hint={
                 snapshot
                   ? 'Immutable recorded inputs'
-                  : `${tokens.toLocaleString()} fixture tokens in history`
+                  : unknownTokens
+                    ? 'Token totals unavailable for some runs'
+                    : `${tokens.toLocaleString()} fixture tokens in history`
               }
             />
           </div>

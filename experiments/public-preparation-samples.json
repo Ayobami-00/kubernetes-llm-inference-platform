@@ -1,0 +1,203 @@
+{
+  "fixture": true,
+  "preparations": [
+    {
+      "adaptations": {
+        "contiguous_context_prefix": 63,
+        "contiguous_turn_bound_prefix": 97,
+        "inference_snapshot_replay": 100,
+        "model_alias_override": 598,
+        "openai_function_tool_envelope": 598,
+        "output_cap": 427
+      },
+      "artifact_sha256": "835f41927315a1444820f3ba9ac4f128dfa3a090c1b708858a038374b6ff861b",
+      "customer_ref": "code-agent@1",
+      "entry_count": 100,
+      "exclusions": {
+        "context_limit_turns": 5162,
+        "no_compatible_turns": 19,
+        "turn_bound_excluded_calls": 6991
+      },
+      "id": "prepared-code-agent-1334845ddfd1",
+      "license_evidence": {
+        "Exgentic/agent-llm-traces-v2": "Project declaration in exgentic-code@1, source revision 4b8ad4ab198438e5a170f9171c19c6a2cf7c1814: Source manifest; prepared artifacts are recorded separately. The project owner confirmed on 2026-11-03 that CDLA-Permissive-2.0 applies to this pinned Exgentic v2 revision. This is a project-confirmed declaration; the upstream Hugging Face license field was unset when checked. Upstream metadata (license unset): https://huggingface.co/api/datasets/Exgentic/agent-llm-traces-v2/revision/4b8ad4ab198438e5a170f9171c19c6a2cf7c1814?blobs=true#sha256=a6ad9e7f080978c56bd77bc8dbe7d70aa1e00f98d9d01dc8cc61e5bb393a0d5a"
+      },
+      "licenses": {
+        "Exgentic/agent-llm-traces-v2": "CDLA-Permissive-2.0"
+      },
+      "max_rendered_input_tokens": 16384,
+      "prompt_template_sha256": "0e302dad626c0c17c535e600ed57b6e1f45899f20720a581194d58abbb91fc7a",
+      "scanned": 119,
+      "selection": {
+        "cohort_policy": "source split for JFLEG; otherwise source-ID hash 20% warmup",
+        "download_limit_bytes": 1073741824,
+        "max_characters_before_tokenization": 262144,
+        "maximum_contiguous_turns": 8,
+        "requested_bound": 100
+      },
+      "source_revisions": {
+        "Exgentic/agent-llm-traces-v2": "4b8ad4ab198438e5a170f9171c19c6a2cf7c1814"
+      },
+      "source_urls": {
+        "Exgentic/agent-llm-traces-v2": "https://huggingface.co/datasets/Exgentic/agent-llm-traces-v2/tree/4b8ad4ab198438e5a170f9171c19c6a2cf7c1814"
+      },
+      "token_accounting": "model_tokenizer",
+      "tokenizer_id": "Qwen/Qwen3-235B-A22B",
+      "tokenizer_revision": "8efa61729e24bd65b1d152b5ab5409052aa80e65",
+      "transform_version": "0.4.1",
+      "warmup_count": 20
+    },
+    {
+      "adaptations": {
+        "adapted_extraction_task": 100,
+        "evidence_preserving_chunk": 100
+      },
+      "artifact_sha256": "514f2afa17fa7ec94fa8d7c5ef1c62a55664cfc7d4391d566d86e79d148f2a71",
+      "customer_ref": "doc-flow@1",
+      "entry_count": 100,
+      "exclusions": {},
+      "id": "prepared-doc-flow-55eeae5478df",
+      "license_evidence": {
+        "cuad": "https://www.atticusprojectai.org/cuad/#sha256=2b2f95a3aa9feb2a89468c0f5995c9969e30273fe65b7eea0b995127a72ed6c9"
+      },
+      "licenses": {
+        "cuad": "CC-BY-4.0"
+      },
+      "max_rendered_input_tokens": 3412,
+      "prompt_template_sha256": "0e3255f1203d64472927453b2836b1d4b3c76cae34ceb99bd41e32119916258f",
+      "scanned": 100,
+      "selection": {
+        "cohort_policy": "source split for JFLEG; otherwise source-ID hash 20% warmup",
+        "download_limit_bytes": 1073741824,
+        "max_characters_before_tokenization": 131072,
+        "maximum_contiguous_turns": null,
+        "requested_bound": 100
+      },
+      "source_revisions": {
+        "cuad": "67faa0e6023b04fcaae6cc09497ab00e5d63a2a2"
+      },
+      "source_urls": {
+        "cuad": "https://github.com/TheAtticusProject/cuad/tree/67faa0e6023b04fcaae6cc09497ab00e5d63a2a2"
+      },
+      "token_accounting": "model_tokenizer",
+      "tokenizer_id": "Qwen/Qwen3-14B",
+      "tokenizer_revision": "40c069824f4251a91eefaf281ebe4c544efd3e18",
+      "transform_version": "0.4.0",
+      "warmup_count": 20
+    },
+    {
+      "adaptations": {
+        "assumed_turn_timing": 100,
+        "prepared_qa_substeps": 100
+      },
+      "artifact_sha256": "0b91a9b661265dd003db4a9b0c82d6c1535d20c9d735d2a1dea018c17d97b91d",
+      "customer_ref": "research-agent@1",
+      "entry_count": 100,
+      "exclusions": {},
+      "id": "prepared-research-agent-930f5badfc2e",
+      "license_evidence": {
+        "hotpotqa/hotpot_qa": "https://huggingface.co/api/datasets/hotpotqa/hotpot_qa/revision/main?blobs=true#sha256=62272a7caa991a6922bc36a4a69df8d608d98905305b705736183e726b878fc1"
+      },
+      "licenses": {
+        "hotpotqa/hotpot_qa": "cc-by-sa-4.0"
+      },
+      "max_rendered_input_tokens": 4377,
+      "prompt_template_sha256": "86366176ca7a6f75116969d634ad7971d4ee55c86556bdb27d025d036fce5d3e",
+      "scanned": 100,
+      "selection": {
+        "cohort_policy": "source split for JFLEG; otherwise source-ID hash 20% warmup",
+        "download_limit_bytes": 1073741824,
+        "max_characters_before_tokenization": 131072,
+        "maximum_contiguous_turns": null,
+        "requested_bound": 100
+      },
+      "source_revisions": {
+        "hotpotqa/hotpot_qa": "1908d6afbbead072334abe2965f91bd2709910ab"
+      },
+      "source_urls": {
+        "hotpotqa/hotpot_qa": "https://huggingface.co/datasets/hotpotqa/hotpot_qa/tree/1908d6afbbead072334abe2965f91bd2709910ab"
+      },
+      "token_accounting": "model_tokenizer",
+      "tokenizer_id": "Qwen/Qwen3-14B",
+      "tokenizer_revision": "40c069824f4251a91eefaf281ebe4c544efd3e18",
+      "transform_version": "0.4.0",
+      "warmup_count": 20
+    },
+    {
+      "adaptations": {
+        "assumed_turn_timing": 100,
+        "contiguous_context_prefix": 26
+      },
+      "artifact_sha256": "4d9983cb4a310a2f4239f52bd5ce0b453f90e5fbe31692648e79ba54e0e5bd98",
+      "customer_ref": "tutor-chat@1",
+      "entry_count": 100,
+      "exclusions": {
+        "context_limit_turns": 51
+      },
+      "id": "prepared-tutor-chat-87453ea82667",
+      "license_evidence": {
+        "mathdial": "https://raw.githubusercontent.com/eth-nlped/mathdial/b06c020a0a1f57a87577fec33e657b63e7eb476e/README.md#sha256=50430d327d94453c02a9c21d831fac2bfb73aa8a261d4c669cf2b335651ec227"
+      },
+      "licenses": {
+        "mathdial": "CC-BY-SA-4.0"
+      },
+      "max_rendered_input_tokens": 4073,
+      "prompt_template_sha256": "92dbefb9ab690faa57d74a6143046a015ca505897ac613dad95bc15ca085a025",
+      "scanned": 100,
+      "selection": {
+        "cohort_policy": "source split for JFLEG; otherwise source-ID hash 20% warmup",
+        "download_limit_bytes": 1073741824,
+        "max_characters_before_tokenization": 65536,
+        "maximum_contiguous_turns": null,
+        "requested_bound": 100
+      },
+      "source_revisions": {
+        "mathdial": "b06c020a0a1f57a87577fec33e657b63e7eb476e"
+      },
+      "source_urls": {
+        "mathdial": "https://github.com/eth-nlped/mathdial/tree/b06c020a0a1f57a87577fec33e657b63e7eb476e"
+      },
+      "token_accounting": "model_tokenizer",
+      "tokenizer_id": "Qwen/Qwen3-8B",
+      "tokenizer_revision": "b968826d9c46dd6066d109eabc6255188de91218",
+      "transform_version": "0.4.0",
+      "warmup_count": 20
+    },
+    {
+      "adaptations": {},
+      "artifact_sha256": "2fa9964f3e275119e4fe18d210fc04a25cbbde71b98cf14f6bef975278cc95c7",
+      "customer_ref": "writer-assist@1",
+      "entry_count": 100,
+      "exclusions": {},
+      "id": "prepared-writer-assist-3b567885b1b2",
+      "license_evidence": {
+        "jfleg": "https://raw.githubusercontent.com/keisks/jfleg/ee06ff806a208aba815ac45313f4e750a48330a5/README.md#sha256=f1413ad6167f35a3c0f8d5d78be2f36e248358ddff11bdeb9c78e4bb274be853"
+      },
+      "licenses": {
+        "jfleg": "CC-BY-NC-SA-4.0"
+      },
+      "max_rendered_input_tokens": 97,
+      "prompt_template_sha256": "b082d30042586f896d150d14e015a506fe74db72f0d473332b1e31d0d4996f8d",
+      "scanned": 100,
+      "selection": {
+        "cohort_policy": "source split for JFLEG; otherwise source-ID hash 20% warmup",
+        "download_limit_bytes": 1073741824,
+        "max_characters_before_tokenization": 8192,
+        "maximum_contiguous_turns": null,
+        "requested_bound": 100
+      },
+      "source_revisions": {
+        "jfleg": "ee06ff806a208aba815ac45313f4e750a48330a5"
+      },
+      "source_urls": {
+        "jfleg": "https://github.com/keisks/jfleg/tree/ee06ff806a208aba815ac45313f4e750a48330a5"
+      },
+      "token_accounting": "model_tokenizer",
+      "tokenizer_id": "Qwen/Qwen3-4B",
+      "tokenizer_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+      "transform_version": "0.4.0",
+      "warmup_count": 20
+    }
+  ],
+  "purpose": "CPU-only public-input acceptance; no live model claims"
+}
