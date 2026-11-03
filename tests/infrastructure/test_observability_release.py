@@ -57,6 +57,48 @@ def test_monitoring_uses_rotating_credentials_and_separate_scoped_roles():
     )
 
 
+def test_workload_labels_survive_target_collision_without_honoring_untrusted_labels():
+    import re
+
+    values = release.monitoring_values()
+    assert values["prometheus"]["prometheusSpec"]["overrideHonorLabels"] is True
+    labels = {
+        "namespace": "observability",
+        "pod": "ksm-exporter",
+        "container": "kube-state-metrics",
+        "exported_namespace": "platform-data",
+        "exported_pod": "klip-db-1",
+        "exported_container": "postgres",
+        "job": "kube-state-metrics",
+        "cluster": "klip",
+    }
+    for rule in values["kube-state-metrics"]["prometheus"]["monitor"]["metricRelabelings"]:
+        if rule["action"] == "labeldrop":
+            labels = {k: v for k, v in labels.items() if not re.fullmatch(rule["regex"], k)}
+        else:
+            value = ";".join(labels.get(k, "") for k in rule["sourceLabels"])
+            if re.fullmatch(rule["regex"], value):
+                labels[rule["targetLabel"]] = value
+    assert labels == {
+        "namespace": "platform-data",
+        "pod": "klip-db-1",
+        "container": "postgres",
+        "scrape_namespace": "observability",
+        "scrape_pod": "ksm-exporter",
+        "scrape_container": "kube-state-metrics",
+        "job": "kube-state-metrics",
+        "cluster": "klip",
+    }
+    path = release.CACHE / "kube-prometheus-stack/values.yaml"
+    if path.exists():
+        upstream = yaml.safe_load(path.read_text())["kubelet"]["serviceMonitor"]
+        configured = values["kubelet"]["serviceMonitor"]
+        for field in ("metricRelabelings", "cAdvisorMetricRelabelings", "probesMetricRelabelings"):
+            assert configured[field] == upstream[field] + release.workload_label_relabelings(
+                ["namespace"]
+            )
+
+
 @pytest.mark.skipif(
     not (release.CACHE / "kube-prometheus-stack/Chart.yaml").exists(),
     reason="Requires the checksum-verified upstream monitoring chart",

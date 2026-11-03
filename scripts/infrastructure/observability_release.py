@@ -103,8 +103,46 @@ def image(reference: str) -> str:
     return reference + "@" + value["digest"]
 
 
+def workload_label_relabelings(fields):
+    """Recover trusted object labels without changing scrape identity or honor policy."""
+    result = []
+    for field in fields:
+        result.extend(
+            [
+                {
+                    "sourceLabels": [field],
+                    "targetLabel": "scrape_" + field,
+                    "regex": "(.+)",
+                    "action": "replace",
+                },
+                {
+                    "sourceLabels": ["exported_" + field],
+                    "targetLabel": field,
+                    "regex": "(.+)",
+                    "action": "replace",
+                },
+                {"action": "labeldrop", "regex": "exported_" + field},
+            ]
+        )
+    return result
+
+
 def monitoring_values() -> dict:
     values = yaml.safe_load((ROOT / "deploy/observability/monitoring.yaml").read_text())
+    # overrideHonorLabels remains enabled. Only these Kubernetes-owned exporters
+    # restore their API/kubelet workload identity after target-label collision.
+    filters = yaml.safe_load(
+        (ROOT / "deploy/observability/kubelet-filter-defaults.yaml").read_text()
+    )
+    for field, defaults in filters.items():
+        values["kubelet"]["serviceMonitor"][field] = defaults + workload_label_relabelings(
+            ["namespace"]
+        )
+    values["kube-state-metrics"]["prometheus"] = {
+        "monitor": {
+            "metricRelabelings": workload_label_relabelings(["namespace", "pod", "container"])
+        }
+    }
     operator = values["prometheusOperator"]
     bindings = [
         (operator, "image", "quay.io/prometheus-operator/prometheus-operator:v0.94.2"),

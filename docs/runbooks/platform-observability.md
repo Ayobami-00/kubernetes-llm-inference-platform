@@ -338,10 +338,20 @@ are not relaxed. Node exporter reads it through its existing read-only host moun
 Source, units and setup are also included in future Ansible host preparation.
 
 The monitoring update adds a private PodMonitor for the actual CNPG `metrics`
-port (9187). Grafana's release provisions the initial platform, cluster, storage
-and telemetry views from versioned JSON, using a mounted ConfigMap and file
+port (9187). Grafana's release provisions the initial platform, cluster, storage,
+WireGuard network and telemetry views from versioned JSON, using a mounted ConfigMap and file
 provider. No download container, API token, sidecar or external plugin is needed.
 Dashboard JSON remains literal through Helm even when Grafana legend templates
 contain braces. Source hashes include these definitions and host programs, while
 excluding Python bytecode caches. Missing application/GPU/serving sources remain
-explicitly unavailable; the other eight agreed views follow their instrumentation.
+explicitly unavailable; the remaining agreed views follow their instrumentation.
+
+Prometheus retains `overrideHonorLabels: true`. For the pinned KSM and authenticated
+kubelet exporters only, metric relabeling restores Kubernetes workload labels
+after target-label collision, retaining exporter provenance in `scrape_namespace`,
+`scrape_pod` and `scrape_container`. Otherwise a database sample's namespace would
+be the exporter's namespace and default rules would join the wrong objects.
+Automatic scrape series such as `up` keep their target labels. Original pinned
+kubelet sample filters remain intact. This exception must not be applied to
+tenant-controlled exporters. Verify source labels and real panel queries after
+every relevant upgrade; successful HTTP queries alone do not establish correctness.

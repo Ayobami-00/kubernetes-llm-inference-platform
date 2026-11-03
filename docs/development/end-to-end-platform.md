@@ -497,3 +497,12 @@ connection limits or `ensure: absent`. The failed validation is retained, not
 replayed. Five CPU diagnostic views are defined, with explicit missing-source
 limitations; their live provisioning is a subsequent check. Updating dashboard
 content preserves the original private-runtime risk-review expiry and findings.
+
+Grafana plan `3e81c630d2a6663894d894270c0dcf7f919f2fdc1353a8c2fa7dd2d36c44d99a`
+completed at 23:40:55 UTC with both replicas Ready. Verification found all five
+provisioned views and executed 38 queries. Several storage panels were empty:
+`overrideHonorLabels` had renamed workload labels to `exported_namespace` and
+`exported_pod`. This is a correctness failure, not healthy storage evidence.
+The correction restores authoritative KSM/kubelet workload identity during metric
+relabeling, retains exporter labels under `scrape_*`, keeps global honor-label
+protection and preserves pinned sample filters. Live verification follows rollout.
