@@ -12,9 +12,24 @@ availability:
   spreadAcrossZones: true
 terminationGracePeriodSeconds: 60
 web:
+  serviceType: NodePort
+  nodePort: 30443
+  trustedProxyCIDRs:
+    # ALB subnets, plus NodePort source NAT addresses on the three workers.
+    - 10.40.0.0/24
+    - 10.40.1.0/24
+    - 10.40.2.0/24
+    - 10.200.0.64/32
+    - 10.200.0.65/32
+    - 10.200.0.66/32
   tls:
     enabled: true
     dnsNames: [management.klip-lab.click, klip-web, klip-web.klip.svc, klip-web.klip.svc.cluster.local]
+api:
+  # Only the web Pods can reach the API (the policy is mandatory for this trust).
+  trustedProxyCIDRs: [10.244.0.0/16]
+networkPolicy:
+  enabled: true
 database:
   requireTLS: true
   caSecret: klip-db-ca

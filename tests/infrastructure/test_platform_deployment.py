@@ -121,6 +121,40 @@ def test_management_tls_exposes_https_without_watching_secrets_or_sharing_proces
     assert cert["spec"]["duration"] == "2160h" and cert["spec"]["renewBefore"] == "720h"
 
 
+def test_forwarded_identity_is_bounded_by_api_ingress_policy():
+    docs = render("klip")
+    api = next(x for x in docs if x["kind"] == "Deployment" and x["metadata"]["name"] == "klip-api")
+    command = api["spec"]["template"]["spec"]["containers"][0]["command"]
+    assert command[-2:] == ["--forwarded-allow-ips", "10.244.0.0/16"]
+    policy = next(x for x in docs if x["kind"] == "NetworkPolicy")
+    assert policy["spec"]["podSelector"]["matchLabels"]["app.kubernetes.io/component"] == "api"
+    assert policy["spec"]["ingress"] == [
+        {
+            "from": [
+                {
+                    "podSelector": {
+                        "matchLabels": {
+                            "app.kubernetes.io/name": "klip",
+                            "app.kubernetes.io/component": "web",
+                        }
+                    }
+                }
+            ],
+            "ports": [{"protocol": "TCP", "port": 8000}],
+        }
+    ]
+    assert "proxy identity" in render("klip", ["networkPolicy.enabled=false"], success=False)
+    # The old headers are discarded after trusted ALB/NodePort address resolution.
+    config = next(
+        x for x in docs if x["kind"] == "ConfigMap" and x["metadata"]["name"] == "klip-web-tls"
+    )
+    assert "real_ip_recursive on" in config["data"]["server.conf"]
+    assert "set_real_ip_from 0.0.0.0/0" not in config["data"]["server.conf"]
+    template = (ROOT / "apps/management/web/nginx.conf.template").read_text()
+    assert "proxy_set_header X-Forwarded-For $remote_addr;" in template
+    assert "$proxy_add_x_forwarded_for" not in template
+
+
 @pytest.mark.parametrize(
     "override,reason",
     [

@@ -4,6 +4,7 @@ web:
   image: ""
   serviceType: ClusterIP
   nodePort: null
+  trustedProxyCIDRs: []
   tls:
     enabled: false
     existingSecret: klip-web-tls
@@ -13,6 +14,10 @@ replicas:
   api: 2
   worker: 2
   web: 1
+api:
+  trustedProxyCIDRs: []
+networkPolicy:
+  enabled: false
 auth:
   existingSecret: ""
   adminPasswordKey: admin-password

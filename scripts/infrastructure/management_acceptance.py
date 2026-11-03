@@ -94,13 +94,13 @@ def forwarding(log):
                 process.wait(timeout=10)
 
 
-def https_probe(port: int, ca_file) -> dict:
+def https_probe(port: int | None, ca_file=None, *, handler=None) -> dict:
     jar = http.cookiejar.CookieJar()
     context = ssl.create_default_context(cafile=str(ca_file))
     opener = urllib.request.build_opener(
         urllib.request.ProxyHandler({}),
         urllib.request.HTTPCookieProcessor(jar),
-        PrivateHTTPSHandler(context, port),
+        handler or PrivateHTTPSHandler(context, port),
     )
 
     def request(path, body=None, csrf=None):

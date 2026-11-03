@@ -46,6 +46,13 @@ def plan_changes(document: dict) -> list[dict]:
 
 
 def input_values(root: str, origins_file: Path | None, deletion_protection: bool = True) -> dict:
+    if root == "frontend":
+        from management_frontend import publish_requested, validate_activation
+
+        publish = publish_requested()
+        if publish:
+            validate_activation()
+        return {"publish_dns": publish, "deletion_protection": deletion_protection}
     if root == "foundation":
         public, _ = ensure_ssh_key()
         return {
@@ -101,11 +108,11 @@ def create_plan(
 ) -> dict:
     if root == "bootstrap" and preview:
         raise ValueError("Bootstrap's local first-use plan is real; omit --preview")
-    if root in {"identity", "storage", "storage-access", "registry"} and preview:
+    if root in {"identity", "storage", "storage-access", "registry", "frontend"} and preview:
         raise ValueError(
             "Retained identity/storage uses a real administrator-owned saved plan; omit --preview"
         )
-    if allow_origin_removal and root != "dns":
+    if allow_origin_removal and root not in {"dns", "frontend"}:
         raise ValueError("Origin removal applies only to the DNS root")
     validate_configuration(CONFIG)
     values = input_values(root, origins_file, deletion_protection=phase == "apply")
@@ -133,12 +140,15 @@ def create_plan(
     deleting = [item for item in changes if "delete" in item["actions"]]
     if deleting and allow_origin_removal:
         for item in deleting:
-            if not item["address"].startswith(
+            permitted = (
                 (
                     "module.inference_dns.aws_route53_record.",
                     "module.inference_dns.aws_route53_health_check.",
                 )
-            ):
+                if root == "dns"
+                else ("aws_route53_record.management[",)
+            )
+            if not item["address"].startswith(permitted):
                 raise ValueError("DNS origin removal cannot delete other resource types")
     if phase == "apply" and deleting and not allow_origin_removal:
         raise ValueError(
@@ -224,6 +234,12 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
     if (receipt["phase"] in {"unprotect", "destroy"}) != teardown:
         raise ValueError("Use the explicit destroy command for teardown plans")
     Aws(PROFILES[root]).preflight(root)
+    if root == "frontend" and json.loads(Path(receipt["variables_path"]).read_text()).get(
+        "publish_dns"
+    ):
+        from management_frontend import validate_activation
+
+        validate_activation()
     if root == "identity" and receipt["phase"] == "apply":
         from workload_identity import verify_signers_for_apply
 

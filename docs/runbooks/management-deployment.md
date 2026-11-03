@@ -57,12 +57,67 @@ Client-controlled SNI cannot select another file. This uses the
 without an extra watcher, API permissions or shared process namespace. Verify
 actual renewal/handshakes before claiming this behavior is live-proven.
 
-The HTTPS Service is initially ClusterIP. `https://management.klip-lab.click` is its
-intended origin; a resilient external frontend and public certificate/DNS remain a
-separate deployment step. Internal probes must verify the internal CA and hostname.
+The lab HTTPS Service uses NodePort 30443 for the dedicated external frontend.
+Internal probes must verify the internal CA and hostname.
 The generic chart ingress supports its existing TLS-termination mode with native
 web TLS disabled. It rejects combining that HTTP-upstream configuration with the
 native HTTPS mode. Keep the current private API/SSM access path for operator work.
+
+## Public frontend and activation
+
+Terraform root `platform-frontend` owns the management ALB, WAF, ACM certificate,
+certificate-validation record and management DNS alias. It uses the three existing
+CPU subnets and instance targets, with encrypted HTTPS to NodePort 30443. Only the
+ALB security group can reach that port through the worker security group. The
+public listener accepts HTTPS 443, uses the reviewed TLS 1.2/1.3 policy and forwards
+only the management Host header. Its default action is 404. There is no public
+HTTP listener or Kubernetes API access. Deletion protection is enabled.
+
+The ALB does not validate backend certificates, as documented by
+[AWS HTTPS target groups](https://docs.aws.amazon.com/elasticloadbalancing/latest/application/load-balancer-target-groups.html).
+This is encrypted transport inside the security-group boundary, not mutually
+authenticated TLS. Internal operator probes independently verify the backend CA.
+ACM manages the public certificate using its retained DNS-validation record.
+ALB access-log storage remains a telemetry milestone; native ALB/WAF metrics are
+available. WAF sampling is disabled to avoid retained request bodies or headers.
+
+The two WAF IP rules allow 3,000 total requests and 30 login requests per five-minute
+window before returning 429. Application login throttling remains stricter. Nginx
+trusts forwarded addresses only from the ALB subnets and the three NodePort source
+addresses. It discards the incoming chain after resolving the client address. The
+API trusts only Pod-CIDR proxies, and an ingress NetworkPolicy restricts API access
+to this release's web Pods. Do not disable the policy while retaining proxy trust.
+
+```sh
+make management-frontend-cost
+make management-frontend-plan
+make management-frontend-apply PLAN_SHA=<reviewed-unpublished-plan>
+make management-frontend-verify
+make management-frontend-activate
+make management-frontend-plan
+make management-frontend-apply PLAN_SHA=<reviewed-dns-activation-plan>
+```
+
+The first apply leaves public management DNS absent. Verification requires all three
+exact instance targets healthy, correct live project ownership and authenticated
+HTTPS using the public certificate/hostname. Before DNS exists it connects to the
+ALB address while retaining management SNI and Host, without disabling TLS checks.
+Activation records durable intent bound to the current ALB/target-group/instances;
+planning and applying publication repeat the fresh checks. A rebuilt allocation
+cannot inherit stale activation intent. Cookies and CSRF tokens stay in memory,
+and the probe logs out its own session.
+
+Deactivation records unpublished intent. Review a subsequent `manage.py plan --root
+frontend --allow-origin-removal`, then apply that exact saved plan. Only removal of
+the management alias is permitted by this override. It cannot delete an ALB or any
+other resource. Full teardown remains a separate retained-state procedure.
+
+The 2026-11-03 AWS Price List estimate is $43.40/month at 730 hours and one average
+LCU: ALB $0.02646/hour, LCU $0.0084/hour, three public IPv4 addresses
+[$0.005/hour each](https://aws.amazon.com/vpc/pricing/), plus
+[WAF](https://aws.amazon.com/waf/pricing/) $5/ACL and $1/rule monthly. Request volume,
+extra LCU/IP usage, data transfer, DNS queries and tax are additional. No new VM or
+GPU is included. Keep the generated cost receipt with the saved infrastructure plan.
 
 ## Image review
 

@@ -108,6 +108,26 @@ management-verify:
 management-evidence:
 	$(PYTHON) scripts/infrastructure/management_acceptance.py bundle
 
+.PHONY: management-frontend-cost management-frontend-plan management-frontend-apply management-frontend-verify management-frontend-activate management-frontend-deactivate
+management-frontend-cost:
+	$(PYTHON) scripts/infrastructure/management_frontend.py cost
+
+management-frontend-plan:
+	$(OPERATOR) plan --root frontend
+
+management-frontend-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed frontend Terraform plan digest'; exit 1)
+	$(OPERATOR) apply --root frontend --approve-plan "$(PLAN_SHA)"
+
+management-frontend-verify:
+	$(PYTHON) scripts/infrastructure/management_frontend.py verify
+
+management-frontend-activate:
+	$(PYTHON) scripts/infrastructure/management_frontend.py activate
+
+management-frontend-deactivate:
+	$(PYTHON) scripts/infrastructure/management_frontend.py deactivate
+
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
 	$(PYTHON) scripts/infrastructure/image_credentials.py prepare

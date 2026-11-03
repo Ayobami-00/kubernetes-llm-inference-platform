@@ -32,7 +32,7 @@ spec:
           {{- if eq $role "worker" }}
           command: [management-worker]
           {{- else }}
-          command: [uvicorn, platform_management.api.app:app, --host, 0.0.0.0, --port, "8000"]
+          command: [uvicorn, platform_management.api.app:app, --host, 0.0.0.0, --port, "8000", --proxy-headers, --forwarded-allow-ips, {{ join "," $.Values.api.trustedProxyCIDRs | quote }}]
           ports: [{containerPort: 8000, name: http}]
           {{- end }}
           env: {{ include "klip.env" $ | nindent 12 }}
