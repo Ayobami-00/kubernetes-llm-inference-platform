@@ -1,5 +1,6 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ThemeControl } from './theme';
+import CapacityView from '../features/capacity/CapacityView';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -135,7 +136,7 @@ function Login() {
           <div className="login-icon">
             <ShieldCheck size={25} />
           </div>
-          <h2>Welcome to Stratum</h2>
+          <h2>Welcome to KLIP</h2>
           <p>Sign in to your management workspace.</p>
           <label>
             Username
@@ -178,13 +179,11 @@ function Login() {
 }
 function Brand() {
   return (
-    <Link className="brand" to="/">
+    <Link className="brand" to="/" aria-label="KLIP home" title="Kubernetes LLM Inference Platform">
       <span className="brand-symbol">
         <Layers3 size={23} />
       </span>
-      <span>
-        stratum<span className="brand-dot">.</span>
-      </span>
+      <span className="brand-name">KLIP</span>
     </Link>
   );
 }
@@ -351,14 +350,6 @@ function Workspace() {
     <div className="application">
       <aside className="navigation">
         <Brand />
-        <div className="workspace-switch">
-          <span className="workspace-avatar">IP</span>
-          <div>
-            <b>Inference platform</b>
-            <small>Local workspace</small>
-          </div>
-          <ChevronDown size={13} />
-        </div>
         <span className="nav-label">WORKSPACE</span>
         <nav>
           {navigation.map((item) => (
@@ -404,20 +395,6 @@ function Workspace() {
           Export configuration
         </a>
         <div className="nav-bottom">
-          <div className="connection-card">
-            <div>
-              <span className={`status-dot ${capacity.data?.status === 'fresh' ? 'ready' : ''}`} />
-              <b>Lambda Cloud</b>
-            </div>
-            <small>
-              {capacity.data?.status === 'fresh'
-                ? 'Live inventory connected'
-                : 'Inventory not connected'}
-            </small>
-            <Link to="/capacity">
-              View capacity <ArrowRight size={12} />
-            </Link>
-          </div>
           <div className="user-card">
             <span className="user-avatar">A</span>
             <div>
@@ -460,7 +437,7 @@ function Workspace() {
         </header>
         <div className="page-heading">
           <div>
-            <div className="eyebrow">INFERENCE PLATFORM / MANAGEMENT</div>
+            <div className="eyebrow">KLIP / MANAGEMENT</div>
             <h1>
               {snapshot
                 ? 'Frozen run snapshot'
@@ -520,40 +497,42 @@ function Workspace() {
             )}
           </div>
         </div>
-        <div className="summary-grid">
-          <Summary
-            icon={Users}
-            label="Customers"
-            value={count?.customers ?? '—'}
-            hint="Published service contracts"
-          />
-          <Summary
-            icon={Cpu}
-            label="Configured GPU demand"
-            value={count?.planned_gpus ?? '—'}
-            hint={`Across ${count?.serving_deployments ?? 0} distinct deployments`}
-          />
-          <Summary
-            icon={Activity}
-            label={snapshot ? 'Worker specifications' : 'Active worker groups'}
-            value={(snapshot ? count?.worker_group_specs : count?.worker_groups) ?? 0}
-            hint={
-              snapshot
-                ? 'Frozen configuration inputs'
-                : `${groups.data?.filter((g) => g.group.status.phase === 'ready').length || 0} GPU-ready · simulated`
-            }
-          />
-          <Summary
-            icon={FlaskConical}
-            label={snapshot ? 'Historical run' : 'Active runs'}
-            value={snapshot ? 1 : (count?.active_runs ?? 0)}
-            hint={
-              snapshot
-                ? 'Immutable recorded inputs'
-                : `${tokens.toLocaleString()} fixture tokens in history`
-            }
-          />
-        </div>
+        {pathname !== '/capacity' && (
+          <div className="summary-grid">
+            <Summary
+              icon={Users}
+              label="Customers"
+              value={count?.customers ?? '—'}
+              hint="Published service contracts"
+            />
+            <Summary
+              icon={Cpu}
+              label="Configured GPU demand"
+              value={count?.planned_gpus ?? '—'}
+              hint={`Across ${count?.serving_deployments ?? 0} distinct deployments`}
+            />
+            <Summary
+              icon={Activity}
+              label={snapshot ? 'Worker specifications' : 'Active worker groups'}
+              value={(snapshot ? count?.worker_group_specs : count?.worker_groups) ?? 0}
+              hint={
+                snapshot
+                  ? 'Frozen configuration inputs'
+                  : `${groups.data?.filter((g) => g.group.status.phase === 'ready').length || 0} GPU-ready · simulated`
+              }
+            />
+            <Summary
+              icon={FlaskConical}
+              label={snapshot ? 'Historical run' : 'Active runs'}
+              value={snapshot ? 1 : (count?.active_runs ?? 0)}
+              hint={
+                snapshot
+                  ? 'Immutable recorded inputs'
+                  : `${tokens.toLocaleString()} fixture tokens in history`
+              }
+            />
+          </div>
+        )}
         {feedback && (
           <div
             role={feedback.error ? 'alert' : 'status'}
@@ -694,10 +673,9 @@ function Workspace() {
             ) : pathname === '/capacity' ? (
               <CapacityView
                 data={capacity.data}
+                requestError={capacity.error ? message(capacity.error) : undefined}
                 busy={busy}
-                refresh={() =>
-                  act(() => unwrap(e.refreshCapacity()), 'Capacity observations refreshed')
-                }
+                refresh={() => act(() => unwrap(e.refreshCapacity()), 'Capacity refresh requested')}
               />
             ) : pathname === '/runs' ? (
               <div className="list-page">
@@ -878,7 +856,7 @@ function Workspace() {
         <footer className="workspace-footer">
           <span>
             <GitBranch size={12} />
-            Stream C · local management
+            KLIP · local management
           </span>
           <span>Live observations are timestamped. Synthetic results are labelled.</span>
         </footer>
@@ -930,98 +908,6 @@ function Empty({ title, text }: { title: string; text: string }) {
       <Network size={33} />
       <h3>{title}</h3>
       <p>{text}</p>
-    </div>
-  );
-}
-function CapacityView({
-  data,
-  busy,
-  refresh,
-}: {
-  data: Awaited<ReturnType<typeof e.getCapacity>>['data'];
-  busy: boolean;
-  refresh: () => void;
-}) {
-  return (
-    <div className="list-page">
-      <div className="section-title">
-        <div>
-          <h3>Lambda Cloud observations</h3>
-          <p>
-            Last observed {formatDate(data?.observed_at)} · regional availability is not reserved
-            capacity.
-          </p>
-        </div>
-        <button className="secondary small" disabled={busy} onClick={refresh}>
-          <RefreshCw size={14} />
-          Refresh
-        </button>
-      </div>
-      {data?.status === 'unconfigured' ? (
-        <div className="connection-empty">
-          <div className="login-icon">
-            <Cpu size={27} />
-          </div>
-          <h3>Connect your Lambda account</h3>
-          <p>
-            Add a Lambda API key through the server secret to see live GPU types, regional
-            availability and your account instances.
-          </p>
-          <span className="badge">Credentials stay server-side</span>
-        </div>
-      ) : (
-        <>
-          {data?.error && (
-            <div className="notice error">{data.error} · Previous observations are retained.</div>
-          )}
-          <Badge value={data?.status || 'loading'} />
-          <h4>GPU catalogue</h4>
-          <div className="capacity-grid">
-            {data?.instance_types?.map((item: any) => (
-              <div className="detail-card" key={item.name}>
-                <div className="split">
-                  <Cpu size={22} />
-                  <strong>
-                    ${(item.price_cents_per_hour / 100).toFixed(2)}
-                    <small> / hour</small>
-                  </strong>
-                </div>
-                <h3>{item.gpu_description}</h3>
-                <p>
-                  {item.specs?.gpus} GPU(s) · {item.specs?.memory_gib} GiB RAM
-                </p>
-                <small>{item.name}</small>
-                <div className="region-list">
-                  {item.regions_with_capacity_available?.length ? (
-                    item.regions_with_capacity_available.map((region: any) => (
-                      <Badge key={region.name} value={region.name} />
-                    ))
-                  ) : (
-                    <span className="muted">No region reported with capacity</span>
-                  )}
-                </div>
-              </div>
-            ))}
-          </div>
-          <h4>Account instances</h4>
-          {data?.instances?.length ? (
-            data.instances?.map((item: any) => (
-              <div className="detail-card" key={item.id}>
-                <div className="split">
-                  <strong>{item.name || item.id}</strong>
-                  <Badge value={item.status} />
-                </div>
-                <p>{item.id} · observational account instance</p>
-              </div>
-            ))
-          ) : (
-            <Empty
-              title="No account instances"
-              text="This is the provider-reported account inventory, separate from simulated groups."
-            />
-          )}
-        </>
-      )}
     </div>
   );
 }

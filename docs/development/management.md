@@ -156,8 +156,8 @@ keeps its optional YAML parser dependency current; the generated client is check
 Verified locally on 3 November 2026:
 
 - 171 Python tests, including the original contract suite and management integration tests.
-- Nine frontend presentation tests and successful production builds on host and Node 24 Docker.
-- Ten browser tests cover both appearances, system preference changes, readable configuration/history,
+- Sixteen frontend presentation tests and successful production builds on host and Node 24 Docker.
+- Twelve browser tests cover both appearances, system preference changes, readable configuration/history,
   form/advanced editing, draft publication, keyboard interaction and mobile layouts. Automated WCAG
   checks cover login, topology, customers, capacity, results, operations and simulation. The complete
   allocation/worker-restart/serving/run/history workflow and insufficient-data navigation also pass.
@@ -197,3 +197,25 @@ the complete simulated lifecycle workflow. Its containers and test volume are re
 Ports 5174, 58001 and 55433 must be free. Docker Compose 2.24.4 or newer is required for the override.
 Screenshots are saved under `artifacts/management/`. The connected workspace and its secrets are kept
 separate. To run one case, pass Playwright arguments, e.g. `./dev/test-ui --grep accessibility`.
+
+## KLIP capacity catalogue
+
+The application wordmark, login and browser title use **KLIP** (Kubernetes LLM Inference Platform).
+The navigation keeps the main routes and administrator controls; the workspace selector and Lambda
+connection card have been removed.
+
+The capacity page starts with the catalogue, ahead of unrelated workspace counts. It puts GPU
+types with reported regional capacity first, then unconfirmed and
+unavailable GPU options. Unavailable cards have muted styling and keep their specifications readable.
+Non-GPU types follow the GPU catalogue, with observed account instances last. The card price is USD
+per instance-hour; system RAM is separate from the GPU model description.
+
+Availability follows Lambda's
+[instance-type regional observations](https://docs.lambda.ai/api/cloud), not a reservation or a
+count of free GPUs. Observations older than 90 seconds, failed fetches and incomplete regional
+information show availability as unconfirmed. The browser expires the availability display even
+when the API cannot be reached. Account instances remain observations, without inferred Kubernetes
+readiness.
+
+Capacity browser tests supply explicitly named fixture observations for both appearances and mobile
+layouts. Authentication and the rest of the workflow use the isolated real API and database.
