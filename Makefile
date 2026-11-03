@@ -1,5 +1,6 @@
 UV ?= uv
 PYTHON = $(UV) run --locked --group infrastructure python
+MANAGEMENT_PYTHON = $(UV) run --locked --all-packages --group infrastructure python
 OPERATOR = $(PYTHON) scripts/infrastructure/manage.py
 
 .PHONY: infra-tools infra-policies infra-check infra-lock infra-profiles infra-bootstrap-plan infra-bootstrap-apply infra-plan infra-preview infra-apply infra-smoke infra-export infra-verify infra-dns-plan infra-dns-preview infra-dns-apply infra-destroy-plan infra-destroy
@@ -60,6 +61,20 @@ database-verify-secret:
 
 database-restore-secret:
 	$(PYTHON) scripts/infrastructure/database_secrets.py restore
+
+.PHONY: database-migration-prepare database-migration-restore database-migration-verify database-migration-upgrade
+database-migration-prepare:
+	$(MANAGEMENT_PYTHON) scripts/infrastructure/database_migration.py prepare
+
+database-migration-restore:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the exact reviewed local data migration'; exit 1)
+	$(MANAGEMENT_PYTHON) scripts/infrastructure/database_migration.py restore --approve-plan "$(PLAN_SHA)"
+
+database-migration-verify:
+	$(MANAGEMENT_PYTHON) scripts/infrastructure/database_migration.py verify
+
+database-migration-upgrade:
+	$(MANAGEMENT_PYTHON) scripts/infrastructure/database_migration.py upgrade
 
 .PHONY: identity-collect identity-plan identity-apply identity-verify-public identity-activate identity-verify-federation
 identity-collect:

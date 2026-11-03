@@ -46,6 +46,7 @@ def sql(cluster: str, statement: str) -> str:
         "--",
         "psql",
         "-X",
+        "-q",
         "-A",
         "-t",
         "-v",

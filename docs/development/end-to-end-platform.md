@@ -209,3 +209,10 @@ The pinned plugin manager is a single recoverable replica, not HA. Management da
 migration, client reconnection/failover and the retained-state environment rebuild
 remain unproven. Offline checks pass 527 tests (17 optional skips), all 19 schemas,
 strict initialization/recovery CRD rendering and Ruff/formatting.
+
+The preserved local management database has subsequently been copied through a
+consistent exported snapshot: all 15 tables and 204 rows matched. C's existing
+Alembic revision 0002 then ran using the real application connector over verified
+TLS 1.3 as a non-superuser; original row content remained intact. The original local
+database/volume are retained. Application deployment and failover tests remain
+pending; this migration alone does not pass the management HA gate.

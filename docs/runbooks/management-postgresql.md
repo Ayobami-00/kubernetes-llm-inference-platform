@@ -135,6 +135,41 @@ durable operations and artifact access against the restored/migrated data. Test
 primary loss and actual application reconnection separately, recording committed
 markers and observed recovery time.
 
+The initial bounded local migration is encoded as:
+
+```sh
+# Local application clients must be stopped; retain the original Docker volume.
+make database-migration-prepare
+make database-migration-restore PLAN_SHA=<reviewed-migration-digest>
+make database-migration-verify  # compare original schema before upgrading it
+make database-migration-upgrade
+```
+
+Preparation exports one read-only repeatable-read PostgreSQL snapshot and dumps
+with that snapshot. The private dump has a 128-MiB limit for this one-time local
+development migration. The reviewed receipt binds the target Cluster UID and
+dump checksum. Restoration requires an empty application schema and runs as the
+application owner in one transaction; a retry reconciles already-restored data
+rather than overwriting it. Every original table's row count and logical content
+fingerprint must match. The dump's integrity uses SHA-256; per-table MD5 values
+are diagnostic fingerprints, not cryptographic authenticity claims.
+
+The schema upgrade uses C's existing Alembic migration and actual database
+connector with verified TLS. The probe and migration share one connection;
+Kubernetes port-forward can terminate on a reset from a disposable probe. The
+operator checks the public CA and connects with the non-superuser application
+role. Revision 0002 adds explicit legacy simulation bindings; comparison excludes
+only these declared added columns and the expected Alembic revision change.
+`verify` compares the original schema before upgrade; retain its evidence as
+historical proof rather than expecting unchanged fingerprints after application
+use. The deployment's migration Job still runs idempotently at application startup.
+
+The live lab copy matched all 15 original tables and 204 rows, then upgraded from
+0001 to 0002 over TLS 1.3 with original content preserved. The source container
+and volume remain unchanged. These checks establish data migration and database
+authentication, not deployed application HA or client recovery after failover.
+Take and verify a fresh external backup after the upgrade.
+
 Sources: [pinned Barman usage](https://cloudnative-pg.io/plugin-barman-cloud/docs/0.15.0/usage/),
 [CloudNativePG recovery schema](https://github.com/cloudnative-pg/cloudnative-pg/blob/v1.30.1/api/v1/cluster_types.go),
 and [S3 HeadBucket permissions](https://docs.aws.amazon.com/AmazonS3/latest/API/API_HeadBucket.html).
