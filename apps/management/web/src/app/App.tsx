@@ -1,5 +1,7 @@
 import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ThemeControl } from './theme';
+import ImportsPage from '../features/integrations/ImportsPage';
+import ReadinessPage from '../features/integrations/ReadinessPage';
 import CapacityView from '../features/capacity/CapacityView';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
@@ -29,6 +31,8 @@ import {
   Sparkles,
   Terminal,
   Users,
+  FileUp,
+  PlugZap,
   X,
 } from 'lucide-react';
 import { endpoints as e, message, setCsrf, unwrap } from '../api/client';
@@ -45,6 +49,8 @@ const navigation = [
   { path: '/runs', label: 'Runs & results', icon: FlaskConical },
   { path: '/operations', label: 'Operations', icon: Activity },
   { path: '/simulation', label: 'Simulation lab', icon: Sparkles },
+  { path: '/imports', label: 'Imports', icon: FileUp },
+  { path: '/integrations', label: 'Integrations', icon: PlugZap },
 ];
 const allKinds = [
   'dataset-manifest',
@@ -55,6 +61,8 @@ const allKinds = [
   'instance',
   'scenario',
   'run',
+  'cluster',
+  'infrastructure-node',
 ];
 export default function App() {
   const query = useQuery({
@@ -195,7 +203,16 @@ function Workspace() {
   const [snapshot, setSnapshot] = useState<string | null>(null);
   const [search, setSearch] = useState('');
   const [kinds, setKinds] = useState(
-    new Set(['dataset-manifest', 'customer', 'serving-profile', 'worker-group', 'group', 'run']),
+    new Set([
+      'dataset-manifest',
+      'customer',
+      'serving-profile',
+      'worker-group',
+      'group',
+      'run',
+      'cluster',
+      'infrastructure-node',
+    ]),
   );
   const [showFilters, setShowFilters] = useState(false);
   const [history, setHistory] = useState(false);
@@ -283,7 +300,11 @@ function Workspace() {
     setIsNew(false);
     setSelection(node);
   }
-  function selectRun(run: Run) {
+  function selectRun(
+    run: Run,
+    source = 'management',
+    provenance = run.fixture ? 'synthetic' : 'unverified',
+  ) {
     select({
       id: 'run:' + run.id,
       kind: 'run',
@@ -292,7 +313,10 @@ function Workspace() {
       status: run.status,
       provenance: 'historical',
       resource_id: run.id,
-      document: run as unknown as Record<string, unknown>,
+      document: { ...run, _management: { source, provenance } } as unknown as Record<
+        string,
+        unknown
+      >,
     });
   }
   function newConfiguration(kind: string) {
@@ -338,14 +362,22 @@ function Workspace() {
       `${n.label} ${n.subtitle}`.toLowerCase().includes(search.toLowerCase()),
     ) || [];
   const title = navigation.find((n) => n.path === pathname)?.label || 'Topology';
-  const tokens =
-    runs.data?.reduce(
-      (sum, r) =>
-        sum +
-        (r.run.result?.measurements?.reduce((t, m) => t + m.input_tokens + m.output_tokens, 0) ||
-          0),
-      0,
-    ) || 0;
+  const usage = { synthetic: 0, reported: 0, missing: 0 };
+  for (const item of runs.data || []) {
+    for (const measurement of item.run.result?.measurements || []) {
+      for (const value of [measurement.input_tokens, measurement.output_tokens]) {
+        if (typeof value !== 'number') usage.missing++;
+        else usage[item.run.fixture ? 'synthetic' : 'reported'] += value;
+      }
+    }
+  }
+  const tokenHint =
+    usage.synthetic.toLocaleString() +
+    ' synthetic · ' +
+    usage.reported.toLocaleString() +
+    ' reported tokens' +
+    (usage.missing ? ' · some usage unreported' : '');
+
   return (
     <div className="application">
       <aside className="navigation">
@@ -497,7 +529,7 @@ function Workspace() {
             )}
           </div>
         </div>
-        {pathname !== '/capacity' && (
+        {!['/capacity', '/imports', '/integrations'].includes(pathname) && (
           <div className="summary-grid">
             <Summary
               icon={Users}
@@ -525,11 +557,7 @@ function Workspace() {
               icon={FlaskConical}
               label={snapshot ? 'Historical run' : 'Active runs'}
               value={snapshot ? 1 : (count?.active_runs ?? 0)}
-              hint={
-                snapshot
-                  ? 'Immutable recorded inputs'
-                  : `${tokens.toLocaleString()} fixture tokens in history`
-              }
+              hint={snapshot ? 'Immutable recorded inputs' : tokenHint}
             />
           </div>
         )}
@@ -677,6 +705,10 @@ function Workspace() {
                 busy={busy}
                 refresh={() => act(() => unwrap(e.refreshCapacity()), 'Capacity refresh requested')}
               />
+            ) : pathname === '/imports' ? (
+              <ImportsPage act={act} busy={busy} />
+            ) : pathname === '/integrations' ? (
+              <ReadinessPage />
             ) : pathname === '/runs' ? (
               <div className="list-page">
                 <div className="section-title">
@@ -694,11 +726,17 @@ function Workspace() {
                     <span>SLO VERDICT</span>
                     <span>FINISHED</span>
                   </div>
-                  {runs.data?.map(({ run }) => (
-                    <button className="table-row" key={run.id} onClick={() => selectRun(run)}>
+                  {runs.data?.map(({ run, source, provenance }) => (
+                    <button
+                      className="table-row"
+                      key={run.id}
+                      onClick={() => selectRun(run, source, provenance)}
+                    >
                       <span>
                         <b>{run.snapshot.scenario.id.replace('-baseline', '')}</b>
-                        <small>{run.id}</small>
+                        <small>
+                          {run.id} · {run.fixture ? 'synthetic' : provenance}
+                        </small>
                       </span>
                       <span>
                         <Badge value={run.status} />

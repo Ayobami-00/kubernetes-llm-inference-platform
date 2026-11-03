@@ -1,0 +1,83 @@
+{{- if and (not .Values.localDevelopment) (not (hasPrefix "https://" .Values.publicOrigin)) -}}
+{{- fail "Production publicOrigin must use HTTPS; localDevelopment explicitly enables local HTTP" -}}
+{{- end -}}
+{{- if not .Values.artifacts.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ include "klip.artifacts" . }}
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: {{ required "B must supply artifacts.storageClass or artifacts.existingClaim" .Values.artifacts.storageClass | quote }}
+  resources:
+    requests: {storage: {{ .Values.artifacts.size }}}
+---
+{{- end }}
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: {{ .Release.Name }}-api}
+automountServiceAccountToken: false
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: {{ .Release.Name }}-runner}
+automountServiceAccountToken: false
+{{- with .Values.imagePullSecrets }}
+imagePullSecrets: {{ toYaml . | nindent 2 }}
+{{- end }}
+---
+apiVersion: v1
+kind: ServiceAccount
+metadata: {name: {{ .Release.Name }}-worker}
+{{- with .Values.imagePullSecrets }}
+imagePullSecrets: {{ toYaml . | nindent 2 }}
+{{- end }}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ .Release.Name }}-jobs}
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [get, list, watch, create, patch, delete]
+  - apiGroups: [""]
+    resources: [pods, pods/log]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ .Release.Name }}-jobs}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ .Release.Name }}-jobs}
+subjects:
+  - {kind: ServiceAccount, name: {{ .Release.Name }}-worker, namespace: {{ .Release.Namespace }}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRole
+metadata: {name: {{ .Release.Namespace }}-{{ .Release.Name }}-observations}
+rules:
+  - apiGroups: [""]
+    resources: [nodes]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: ClusterRoleBinding
+metadata: {name: {{ .Release.Namespace }}-{{ .Release.Name }}-observations}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: ClusterRole, name: {{ .Release.Namespace }}-{{ .Release.Name }}-observations}
+subjects:
+  - {kind: ServiceAccount, name: {{ .Release.Name }}-worker, namespace: {{ .Release.Namespace }}}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ .Release.Name }}-serving-observer, namespace: {{ .Values.runner.servingNamespace }}}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    verbs: [get, list, watch]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ .Release.Name }}-serving-observer, namespace: {{ .Values.runner.servingNamespace }}}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ .Release.Name }}-serving-observer}
+subjects:
+  - {kind: ServiceAccount, name: {{ .Release.Name }}-worker, namespace: {{ .Release.Namespace }}}

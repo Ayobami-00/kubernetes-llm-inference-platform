@@ -2,7 +2,7 @@ from platform_contracts import Run, RunSnapshot
 from sqlalchemy import select
 
 from platform_management.api.schemas import GraphEdge, GraphNode, Topology
-from platform_management.db.models import Observation, Resource, RunRow, Spec
+from platform_management.db.models import InventorySnapshot, Observation, Resource, RunRow, Spec
 from platform_management.services.catalog import catalog, view
 from platform_management.services.common import AppError, now
 
@@ -211,6 +211,71 @@ def topology(db, run_id=None, include_history=False):
                     instance["id"],
                     {**instance, "observed_at": observed.payload.get("observed_at")},
                 )
+    if not historical:
+        from platform_contracts.inventory import NodeObservation
+
+        from platform_management.services.imports import current_inventory_ids
+        from platform_management.settings import get_settings
+
+        selected_ids = current_inventory_ids(db)
+        # Full and partial records remain distinct; full cluster evidence takes precedence.
+        records = list(
+            db.scalars(
+                select(InventorySnapshot)
+                .where(InventorySnapshot.id.in_(selected_ids))
+                .order_by(InventorySnapshot.complete)
+            )
+        )
+        for observed_inventory in records:
+            doc = observed_inventory.document
+            cid = "cluster:" + observed_inventory.cluster_id
+            fresh = (
+                0
+                <= (now() - observed_inventory.captured_at).total_seconds()
+                <= get_settings().cluster_observation_max_age_seconds
+            )
+            provenance = "simulation" if observed_inventory.fixture else "imported"
+            add(
+                cid,
+                "cluster",
+                observed_inventory.cluster_id,
+                "Infrastructure observation",
+                "partial" if not observed_inventory.complete else "observed" if fresh else "stale",
+                provenance,
+                observed_inventory.cluster_id,
+                {
+                    "source": observed_inventory.source,
+                    "captured_at": observed_inventory.captured_at.isoformat(),
+                    "complete_inventory": observed_inventory.complete,
+                    **doc.get("cluster", {}),
+                },
+            )
+            for value in doc["nodes"]:
+                node = NodeObservation.model_validate(value)
+                nid = "infrastructure-node:" + node.provider + ":" + node.provider_instance_id
+                readiness = node.readiness.model_dump()
+                ready = node.readiness.kubernetes and (
+                    node.role == "control_plane" or node.readiness.gpu_runtime
+                )
+                add(
+                    nid,
+                    "infrastructure-node",
+                    node.kubernetes.name if node.kubernetes else node.id,
+                    node.role.replace("_", " ") + " · " + node.provider,
+                    "stale" if not fresh else "observed-ready" if ready else "preparing",
+                    provenance,
+                    node.provider_instance_id,
+                    {
+                        **value,
+                        "source": observed_inventory.source,
+                        "captured_at": observed_inventory.captured_at.isoformat(),
+                        "complete_inventory": observed_inventory.complete,
+                        "readiness": readiness,
+                    },
+                )
+                edge(cid, nid, "observes")
+                if node.worker_group_ref:
+                    edge("worker-group:" + node.worker_group_ref, nid, "observed worker")
     for row in db.scalars(select(RunRow)):
         run = Run.model_validate(row.payload)
         if historical and row.id != run_id:
@@ -224,9 +289,21 @@ def topology(db, run_id=None, include_history=False):
             run.snapshot.scenario.id.replace("-baseline", ""),
             f"{run.status} · " + (run.result.slo_verdict if run.result else run.stage or "queued"),
             run.status,
-            "historical" if row.context.get("seed") else "simulation",
+            "historical"
+            if row.context.get("seed")
+            else "simulation"
+            if run.fixture
+            else "imported",
             row.id,
-            row.payload,
+            {
+                **row.payload,
+                "_management": {
+                    "source": row.context.get("source", "management"),
+                    "provenance": row.context.get(
+                        "provenance", "synthetic" if run.fixture else "unverified"
+                    ),
+                },
+            },
         )
         edge("scenario:" + run.snapshot.scenario.ref, identity, "executes")
         for dataset in run.snapshot.datasets:

@@ -81,6 +81,36 @@ export type Artifact = {
 };
 
 /**
+ * ArtifactView
+ */
+export type ArtifactView = {
+    /**
+     * Checked At
+     */
+    checked_at: string;
+    /**
+     * Error
+     */
+    error: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Sha256
+     */
+    sha256: string | null;
+    /**
+     * Status
+     */
+    status: 'verified' | 'blocked' | 'unverified';
+    /**
+     * Uri
+     */
+    uri: string;
+};
+
+/**
  * Capacity
  */
 export type Capacity = {
@@ -268,6 +298,21 @@ export type CustomerSpec = {
     tier: 'dedicated' | 'provisioned' | 'best_effort';
     traffic_allowance: TrafficAllowance;
     workload: Workload;
+};
+
+/**
+ * DatasetImport
+ */
+export type DatasetImport = {
+    document: DatasetManifest;
+    /**
+     * Provenance
+     */
+    provenance?: 'synthetic' | 'measured' | 'unverified';
+    /**
+     * Source
+     */
+    source: string;
 };
 
 /**
@@ -541,6 +586,33 @@ export type Fault = {
 };
 
 /**
+ * FoundationObservation
+ *
+ * C's projection of B's foundation.v1 envelope, not a fabricated full inventory.
+ */
+export type FoundationObservation = {
+    /**
+     * Allocation
+     */
+    allocation: {
+        [key: string]: unknown;
+    };
+    /**
+     * Captured At
+     */
+    captured_at: string;
+    network: NetworkInfo;
+    /**
+     * Nodes
+     */
+    nodes: Array<NodeObservation>;
+    /**
+     * Schema Version
+     */
+    schema_version: 'foundation.v1';
+};
+
+/**
  * GPUHardware
  */
 export type GpuHardware = {
@@ -645,7 +717,7 @@ export type GraphNode = {
     /**
      * Provenance
      */
-    provenance: 'configuration' | 'simulation' | 'live' | 'historical';
+    provenance: 'configuration' | 'simulation' | 'live' | 'historical' | 'imported';
     /**
      * Resource Id
      */
@@ -694,6 +766,60 @@ export type HostAccess = {
 };
 
 /**
+ * ImportAccepted
+ */
+export type ImportAccepted = {
+    /**
+     * Import Id
+     */
+    import_id: string;
+};
+
+/**
+ * ImportView
+ */
+export type ImportView = {
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Error
+     */
+    error?: string | null;
+    /**
+     * Finished At
+     */
+    finished_at?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kind
+     */
+    kind: string;
+    /**
+     * Provenance
+     */
+    provenance: 'synthetic' | 'measured' | 'unverified';
+    /**
+     * Result
+     */
+    result?: {
+        [key: string]: unknown;
+    };
+    /**
+     * Source
+     */
+    source: string;
+    /**
+     * Status
+     */
+    status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+};
+
+/**
  * InfrastructureInventory
  */
 export type InfrastructureInventory = {
@@ -719,6 +845,118 @@ export type InfrastructureInventory = {
      * Snapshot Id
      */
     snapshot_id: string;
+};
+
+/**
+ * IntegrationCapability
+ */
+export type IntegrationCapability = {
+    /**
+     * Category
+     */
+    category: string;
+    /**
+     * Configured
+     */
+    configured: boolean;
+    /**
+     * Real
+     */
+    real: string;
+    /**
+     * Simulation
+     */
+    simulation: string;
+};
+
+/**
+ * IntegrationReport
+ */
+export type IntegrationReport = {
+    /**
+     * Adapters
+     */
+    adapters: Array<IntegrationCapability>;
+    /**
+     * Artifacts Root
+     */
+    artifacts_root: string;
+    /**
+     * Checks
+     */
+    checks?: Array<ReadinessCheck>;
+    /**
+     * Cluster Observation
+     */
+    cluster_observation?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Inventory Max Age Seconds
+     */
+    inventory_max_age_seconds: number;
+    /**
+     * Real Lambda Mutations
+     */
+    real_lambda_mutations?: false;
+};
+
+/**
+ * InventoryImport
+ */
+export type InventoryImport = {
+    /**
+     * Document
+     */
+    document: InfrastructureInventory | FoundationObservation;
+    /**
+     * Provenance
+     */
+    provenance?: 'synthetic' | 'measured' | 'unverified';
+    /**
+     * Source
+     */
+    source: string;
+};
+
+/**
+ * InventoryView
+ */
+export type InventoryView = {
+    /**
+     * Captured At
+     */
+    captured_at: string;
+    /**
+     * Cluster Id
+     */
+    cluster_id: string;
+    /**
+     * Complete
+     */
+    complete: boolean;
+    /**
+     * Current
+     */
+    current: boolean;
+    /**
+     * Document
+     */
+    document: {
+        [key: string]: unknown;
+    };
+    /**
+     * Fixture
+     */
+    fixture: boolean;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Source
+     */
+    source: string;
 };
 
 /**
@@ -990,6 +1228,10 @@ export type Phase = {
  */
 export type Preflight = {
     /**
+     * Checks
+     */
+    checks?: Array<ReadinessCheck>;
+    /**
      * Contract Blockers
      */
     contract_blockers: Array<string>;
@@ -1005,6 +1247,21 @@ export type Preflight = {
      * Simulation Available
      */
     simulation_available?: boolean;
+};
+
+/**
+ * PreparedBundle
+ */
+export type PreparedBundle = {
+    /**
+     * Fixture
+     */
+    fixture: boolean;
+    /**
+     * Id
+     */
+    id: string;
+    snapshot: RunSnapshot;
 };
 
 /**
@@ -1035,6 +1292,44 @@ export type PreparedDataset = {
      * Uri
      */
     uri: string;
+};
+
+/**
+ * PreparedImport
+ */
+export type PreparedImport = {
+    document: PreparedBundle;
+    /**
+     * Provenance
+     */
+    provenance?: 'synthetic' | 'measured' | 'unverified';
+    /**
+     * Source
+     */
+    source: string;
+};
+
+/**
+ * PreparedView
+ */
+export type PreparedView = {
+    /**
+     * Digest
+     */
+    digest: string;
+    /**
+     * Fixture
+     */
+    fixture: boolean;
+    /**
+     * Id
+     */
+    id: string;
+    snapshot: RunSnapshot;
+    /**
+     * Source
+     */
+    source: string;
 };
 
 /**
@@ -1127,6 +1422,32 @@ export type Readiness = {
      * Wireguard
      */
     wireguard?: boolean;
+};
+
+/**
+ * ReadinessCheck
+ */
+export type ReadinessCheck = {
+    /**
+     * Code
+     */
+    code: string;
+    /**
+     * Detail
+     */
+    detail: string;
+    /**
+     * Label
+     */
+    label: string;
+    /**
+     * Resource Ref
+     */
+    resource_ref?: string | null;
+    /**
+     * Status
+     */
+    status: 'ready' | 'blocked' | 'unconfigured' | 'stale';
 };
 
 /**
@@ -1224,6 +1545,21 @@ export type Run = {
 };
 
 /**
+ * RunImport
+ */
+export type RunImport = {
+    document: Run;
+    /**
+     * Provenance
+     */
+    provenance?: 'synthetic' | 'measured' | 'unverified';
+    /**
+     * Source
+     */
+    source: string;
+};
+
+/**
  * RunLaunch
  */
 export type RunLaunch = {
@@ -1245,6 +1581,10 @@ export type RunLaunch = {
      * Outcome
      */
     outcome?: 'passing' | 'violating' | 'insufficient_data' | 'invalid' | 'failed';
+    /**
+     * Prepared Run Id
+     */
+    prepared_run_id?: string | null;
     /**
      * Scenario Ref
      */
@@ -1343,7 +1683,15 @@ export type RunView = {
      * Mode
      */
     mode: 'simulation' | 'real';
+    /**
+     * Provenance
+     */
+    provenance?: 'synthetic' | 'measured' | 'unverified';
     run: Run;
+    /**
+     * Source
+     */
+    source?: string;
 };
 
 /**
@@ -1832,6 +2180,117 @@ export type Workload = {
     task: 'sentence_correction' | 'coding' | 'tutoring' | 'extraction' | 'research';
 };
 
+export type ListArtifactsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/artifacts';
+};
+
+export type ListArtifactsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ListArtifactsError = ListArtifactsErrors[keyof ListArtifactsErrors];
+
+export type ListArtifactsResponses = {
+    /**
+     * Response Listartifacts
+     *
+     * Successful Response
+     */
+    200: Array<ArtifactView>;
+};
+
+export type ListArtifactsResponse = ListArtifactsResponses[keyof ListArtifactsResponses];
+
+export type DownloadArtifactData = {
+    body?: never;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/artifacts/{identity}';
+};
+
+export type DownloadArtifactErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type DownloadArtifactError = DownloadArtifactErrors[keyof DownloadArtifactErrors];
+
+export type DownloadArtifactResponses = {
+    /**
+     * Successful Response
+     */
+    200: unknown;
+};
+
 export type ListAssignmentsData = {
     body?: never;
     path?: never;
@@ -1860,6 +2319,10 @@ export type ListAssignmentsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -1917,6 +2380,10 @@ export type SaveAssignmentErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -1965,6 +2432,10 @@ export type LoginErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2015,6 +2486,10 @@ export type LogoutErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2063,6 +2538,10 @@ export type GetSessionErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2113,6 +2592,10 @@ export type GetCapacityErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2161,6 +2644,10 @@ export type RefreshCapacityErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2211,6 +2698,10 @@ export type ExportConfigurationErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2257,6 +2748,10 @@ export type ListCustomersErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2314,6 +2809,10 @@ export type SaveCustomersDraftErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2368,6 +2867,10 @@ export type ExportCustomersErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2419,6 +2922,10 @@ export type PublishCustomersErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2474,6 +2981,10 @@ export type HistoryCustomersErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2524,6 +3035,10 @@ export type ListDatasetsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2581,6 +3096,10 @@ export type SaveDatasetsDraftErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2635,6 +3154,10 @@ export type ExportDatasetsErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2686,6 +3209,10 @@ export type PublishDatasetsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2741,6 +3268,10 @@ export type HistoryDatasetsErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2762,6 +3293,521 @@ export type HistoryDatasetsResponses = {
 };
 
 export type HistoryDatasetsResponse = HistoryDatasetsResponses[keyof HistoryDatasetsResponses];
+
+export type ListImportsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports';
+};
+
+export type ListImportsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ListImportsError = ListImportsErrors[keyof ListImportsErrors];
+
+export type ListImportsResponses = {
+    /**
+     * Response Listimports
+     *
+     * Successful Response
+     */
+    200: Array<ImportView>;
+};
+
+export type ListImportsResponse = ListImportsResponses[keyof ListImportsResponses];
+
+export type ImportDatasetData = {
+    body: DatasetImport;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports/datasets';
+};
+
+export type ImportDatasetErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ImportDatasetError = ImportDatasetErrors[keyof ImportDatasetErrors];
+
+export type ImportDatasetResponses = {
+    /**
+     * Successful Response
+     */
+    202: ImportAccepted;
+};
+
+export type ImportDatasetResponse = ImportDatasetResponses[keyof ImportDatasetResponses];
+
+export type ImportInventoryData = {
+    body: InventoryImport;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports/inventory';
+};
+
+export type ImportInventoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ImportInventoryError = ImportInventoryErrors[keyof ImportInventoryErrors];
+
+export type ImportInventoryResponses = {
+    /**
+     * Successful Response
+     */
+    202: ImportAccepted;
+};
+
+export type ImportInventoryResponse = ImportInventoryResponses[keyof ImportInventoryResponses];
+
+export type ImportPreparedRunData = {
+    body: PreparedImport;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports/prepared-runs';
+};
+
+export type ImportPreparedRunErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ImportPreparedRunError = ImportPreparedRunErrors[keyof ImportPreparedRunErrors];
+
+export type ImportPreparedRunResponses = {
+    /**
+     * Successful Response
+     */
+    202: ImportAccepted;
+};
+
+export type ImportPreparedRunResponse = ImportPreparedRunResponses[keyof ImportPreparedRunResponses];
+
+export type ImportHistoricalRunData = {
+    body: RunImport;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports/runs';
+};
+
+export type ImportHistoricalRunErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ImportHistoricalRunError = ImportHistoricalRunErrors[keyof ImportHistoricalRunErrors];
+
+export type ImportHistoricalRunResponses = {
+    /**
+     * Successful Response
+     */
+    202: ImportAccepted;
+};
+
+export type ImportHistoricalRunResponse = ImportHistoricalRunResponses[keyof ImportHistoricalRunResponses];
+
+export type GetImportData = {
+    body?: never;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/imports/{identity}';
+};
+
+export type GetImportErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type GetImportError = GetImportErrors[keyof GetImportErrors];
+
+export type GetImportResponses = {
+    /**
+     * Successful Response
+     */
+    200: ImportView;
+};
+
+export type GetImportResponse = GetImportResponses[keyof GetImportResponses];
+
+export type GetIntegrationsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/integrations';
+};
+
+export type GetIntegrationsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type GetIntegrationsError = GetIntegrationsErrors[keyof GetIntegrationsErrors];
+
+export type GetIntegrationsResponses = {
+    /**
+     * Successful Response
+     */
+    200: IntegrationReport;
+};
+
+export type GetIntegrationsResponse = GetIntegrationsResponses[keyof GetIntegrationsResponses];
+
+export type ListInventoryData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/inventory';
+};
+
+export type ListInventoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ListInventoryError = ListInventoryErrors[keyof ListInventoryErrors];
+
+export type ListInventoryResponses = {
+    /**
+     * Response Listinventory
+     *
+     * Successful Response
+     */
+    200: Array<InventoryView>;
+};
+
+export type ListInventoryResponse = ListInventoryResponses[keyof ListInventoryResponses];
+
+export type GetInventoryData = {
+    body?: never;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/inventory/{identity}';
+};
+
+export type GetInventoryErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type GetInventoryError = GetInventoryErrors[keyof GetInventoryErrors];
+
+export type GetInventoryResponses = {
+    /**
+     * Successful Response
+     */
+    200: InventoryView;
+};
+
+export type GetInventoryResponse = GetInventoryResponses[keyof GetInventoryResponses];
 
 export type ListOperationsData = {
     body?: never;
@@ -2791,6 +3837,10 @@ export type ListOperationsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2848,6 +3898,10 @@ export type GetOperationErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2896,6 +3950,10 @@ export type GetPreferencesErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -2955,6 +4013,10 @@ export type SavePreferencesErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -2978,6 +4040,61 @@ export type SavePreferencesResponses = {
 };
 
 export type SavePreferencesResponse = SavePreferencesResponses[keyof SavePreferencesResponses];
+
+export type ListPreparedRunsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/prepared-runs';
+};
+
+export type ListPreparedRunsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ListPreparedRunsError = ListPreparedRunsErrors[keyof ListPreparedRunsErrors];
+
+export type ListPreparedRunsResponses = {
+    /**
+     * Response Listpreparedruns
+     *
+     * Successful Response
+     */
+    200: Array<PreparedView>;
+};
+
+export type ListPreparedRunsResponse = ListPreparedRunsResponses[keyof ListPreparedRunsResponses];
 
 export type ListRunsData = {
     body?: never;
@@ -3007,6 +4124,10 @@ export type ListRunsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3065,6 +4186,10 @@ export type StartRunErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3113,6 +4238,10 @@ export type PreflightRunErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3167,6 +4296,10 @@ export type GetRunErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3228,6 +4361,10 @@ export type StopRunErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3282,6 +4419,10 @@ export type GetRunTopologyErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3330,6 +4471,10 @@ export type ListScenariosErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3387,6 +4532,10 @@ export type SaveScenariosDraftErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3441,6 +4590,10 @@ export type ExportScenariosErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3492,6 +4645,10 @@ export type PublishScenariosErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3547,6 +4704,10 @@ export type HistoryScenariosErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3597,6 +4758,10 @@ export type ListServingDeploymentsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3655,6 +4820,10 @@ export type DeployServingErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3703,6 +4872,10 @@ export type ListServingProfilesErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3760,6 +4933,10 @@ export type SaveServingProfilesDraftErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3814,6 +4991,10 @@ export type ExportServingProfilesErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -3865,6 +5046,10 @@ export type PublishServingProfilesErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3919,6 +5104,10 @@ export type HistoryServingProfilesErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -3976,6 +5165,10 @@ export type GetTopologyErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -4024,6 +5217,10 @@ export type ListWorkerGroupSpecsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -4081,6 +5278,10 @@ export type SaveWorkerGroupSpecsDraftErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -4135,6 +5336,10 @@ export type ExportWorkerGroupSpecsErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -4186,6 +5391,10 @@ export type PublishWorkerGroupSpecsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -4241,6 +5450,10 @@ export type HistoryWorkerGroupSpecsErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -4291,6 +5504,10 @@ export type ListWorkerGroupsErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -4348,6 +5565,10 @@ export type CreateWorkerGroupErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */
@@ -4409,6 +5630,10 @@ export type DeleteWorkerGroupErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -4469,6 +5694,10 @@ export type RenewWorkerGroupErrors = {
      */
     409: ErrorEnvelope;
     /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
      * Unprocessable Entity
      */
     422: ErrorEnvelope;
@@ -4527,6 +5756,10 @@ export type SetSimulationFaultErrors = {
      * Conflict
      */
     409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
     /**
      * Unprocessable Entity
      */

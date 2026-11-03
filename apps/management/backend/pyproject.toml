@@ -1,11 +1,12 @@
 [project]
 name = "platform-management"
-version = "0.1.0"
+version = "0.2.0"
 requires-python = ">=3.12"
-dependencies = ["platform-contracts", "fastapi>=0.115,<1", "uvicorn[standard]>=0.34,<1", "sqlalchemy>=2.0,<2.1", "psycopg[binary]>=3.2,<4", "alembic>=1.15,<2", "pydantic-settings>=2.8,<3", "httpx>=0.28,<1", "argon2-cffi>=23,<26"]
+dependencies = ["platform-contracts", "fastapi>=0.121,<1", "uvicorn[standard]>=0.34,<1", "sqlalchemy>=2.0,<2.1", "psycopg[binary]>=3.2,<4", "alembic>=1.15,<2", "pydantic-settings>=2.8,<3", "httpx>=0.28,<1", "argon2-cffi>=23,<26"]
 [project.scripts]
 management-worker = "platform_management.jobs.worker:main"
 management-init = "platform_management.db.seed:main"
+management-worker-health = "platform_management.jobs.health:main"
 [tool.uv.sources]
 platform-contracts = { workspace = true }
 [build-system]

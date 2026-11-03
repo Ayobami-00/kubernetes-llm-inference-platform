@@ -1,0 +1,7 @@
+apiVersion: v2
+name: klip
+description: KLIP management application and durable workers
+type: application
+version: 0.2.0
+appVersion: "0.2.0"
+kubeVersion: ">=1.31.0-0"

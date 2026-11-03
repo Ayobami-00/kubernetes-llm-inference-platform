@@ -3,7 +3,7 @@ from platform_contracts.loading import CONFIG_MODELS
 from sqlalchemy import select
 
 from platform_management.api.schemas import SpecView
-from platform_management.db.models import Resource, Revision, Spec
+from platform_management.db.models import PreparedRun, Resource, Revision, Spec
 from platform_management.services.common import AppError
 
 
@@ -93,6 +93,20 @@ def bindings(db, scenario):
 
 
 def snapshot(db, launch):
+    if launch.prepared_run_id:
+        row = db.get(PreparedRun, launch.prepared_run_id)
+        if not row:
+            raise AppError(404, "Prepared run not found")
+        from platform_contracts import RunSnapshot
+
+        prepared = RunSnapshot.model_validate(row.snapshot)
+        if prepared.scenario.ref != launch.scenario_ref:
+            raise AppError(422, "Prepared snapshot does not match the selected scenario")
+        if launch.bindings and [b.model_dump() for b in launch.bindings] != [
+            b.model_dump() for b in prepared.bindings
+        ]:
+            raise AppError(422, "Serving bindings differ from the frozen prepared snapshot")
+        return prepared
     cat = catalog(db)
     scenario = cat.get("scenario", launch.scenario_ref)
     return build_run_snapshot(

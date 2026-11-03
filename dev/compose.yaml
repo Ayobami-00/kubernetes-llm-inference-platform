@@ -4,6 +4,7 @@ x-backend: &backend
   build:
     context: ..
     dockerfile: apps/management/backend/Dockerfile
+    target: development
   environment: &environment
     MANAGEMENT_DATABASE_URL: postgresql+psycopg://management:management@db:5432/management
     MANAGEMENT_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
@@ -51,6 +52,7 @@ services:
     build:
       context: ..
       dockerfile: apps/management/web/Dockerfile
+      target: development
     environment:
       API_PROXY_TARGET: http://api:8000
     ports: ['127.0.0.1:5173:5173']

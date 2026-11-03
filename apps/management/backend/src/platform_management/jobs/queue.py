@@ -3,7 +3,16 @@ from datetime import timedelta
 from platform_contracts import OperationStatus
 from sqlalchemy import and_, or_, select, text
 
-from platform_management.db.models import Event, Job, Operation, Submission
+from platform_management.db.models import (
+    Event,
+    ImportReceipt,
+    Job,
+    Operation,
+    Resource,
+    RunRow,
+    Submission,
+)
+from platform_management.integrations.registry import bind
 from platform_management.services.common import AppError, digest, identifier, lock_key, now
 
 
@@ -18,6 +27,8 @@ def submit(db, key, action, target, payload, mutate):
             )
         operation = db.get(Operation, previous.operation_id)
         return {"operation_id": operation.id, "resource_id": operation.target_id}
+    if db.scalar(select(ImportReceipt).where(ImportReceipt.submission_key == key)):
+        raise AppError(409, "Idempotency key already belongs to an import", "idempotency_conflict")
     op_id = identifier("op")
     mutate(op_id)
     resource_type = (
@@ -27,11 +38,25 @@ def submit(db, key, action, target, payload, mutate):
         if action.endswith("run")
         else "serving_deployment"
     )
+    db.flush()
+    owner_resource = db.get(RunRow, target) if resource_type == "run" else db.get(Resource, target)
+    mode = (
+        (
+            owner_resource.context.get("mode", "simulation")
+            if resource_type == "run"
+            else owner_resource.payload.get("mode", "simulation")
+        )
+        if owner_resource
+        else "simulation"
+    )
+    if owner_resource and not owner_resource.binding_id:
+        owner_resource.binding_id = bind(db, mode)
+    binding_id = owner_resource.binding_id if owner_resource else bind(db, mode)
     stamp = now()
     op = OperationStatus(
         id=op_id,
         type=action,
-        fixture=True,
+        fixture=mode == "simulation",
         target={"resource_type": resource_type, "resource_id": target},
         status="queued",
         created_at=stamp,
@@ -39,9 +64,17 @@ def submit(db, key, action, target, payload, mutate):
     )
     db.add(Operation(id=op_id, target_id=target, payload=op.model_dump(mode="json")))
     db.flush()
-    db.add(Job(id=op_id, checkpoint={"request": payload}, due_at=stamp))
+    db.add(
+        Job(
+            id=op_id,
+            operation_id=op_id,
+            binding_id=binding_id,
+            checkpoint={"request": payload},
+            due_at=stamp,
+        )
+    )
     db.add(Submission(key=key, fingerprint=fingerprint, operation_id=op_id))
-    db.add(Event(operation_id=op_id, message="Accepted · simulation mode"))
+    db.add(Event(operation_id=op_id, message=f"Accepted · {mode} mode"))
     return {"operation_id": op_id, "resource_id": target}
 
 

@@ -106,6 +106,8 @@ for (const theme of ['dark', 'light'] as const) {
       'Runs & results',
       'Operations',
       'Simulation lab',
+      'Imports',
+      'Integrations',
     ]) {
       await page.getByRole('link', { name, exact: true }).click();
       const view = await new AxeBuilder({ page })

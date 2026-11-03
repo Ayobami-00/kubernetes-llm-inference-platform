@@ -19,12 +19,11 @@ from platform_management.db.models import (
     Resource,
     RunRow,
     SimInstance,
+    WorkerHeartbeat,
 )
 from platform_management.db.session import engine, session
-from platform_management.integrations.ansible import SimulatedHostAutomation
-from platform_management.integrations.helm import SimulatedServingAdapter
-from platform_management.integrations.kubernetes import SimulatedClusterAutomation
-from platform_management.integrations.runner import SimulatedRunner
+from platform_management.integrations import registry
+from platform_management.jobs.external_runner import acknowledge_finished, external_step
 from platform_management.jobs.queue import claim, owned
 from platform_management.jobs.reconciliation import reconcile_expiry, refresh_capacity
 from platform_management.providers.base import (
@@ -32,7 +31,6 @@ from platform_management.providers.base import (
     CapacityUnavailable,
     TransientProviderError,
 )
-from platform_management.providers.simulated import SimulatedProvider
 from platform_management.services.common import AppError, lock_key, now
 from platform_management.settings import get_settings
 
@@ -71,7 +69,7 @@ def counts(group):
     WorkerGroup.model_validate(group)
 
 
-def step_group(op, payload, checkpoint):
+def step_group(op, payload, checkpoint, config=None):
     """Return a replacement resource payload and next checkpoint; provider calls have no DB tx."""
     payload = copy.deepcopy(payload)
     group, fault = payload["group"], payload["fault"]
@@ -95,7 +93,8 @@ def step_group(op, payload, checkpoint):
         request["expiry"] = True
         phase = "drain"
     done, failed = False, checkpoint.get("creation_failed", False)
-    provider = SimulatedProvider()
+    config = config or registry.configuration()
+    provider = registry.simulated(config, "provider")
     if phase == "allocate":
         with session() as db, db.begin():
             if not db.get(ProviderIntent, op["id"]):
@@ -142,7 +141,7 @@ def step_group(op, payload, checkpoint):
             checkpoint.update(step="drain", creation_failed=True)
         else:
             for member in state["members"]:
-                SimulatedHostAutomation().prepare(
+                registry.simulated(config, "host").prepare(
                     member["provider_instance_id"], spec["host_profile"], op["id"]
                 )
                 member["phase"] = "configuring"
@@ -150,7 +149,9 @@ def step_group(op, payload, checkpoint):
     elif phase == "join":
         state["phase"] = "joining"
         for member in state["members"]:
-            name, uid = SimulatedClusterAutomation().join(member["provider_instance_id"], op["id"])
+            name, uid = registry.simulated(config, "cluster").join(
+                member["provider_instance_id"], op["id"]
+            )
             member.update(phase="joining", node_name=name, node_uid=uid)
         checkpoint["step"] = "gpu_readiness"
     elif phase == "gpu_readiness":
@@ -174,7 +175,7 @@ def step_group(op, payload, checkpoint):
         state["phase"] = "draining"
         for member in state["members"]:
             if member["node_uid"]:
-                SimulatedClusterAutomation().drain(
+                registry.simulated(config, "cluster").drain(
                     member["node_uid"], spec["drain_timeout_s"], op["id"]
                 )
         checkpoint["step"] = "terminate"
@@ -217,17 +218,20 @@ def step_group(op, payload, checkpoint):
         checkpoint["step"] = "cleanup"
     elif phase == "cleanup":
         for member in state["members"]:
-            SimulatedHostAutomation().remove(member["provider_instance_id"], op["id"])
+            registry.simulated(config, "host").remove(member["provider_instance_id"], op["id"])
         state["phase"] = "expired" if request.get("expiry") else "failed" if failed else "deleted"
         done = True
     counts(group)
     return payload, checkpoint, done, checkpoint.get("creation_failed", False), phase
 
 
-def step_run(op, data, context, checkpoint):
+def step_run(op, data, context, checkpoint, config=None, owner=None):
     data, context = copy.deepcopy(data), copy.deepcopy(context)
+    config = config or registry.configuration()
+    if config.get("runner") != "simulated:v1":
+        return external_step(op, data, context, checkpoint, config, owner)
     phase = checkpoint.get("index", 0)
-    runner = SimulatedRunner()
+    runner = registry.runner(config, data["id"], context.get("outcome", "passing"))
     if op["type"] == "stop_run" or context.get("stop_requested"):
         if data["status"] not in {"completed", "failed", "cancelled"}:
             runner.stop(context.get("handle", ""))
@@ -274,7 +278,14 @@ def step_run(op, data, context, checkpoint):
 def execute(identity, owner):
     # A dedicated autocommit connection holds the session lock, never a long transaction.
     with session() as db:
-        target = db.get(Operation, identity).target_id
+        job = db.get(Job, identity)
+        internal = job.kind != "operation"
+        config = registry.binding(db, job.binding_id) if not internal else None
+        target = db.get(Operation, identity).target_id if not internal else identity
+    if internal:
+        from platform_management.services.imports import execute_import
+
+        return execute_import(identity, owner)
     key = lock_key("execution:" + target)
     with engine().connect().execution_options(isolation_level="AUTOCOMMIT") as guard:
         if not guard.scalar(text("SELECT pg_try_advisory_lock(:k)"), {"k": key}):
@@ -314,11 +325,11 @@ def execute(identity, owner):
             action = op["type"]
             if action.endswith("worker_group"):
                 result, checkpoint, done, creation_failed, step = step_group(
-                    op, resource_data, checkpoint
+                    op, resource_data, checkpoint, config
                 )
             elif action.endswith("run"):
                 run_data, run_context, checkpoint, done, step = step_run(
-                    op, run_data, run_context, checkpoint
+                    op, run_data, run_context, checkpoint, config, owner
                 )
                 result, creation_failed = None, False
             else:
@@ -328,7 +339,7 @@ def execute(identity, owner):
                     ready = group and group.payload["group"]["status"]["phase"] == "ready"
                 if not ready:
                     raise CapacityUnavailable("Worker group is not GPU-ready")
-                adapter = SimulatedServingAdapter()
+                adapter = registry.simulated(config, "serving")
                 from platform_contracts import ServingProfile
 
                 handle = adapter.deploy(
@@ -415,6 +426,10 @@ def execute(identity, owner):
                     operation.payload = stamp_operation(
                         operation.payload, step=step, cleanup=action == "delete_worker_group"
                     )
+                if done and run_data is not None and action == "stop_run":
+                    for prior in db.scalars(select(Operation).where(Operation.target_id == target)):
+                        if prior.id != identity and prior.payload.get("cleanup_pending"):
+                            prior.payload = stamp_operation(prior.payload, cleanup=False)
                 job.checkpoint, job.state, job.owner = (
                     checkpoint,
                     "completed" if done else "pending",
@@ -424,7 +439,7 @@ def execute(identity, owner):
                 job.due_at = now() + timedelta(seconds=get_settings().simulation_step_seconds)
                 db.add(Event(operation_id=identity, message=step.replace("_", " ")))
         except Exception as exc:
-            permanent = isinstance(exc, (CapacityUnavailable, ValueError))
+            permanent = isinstance(exc, (CapacityUnavailable, ValueError, AppError))
             with session() as db, db.begin():
                 job = owned(db, identity, owner)
                 job.attempt += 1
@@ -477,6 +492,13 @@ def execute(identity, owner):
                 if terminal and resource and resource.kind == "deployment":
                     resource.payload = {**resource.payload, "status": "failed"}
                     resource.active_operation_id = None
+                if terminal and run_data:
+                    persisted_run = db.get(RunRow, target, with_for_update=True)
+                    if persisted_run.context.get("handle") and config.get("runner", "").startswith(
+                        "kubernetes"
+                    ):
+                        cleanup = True
+                        persisted_run.context = {**persisted_run.context, "cleanup_pending": True}
                 error = {
                     "code": "provider_failure"
                     if isinstance(exc, (CapacityUnavailable, TransientProviderError))
@@ -495,6 +517,7 @@ def execute(identity, owner):
                 if (
                     terminal
                     and run_data
+                    and not cleanup
                     and run_data["status"] not in {"completed", "failed", "cancelled"}
                 ):
                     row = db.get(RunRow, target)
@@ -518,6 +541,7 @@ def execute(identity, owner):
 
 def tick():
     reconcile_expiry()
+    acknowledge_finished()
     owner = uuid4().hex
     with session() as db, db.begin():
         identity = claim(db, owner, get_settings().lease_seconds)
@@ -532,12 +556,23 @@ def main():
     signal.signal(signal.SIGTERM, lambda *_: stop.set())
     signal.signal(signal.SIGINT, lambda *_: stop.set())
     last_refresh = 0
+    last_heartbeat = 0
+    import os
+
+    worker_id = os.environ.get("HOSTNAME", "local-worker")
     import time
 
     while not stop.is_set():
         try:
+            if time.monotonic() - last_heartbeat > 10:
+                with session() as db, db.begin():
+                    db.merge(WorkerHeartbeat(id=worker_id, observed_at=now()))
+                last_heartbeat = time.monotonic()
             if time.monotonic() - last_refresh > 30:
                 refresh_capacity()
+                from platform_management.integrations.observations import refresh_cluster
+
+                refresh_cluster()
                 last_refresh = time.monotonic()
             identity = tick()
             if not identity:

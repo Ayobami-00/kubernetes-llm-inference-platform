@@ -1,0 +1,82 @@
+{{- if not .Values.persistence.existingClaim }}
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: {{ .Release.Name }}-data
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  accessModes: [ReadWriteOnce]
+  storageClassName: {{ required "B must provide persistence.storageClass or persistence.existingClaim" .Values.persistence.storageClass | quote }}
+  resources:
+    requests: {storage: {{ .Values.persistence.size }}}
+---
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ .Release.Name }}-init}
+data:
+  01-klip.sh: |
+    #!/bin/sh
+    set -eu
+    psql -v ON_ERROR_STOP=1 --username postgres --dbname postgres --set=app_password="$PGAPP_PASSWORD" <<'SQL'
+    SELECT format('CREATE ROLE klip LOGIN PASSWORD %L', :'app_password') \gexec
+    CREATE DATABASE klip OWNER klip;
+    SQL
+---
+apiVersion: v1
+kind: Service
+metadata: {name: {{ .Release.Name }}}
+spec:
+  selector: {app.kubernetes.io/name: {{ .Release.Name }}}
+  ports: [{port: 5432, targetPort: postgres}]
+---
+apiVersion: apps/v1
+kind: StatefulSet
+metadata: {name: {{ .Release.Name }}}
+spec:
+  serviceName: {{ .Release.Name }}
+  replicas: 1
+  selector: {matchLabels: {app.kubernetes.io/name: {{ .Release.Name }}}}
+  template:
+    metadata: {labels: {app.kubernetes.io/name: {{ .Release.Name }}}}
+    spec:
+      automountServiceAccountToken: false
+      securityContext: {runAsNonRoot: true, runAsUser: 999, runAsGroup: 999, fsGroup: 999}
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
+      containers:
+        - name: postgres
+          image: {{ .Values.image | quote }}
+          ports: [{name: postgres, containerPort: 5432}]
+          env:
+            - {name: POSTGRES_USER, value: postgres}
+            - {name: POSTGRES_DB, value: postgres}
+            - {name: PGDATA, value: /var/lib/postgresql/data/pgdata}
+            - name: POSTGRES_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ required "auth.existingSecret is required" .Values.auth.existingSecret }}, key: postgres-password}
+            - name: PGAPP_PASSWORD
+              valueFrom:
+                secretKeyRef: {name: {{ .Values.auth.existingSecret }}, key: app-password}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          volumeMounts:
+            - {name: data, mountPath: /var/lib/postgresql/data}
+            - {name: init, mountPath: /docker-entrypoint-initdb.d, readOnly: true}
+            - {name: run, mountPath: /var/run/postgresql}
+            - {name: tmp, mountPath: /tmp}
+          readinessProbe:
+            exec: {command: [pg_isready, -h, 127.0.0.1, -U, postgres, -d, postgres]}
+            periodSeconds: 3
+          livenessProbe:
+            exec: {command: [pg_isready, -h, 127.0.0.1, -U, postgres, -d, postgres]}
+            initialDelaySeconds: 30
+            periodSeconds: 10
+      volumes:
+        - name: data
+          persistentVolumeClaim:
+            claimName: {{ default (printf "%s-data" .Release.Name) .Values.persistence.existingClaim }}
+        - name: init
+          configMap: {name: {{ .Release.Name }}-init}
+        - {name: run, emptyDir: {}}
+        - {name: tmp, emptyDir: {}}

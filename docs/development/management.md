@@ -1,13 +1,13 @@
 # Management application
 
-Stratum is the local Stream C management application. Its graph connects dataset manifests,
+KLIP is the local Stream C management application. Its graph connects dataset manifests,
 customer workloads, serving assignments, worker specifications, simulated allocations and runs.
 Select a resource to inspect or edit it in the right-hand panel. Lists provide another way to browse.
 
 ## Start from a clean checkout
 
 Requirements: Docker Desktop (or Docker Engine with Compose v2), sufficient Docker build memory,
-and the repository checked out on the management branch. Host Python and Node are unnecessary
+and a checkout containing the management application. Host Python and Node are unnecessary
 for the Docker workflow.
 
 From the repository root:
@@ -139,19 +139,21 @@ browser workflows against the complete Docker stack.
 
 ## Downstream interfaces
 
-A supplies real runner launch/stop/observe integration, prepared artifacts, measurements and validated
+A supplies prepared execution bundles, an execute-only runner image, measurements and validated
 RunResult records. C consumes RunSnapshot and RunResult and performs completeness/readiness checks.
 A lost real execution attempt must be observed or failed, never silently restarted with a new clock.
+See the [integration protocol](management-integrations.md) and
+[deployment guide](management-deployment.md) for imports, artifacts, readiness and Kubernetes execution.
 
 B supplies InfrastructureInventory and reusable preparation, join and removal automation. C's
 adapter interfaces use credential references rather than embedding secrets. B owns static releases;
-C owns future dynamic model-pool releases and its eventual management Helm chart. There is one owner
+C owns future dynamic model-pool releases and the management Helm chart. There is one owner
 per release. AWS lifecycle, DNS and firewall foundation changes remain B's responsibility.
 
 The TypeScript generator consumes the committed JSON OpenAPI document. A patched js-yaml override
 keeps its optional YAML parser dependency current; the generated client is checked after regeneration.
 
-## Verification record
+## Previous local milestone verification
 
 Verified locally on 3 November 2026:
 
@@ -169,7 +171,8 @@ Verified locally on 3 November 2026:
 Automated Lambda checks use HTTP mocks for read-only requests, safe payload persistence, refresh
 errors and stale observations. UI tests use an isolated account integration with an empty credential,
 preserving the connected workspace and its live observations. Real runner,
-bootstrap, Kubernetes and dynamic Helm integration remain the downstream dependencies described above.
+bootstrap and dynamic serving integration remain downstream dependencies. The new CPU Job transport
+and chart proof are described in the deployment guide; their tests do not measure inference performance.
 
 ## Appearance and readable specifications
 
@@ -219,3 +222,25 @@ readiness.
 
 Capacity browser tests supply explicitly named fixture observations for both appearances and mobile
 layouts. Authentication and the rest of the workflow use the isolated real API and database.
+
+## Integration and deployment milestone verification
+
+Verified locally on 3 November 2026 against the Stream C worktree:
+
+- 192 Python tests passed, including shared contracts, legacy migration backfill, atomic acceptance,
+  concurrent import replay, immutable history/bindings, artifacts and Kubernetes runner transport.
+- Seventeen frontend unit tests passed; TypeScript and production web/backend Docker builds passed.
+- Thirteen browser tests passed against the real API/PostgreSQL in an isolated CPU-only kind cluster.
+  An additional two checks covered Imports and Integrations accessibility in both appearances.
+- Both Helm charts installed successfully with two API replicas and two workers. A fixture Job
+  retained its UID and exactly one invocation across worker replacement. The real preflight stayed
+  blocked. A subsequent chart upgrade preserved historical snapshots.
+- A logical backup restored configuration, revisions, runs, imports, inventory, prepared bundles and
+  execution bindings into a separate database. Replacing the PostgreSQL Pod preserved results on its PVC.
+- Ruff lint/format, all twelve shared schemas, generated management OpenAPI/client, Helm lint and
+  digest-pinned local chart packaging passed. No shared-contract source, schema or fixture was changed.
+
+The proof uses synthetic data and a single-node test artifact mount. It does not verify real GPU
+lifecycle, inference performance, production multi-node RWX storage, or A's eventual runner image.
+GHCR/OCI publication is prepared but has not been executed; it requires an explicit release tag.
+The isolated test cluster and its credentials are removed after verification.

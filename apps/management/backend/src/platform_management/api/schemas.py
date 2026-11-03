@@ -89,6 +89,7 @@ class DeploymentView(ContractModel):
 
 class RunLaunch(ContractModel):
     scenario_ref: RevisionRef
+    prepared_run_id: Slug | None = None
     mode: Literal["simulation", "real"] = "simulation"
     outcome: Outcome = "passing"
     group_ids: dict[str, str] = Field(default_factory=dict)
@@ -99,6 +100,16 @@ class RunView(ContractModel):
     run: Run
     mode: Literal["simulation", "real"]
     group_ids: dict[str, str] = Field(default_factory=dict)
+    source: str = "management"
+    provenance: Literal["synthetic", "measured", "unverified"] = "synthetic"
+
+
+class ReadinessCheck(ContractModel):
+    code: str
+    label: str
+    status: Literal["ready", "blocked", "unconfigured", "stale"]
+    resource_ref: str | None = None
+    detail: str
 
 
 class Preflight(ContractModel):
@@ -106,6 +117,7 @@ class Preflight(ContractModel):
     contract_blockers: list[str]
     runtime_blockers: list[str]
     simulation_available: bool = True
+    checks: list[ReadinessCheck] = Field(default_factory=list)
 
 
 class EventView(ContractModel):
@@ -135,7 +147,7 @@ class GraphNode(ContractModel):
     label: str
     subtitle: str
     status: str
-    provenance: Literal["configuration", "simulation", "live", "historical"]
+    provenance: Literal["configuration", "simulation", "live", "historical", "imported"]
     resource_id: str
     document: dict[str, Any]
 

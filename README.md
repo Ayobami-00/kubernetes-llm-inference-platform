@@ -108,7 +108,7 @@ management development guide below for regeneration and drift checks.
 
 ## Management application
 
-Stream C adds Stratum, a graph-based local management workspace with authenticated configuration
+Stream C adds KLIP, a graph-based local management workspace with authenticated configuration
 authoring, immutable revisions, durable operations, live Lambda inventory and labelled simulation.
 
 ```bash
@@ -122,3 +122,9 @@ examples. Open [localhost:5173](http://localhost:5173). See the
 
 Lambda observations are read-only. Allocation, cluster and runner workflows use persisted simulation
 adapters until downstream integrations are supplied. Synthetic results are not measured performance.
+
+Management integration handoffs, Kubernetes Jobs and immutable imports are described in the
+[integration guide](docs/development/management-integrations.md). Production images, C-owned charts,
+the isolated kind proof and explicit release workflow are in the
+[deployment guide](docs/development/management-deployment.md). Real cloud mutations and benchmark
+execution remain blocked until their downstream readiness requirements are satisfied.
