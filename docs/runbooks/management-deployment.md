@@ -156,6 +156,11 @@ unsuccessful test. Both commands need the workspace dependencies and the pinned
 Playwright browser installed; they read the existing password file in memory and
 log out their own session. Never run the mutating regression suite against the
 live namespace as a substitute for this scoped test.
+Repeating a completed fault operation returns its original evidence without
+reading credentials or injecting another failure. Its probe record is created
+atomically and cannot overwrite another observation. An interrupted/incomplete
+proof requires inspection; post-recovery probes cannot impersonate observation
+of the original intervention.
 
 ## Image review
 
@@ -217,6 +222,14 @@ The public browser test passed at 19:32:17 UTC, exposing the topology/inspector 
 all 21 retained runs with Secure/HttpOnly cookies and zero browser errors.
 All historical displayed results remain explicitly synthetic. No GPU or live
 inference result is established by these checks.
+
+API fault `3b562aa6e841` ran at 19:37:19 UTC. All 20 authenticated probes returned
+HTTP 200; two spread Ready API replicas were observed again about 10.8 seconds
+after the intervention. The selected Pod UID disappeared and a new Pod UID joined
+the unchanged Deployment. A later browser read at 19:39:58 UTC still returned all
+21 historical runs. Repeating the operation reused the original proof with an
+unchanged checksum. This sampling result does not exclude sub-second outages or
+establish worker/database/host-loss behavior.
 
 `management-evidence` copies an explicit allowlist of plans, rendered values,
 reference-only credential metadata, image scan receipts, public CA and verification

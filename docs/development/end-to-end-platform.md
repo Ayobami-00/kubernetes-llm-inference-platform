@@ -324,3 +324,21 @@ restart. Authenticated HTTPS still returned all 21 retained runs. This proves th
 tested issuance/mount/cache path, not a full calendar renewal interval or ACM
 renewal. Local checks now pass 576 root tests (17 optional skips), with current
 schemas and clean Ruff/formatting. Failure recovery and GPU gates remain pending.
+
+The public frontend release is deployed and DNS active at
+`https://management.klip-lab.click`. Its three exact targets are healthy, the
+two-rule WAF is attached, and the actual public browser authenticated, displayed
+the topology/inspector and all 21 historical runs with zero browser errors and
+Secure/HttpOnly cookies. Deployment evidence `965990a269cb` confirms the new
+release's database TLS, spreading and shared artifacts. Matching source `e347fc0`
+passed image publication, contracts, infrastructure, management browser/API checks
+and all seven actual-runner scenario paths in Kind.
+
+Single API Pod fault `3b562aa6e841` passed: 20/20 authenticated probes were HTTP 200,
+the exact old Pod UID was replaced, and two spread Ready replicas returned about
+10.8 seconds after intervention. A subsequent UI read preserved all 21 histories.
+Terminal operation reuse preserved the original proof checksum. The test uses
+one-second samples and graceful Pod deletion; it does not establish worker
+ownership during a run, PostgreSQL failover, CPU loss or GPU resilience. Offline
+checks pass 592 tests (17 optional skips). The authorized alert receiver reference
+is retained privately; notification delivery remains unverified. No GPU is rented.

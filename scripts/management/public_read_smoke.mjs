@@ -1,10 +1,18 @@
 // A bounded live UI read test. No trace, video, HAR, storage-state export or secret output.
-import { readFile, mkdir, writeFile } from "node:fs/promises";
+import {
+  readFile,
+  mkdir,
+  writeFile,
+  open,
+  link,
+  unlink,
+} from "node:fs/promises";
 import { createRequire } from "node:module";
 import { fileURLToPath } from "node:url";
 import { resolve } from "node:path";
 import { spawn } from "node:child_process";
 import { performance } from "node:perf_hooks";
+import { randomUUID } from "node:crypto";
 
 const root = fileURLToPath(new URL("../../", import.meta.url));
 const require = createRequire(
@@ -28,6 +36,35 @@ if (
 }
 const output = resolve(root, "artifacts/platform/public-management-ui");
 await mkdir(output, { recursive: true, mode: 0o700 });
+if (args.length) {
+  try {
+    const path = resolve(output, "api-failure-" + args[1] + ".json");
+    const previous = JSON.parse(await readFile(path, "utf8"));
+    const intervention = Date.parse(previous.restart?.intervention_at);
+    const covered =
+      previous.probes?.length &&
+      intervention >= Date.parse(previous.probes[0].sent_at) &&
+      intervention <= Date.parse(previous.probes.at(-1).sent_at);
+    if (
+      !previous.process_completed ||
+      !Number.isFinite(previous.recovery_upper_bound_seconds) ||
+      previous.recovery_upper_bound_seconds < 0 ||
+      previous.recovery_upper_bound_seconds > 60 ||
+      !covered
+    ) {
+      throw new Error("Existing incomplete fault proof requires inspection.");
+    }
+    console.log(
+      JSON.stringify({ operation: args[1], reused: true, proof: path }),
+    );
+    process.exit(0);
+  } catch (error) {
+    if (error.code !== "ENOENT")
+      throw new Error(
+        "Existing API fault evidence requires inspection; it will not be overwritten.",
+      );
+  }
+}
 let browser;
 let context;
 let session;
@@ -101,12 +138,35 @@ async function restartProof() {
       process_completed: ended && code === 0,
     };
     if (ended && code === 0) result.restart = JSON.parse(stdout);
-    await writeFile(
-      resolve(output, "api-failure-" + operation + ".json"),
-      JSON.stringify(result, null, 2) + "\n",
-      { mode: 0o600 },
+    result.intervention_observed = Boolean(
+      result.restart &&
+      probes.length &&
+      Date.parse(result.restart.intervention_at) >=
+        Date.parse(probes[0].sent_at) &&
+      Date.parse(result.restart.intervention_at) <=
+        Date.parse(probes.at(-1).sent_at),
     );
-    if (!ended || code !== 0 || recovery === undefined || recovery > 60)
+    const destination = resolve(output, "api-failure-" + operation + ".json");
+    const temporary = destination + "." + randomUUID() + ".tmp";
+    const file = await open(temporary, "wx", 0o600);
+    try {
+      try {
+        await file.writeFile(JSON.stringify(result, null, 2) + "\n");
+        await file.sync();
+      } finally {
+        await file.close();
+      }
+      await link(temporary, destination); // Atomic creation; never replace another observation.
+    } finally {
+      await unlink(temporary);
+    }
+    if (
+      !ended ||
+      code !== 0 ||
+      !result.intervention_observed ||
+      recovery === undefined ||
+      recovery > 60
+    )
       throw new Error("API recovery");
     return result;
   } finally {
@@ -178,6 +238,12 @@ try {
   if (args.length) {
     stage = "one API Pod restart under authenticated traffic";
     failure = await restartProof();
+    const retained = await context.request.get(origin + "/api/v1/runs");
+    if (retained.status() !== 200) throw new Error("history after recovery");
+    const identities = new Set((await retained.json()).map((r) => r.id));
+    if (runs.some((r) => !identities.has(r.id)))
+      throw new Error("history preservation");
+    failure.historical_runs_preserved = true;
   }
   const result = {
     verified_at: new Date().toISOString(),
