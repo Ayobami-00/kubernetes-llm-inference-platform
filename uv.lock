@@ -1611,7 +1611,7 @@ requires-dist = [
 
 [[package]]
 name = "platform-management"
-version = "0.1.0"
+version = "0.2.0"
 source = { editable = "apps/management/backend" }
 dependencies = [
     { name = "alembic" },
@@ -1629,7 +1629,7 @@ dependencies = [
 requires-dist = [
     { name = "alembic", specifier = ">=1.15,<2" },
     { name = "argon2-cffi", specifier = ">=23,<26" },
-    { name = "fastapi", specifier = ">=0.115,<1" },
+    { name = "fastapi", specifier = ">=0.121,<1" },
     { name = "httpx", specifier = ">=0.28,<1" },
     { name = "platform-contracts", editable = "packages/platform-contracts" },
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },

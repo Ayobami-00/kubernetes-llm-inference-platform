@@ -14,6 +14,22 @@ class Settings(BaseSettings):
     simulation_step_seconds: float = 2.0
     repository_root: Path = Path(__file__).resolve().parents[5]
     artifacts_root: Path = Path("artifacts/management")
+    simulation_runner: str = "simulated:v1"
+    real_runner: str = "unconfigured:v1"
+    runner_image: str = ""
+    runner_command: list[str] = []
+    serving_namespace: str = "llm-d"
+    runner_namespace: str = "klip"
+    runner_secret_refs: list[str] = []
+    runner_service_account: str = "klip-runner"
+    artifact_claim: str = ""
+    kube_api_url: str = ""
+    kube_token_file: Path = Path("/var/run/secrets/kubernetes.io/serviceaccount/token")
+    kube_ca_file: Path = Path("/var/run/secrets/kubernetes.io/serviceaccount/ca.crt")
+    kube_allow_insecure_local: bool = False
+    cluster_observation_max_age_seconds: int = 300
+    import_max_bytes: int = 5 * 1024 * 1024
+    runner_startup_allowance_seconds: int = 300
     lease_seconds: int = 60
     heartbeat_seconds: int = 10
 

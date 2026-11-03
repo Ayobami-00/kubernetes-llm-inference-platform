@@ -17,7 +17,8 @@ def get_db():
         yield db
 
 
-Db = Annotated[Session, Depends(get_db)]
+# Commit before sending the response; another API replica may poll it immediately.
+Db = Annotated[Session, Depends(get_db, scope="function")]
 
 
 cookie_auth = APIKeyCookie(name="management_session", auto_error=False)

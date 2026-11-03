@@ -1,0 +1,52 @@
+backend:
+  image: ""
+web:
+  image: ""
+  serviceType: ClusterIP
+  nodePort: null
+replicas:
+  api: 2
+  worker: 2
+  web: 1
+auth:
+  existingSecret: ""
+  adminPasswordKey: admin-password
+  lambdaApiKeyKey: lambda-api-key
+database:
+  existingSecret: ""
+  urlKey: database-url
+publicOrigin: ""
+localDevelopment: false
+artifacts:
+  existingClaim: ""
+  storageClass: ""
+  size: 50Gi
+runner:
+  simulationAdapter: simulated:v1
+  realAdapter: unconfigured:v1
+  image: ""
+  command: []
+  secretRefs: []
+  servingNamespace: llm-d
+imagePullSecrets: []
+nodeSelector:
+  node-role.kubernetes.io/control-plane: ""
+tolerations:
+  - key: node-role.kubernetes.io/control-plane
+    operator: Exists
+    effect: NoSchedule
+ingress:
+  enabled: false
+  className: ""
+  host: ""
+  tlsSecret: ""
+resources:
+  api:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  worker:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: "1", memory: 1Gi}
+  web:
+    requests: {cpu: 25m, memory: 32Mi}
+    limits: {cpu: 250m, memory: 128Mi}

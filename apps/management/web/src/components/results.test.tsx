@@ -45,3 +45,29 @@ describe('historical result presentation', () => {
   it('uses explicit text for status rather than colour alone', () =>
     expect(renderToStaticMarkup(<Badge value="cleanup_pending" />)).toContain('cleanup pending'));
 });
+
+it('keeps external provenance and unknown usage explicit', () => {
+  const run = {
+    ...base,
+    fixture: false,
+    result: {
+      ...base.result!,
+      measurements: [
+        {
+          customer_ref: 'writer-assist@1',
+          input_tokens: null,
+          cached_input_tokens: null,
+          output_tokens: null,
+          latencies: {},
+        },
+      ],
+    },
+  } as unknown as Run;
+  const html = renderToStaticMarkup(
+    <RunDetails run={run} source="external-A" provenance="unverified" />,
+  );
+  expect(html).toContain('Unverified external report');
+  expect(html).toContain('Not reported');
+  expect(html).toContain('external-A');
+  expect(html).not.toContain('Synthetic fixture data');
+});

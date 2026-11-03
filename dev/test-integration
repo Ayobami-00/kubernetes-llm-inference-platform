@@ -1,0 +1,67 @@
+#!/usr/bin/env bash
+# Isolated CPU-only Kubernetes application proof; never uses the operator's kubeconfig.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+umask 077
+qa_directory=$(mktemp -d "${TMPDIR:-/tmp}/klip-integration.XXXXXX")
+qa_cluster="klip-it-$(date +%s)"
+qa_namespace=klip
+qa_keep="${KLIP_KEEP_INTEGRATION:-0}"
+export KUBECONFIG="$qa_directory/kubeconfig"
+cleanup() {
+  if [[ "$qa_keep" == 1 ]]; then
+    echo "Retained local test cluster: $qa_cluster; private state: $qa_directory"
+    return
+  fi
+  docker exec "$qa_cluster-control-plane" chmod -R a+rwx /var/klip-db /var/klip-artifacts 2>/dev/null || true
+  kind delete cluster --name "$qa_cluster" || true
+  rm -rf "$qa_directory"
+}
+trap cleanup EXIT
+mkdir -p "$qa_directory/data/db" "$qa_directory/data/artifacts"
+# These mounts hold disposable synthetic test data only.
+chmod 777 "$qa_directory/data/db" "$qa_directory/data/artifacts"
+qa_port=$(python3 -c 'import socket; s=socket.socket(); s.bind(("127.0.0.1",0)); print(s.getsockname()[1]); s.close()')
+export MANAGEMENT_WEB_URL="http://localhost:$qa_port"
+export MANAGEMENT_E2E_PASSWORD_FILE="$qa_directory/admin_password"
+export MANAGEMENT_E2E_KUBECONFIG="$KUBECONFIG"
+export MANAGEMENT_E2E_NAMESPACE="$qa_namespace"
+cat > "$qa_directory/kind.yaml" <<YAML
+kind: Cluster
+apiVersion: kind.x-k8s.io/v1alpha4
+nodes:
+  - role: control-plane
+    extraPortMappings:
+      - containerPort: 31080
+        hostPort: $qa_port
+        listenAddress: "127.0.0.1"
+    extraMounts:
+      - hostPath: $qa_directory/data/db
+        containerPath: /var/klip-db
+      - hostPath: $qa_directory/data/artifacts
+        containerPath: /var/klip-artifacts
+YAML
+docker build --target production -f apps/management/backend/Dockerfile -t klip-integration-backend:local .
+docker build --target production -f apps/management/web/Dockerfile -t klip-integration-web:local .
+kind create cluster --name "$qa_cluster" --kubeconfig "$KUBECONFIG" --config "$qa_directory/kind.yaml"   --image kindest/node:v1.34.0@sha256:7416a61b42b1662ca6ca89f02028ac133a309a2a30ba309614e8ec94d976dc5a --wait 180s
+docker image inspect postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5 >/dev/null 2>&1 || docker pull postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+docker tag postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5 klip-integration-postgres:local
+kind load docker-image --name "$qa_cluster" klip-integration-backend:local klip-integration-web:local klip-integration-postgres:local
+kubectl create namespace "$qa_namespace"
+kubectl create namespace llm-d
+python3 scripts/management/integration_smoke.py setup "$qa_directory"
+kubectl apply -f "$qa_directory/resources.json"
+helm upgrade --install klip-db charts/klip-postgresql -n "$qa_namespace"   --set image=klip-integration-postgres:local --set auth.existingSecret=klip-test-auth --set persistence.existingClaim=klip-test-db --wait --timeout 180s
+helm upgrade --install klip charts/klip -n "$qa_namespace" -f "$qa_directory/values.json" --wait --timeout 240s
+python3 scripts/management/integration_smoke.py exercise "$qa_directory"
+npm --prefix apps/management/web run test:e2e
+# Reinstall/upgrade executes migration and seeding without rewriting historical records.
+helm upgrade klip charts/klip -n "$qa_namespace" -f "$qa_directory/values.json" --wait --timeout 180s
+kubectl -n "$qa_namespace" exec klip-db-0 -- sh -c   'PGPASSWORD="$POSTGRES_PASSWORD" pg_dump -h 127.0.0.1 -U postgres -Fc klip' > "$qa_directory/backup.dump"
+kubectl -n "$qa_namespace" exec klip-db-0 -- sh -c   'PGPASSWORD="$POSTGRES_PASSWORD" createdb -h 127.0.0.1 -U postgres klip_restore_test'
+kubectl -n "$qa_namespace" exec -i klip-db-0 -- sh -c   'PGPASSWORD="$POSTGRES_PASSWORD" pg_restore -h 127.0.0.1 -U postgres -d klip_restore_test' < "$qa_directory/backup.dump"
+python3 scripts/management/integration_smoke.py verify-restore "$qa_directory"
+kubectl -n "$qa_namespace" delete pod klip-db-0 --wait=true
+kubectl -n "$qa_namespace" rollout status statefulset/klip-db --timeout=180s
+python3 scripts/management/integration_smoke.py verify "$qa_directory"
+echo "Integration proof passed: imports, fixture Jobs, recovery, browser workflows, upgrade, restore and PVC persistence."

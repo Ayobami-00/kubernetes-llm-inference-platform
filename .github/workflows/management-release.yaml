@@ -1,0 +1,80 @@
+name: Release management
+on:
+  push:
+    tags: ['management-v*']
+permissions:
+  contents: read
+concurrency:
+  group: management-release-${{ github.ref }}
+  cancel-in-progress: false
+jobs:
+  verify:
+    uses: ./.github/workflows/management.yaml
+  publish:
+    needs: verify
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      packages: write
+    steps:
+      - uses: actions/checkout@v4
+        with: {fetch-depth: 0}
+      - uses: astral-sh/setup-uv@v6
+        with: {python-version: '3.12', enable-cache: true}
+      - uses: azure/setup-helm@v4.3.0
+        with: {version: 'v3.17.1'}
+      - name: Validate tag and main ancestry
+        env:
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          git merge-base --is-ancestor "$GITHUB_SHA" origin/main
+          uv sync --locked --all-packages
+          version=$(uv run --locked --package platform-management python scripts/management/release.py --tag "$RELEASE_TAG")
+          printf 'RELEASE_VERSION=%s\n' "$version" >> "$GITHUB_ENV"
+          printf 'REGISTRY_REPOSITORY=%s\n' "${GITHUB_REPOSITORY,,}" >> "$GITHUB_ENV"
+      - uses: docker/setup-qemu-action@v3
+      - uses: docker/setup-buildx-action@v3
+      - uses: docker/login-action@v3
+        with:
+          registry: ghcr.io
+          username: ${{ github.actor }}
+          password: ${{ secrets.GITHUB_TOKEN }}
+      - uses: docker/build-push-action@v6
+        id: backend
+        with:
+          context: .
+          file: apps/management/backend/Dockerfile
+          target: production
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ env.REGISTRY_REPOSITORY }}/management-backend:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - uses: docker/build-push-action@v6
+        id: web
+        with:
+          context: .
+          file: apps/management/web/Dockerfile
+          target: production
+          platforms: linux/amd64,linux/arm64
+          push: true
+          tags: ghcr.io/${{ env.REGISTRY_REPOSITORY }}/management-web:${{ env.RELEASE_VERSION }}
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Publish digest-pinned OCI charts
+        env:
+          REGISTRY_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          BACKEND_DIGEST: ${{ steps.backend.outputs.digest }}
+          WEB_DIGEST: ${{ steps.web.outputs.digest }}
+          RELEASE_TAG: ${{ github.ref_name }}
+        run: |
+          uv run --locked --package platform-management python scripts/management/release.py             --tag "$RELEASE_TAG" --repository "$REGISTRY_REPOSITORY"             --backend-digest "$BACKEND_DIGEST" --web-digest "$WEB_DIGEST" --commit "$GITHUB_SHA"
+          printf '%s' "$REGISTRY_TOKEN" | helm registry login ghcr.io --username "$GITHUB_ACTOR" --password-stdin
+          helm push "artifacts/releases/klip-$RELEASE_VERSION.tgz" "oci://ghcr.io/$REGISTRY_REPOSITORY/charts"
+          helm push "artifacts/releases/klip-postgresql-$RELEASE_VERSION.tgz" "oci://ghcr.io/$REGISTRY_REPOSITORY/charts"
+      - uses: actions/upload-artifact@v4
+        with:
+          name: management-release-${{ env.RELEASE_VERSION }}
+          path: artifacts/releases

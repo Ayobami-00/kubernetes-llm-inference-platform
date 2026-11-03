@@ -51,14 +51,31 @@ export type Act = (action: () => Promise<unknown>, success?: string) => Promise<
 export function Badge({ value }: { value: string }) {
   return <span className={`badge ${value}`}>{value.replaceAll('_', ' ')}</span>;
 }
-export function RunDetails({ run }: { run: Run }) {
+export const formatToken = (value: number | null | undefined) =>
+  typeof value === 'number' ? value.toLocaleString() : 'Not reported';
+export function RunDetails({
+  run,
+  source = 'management',
+  provenance = run.fixture ? 'synthetic' : 'unverified',
+}: {
+  run: Run;
+  source?: string;
+  provenance?: string;
+}) {
   const result = run.result;
   return (
     <>
-      <div className="notice synthetic">
+      <div className={'notice ' + (run.fixture || provenance === 'synthetic' ? 'synthetic' : '')}>
         <FlaskIcon />
-        Synthetic fixture data. These values are illustrative, not measured performance.
+        {run.fixture || provenance === 'synthetic'
+          ? 'Synthetic fixture data. These values are illustrative, not measured performance.'
+          : provenance === 'measured'
+            ? 'Imported measurement report. SLO assessments are supplied by the source and validated against the frozen snapshot.'
+            : 'Unverified external report. Source provenance does not establish measured performance.'}
       </div>
+      <p className="section-note">
+        Source: {source} · {provenance}
+      </p>
       <div className="result-statuses">
         <div>
           <small>Execution</small>
@@ -74,7 +91,15 @@ export function RunDetails({ run }: { run: Run }) {
         </div>
         <div>
           <small>Quality</small>
-          <Badge value="not_evaluated" />
+          <Badge
+            value={
+              result?.quality?.length && result.quality.every((q) => q.status === 'measured')
+                ? 'measured'
+                : result?.quality?.some((q) => q.status === 'measured')
+                  ? 'partial'
+                  : 'not_evaluated'
+            }
+          />
         </div>
       </div>
       {run.stage && (
@@ -101,13 +126,13 @@ export function RunDetails({ run }: { run: Run }) {
               <strong>{m.customer_ref}</strong>
               <div className="inline-metrics">
                 <span>
-                  Input <b>{m.input_tokens?.toLocaleString() ?? 'Unknown'}</b>
+                  Input <b>{formatToken(m.input_tokens)}</b>
                 </span>
                 <span>
-                  Cached <b>{m.cached_input_tokens?.toLocaleString() ?? 'Unknown'}</b>
+                  Cached <b>{formatToken(m.cached_input_tokens)}</b>
                 </span>
                 <span>
-                  Output <b>{m.output_tokens?.toLocaleString() ?? 'Unknown'}</b>
+                  Output <b>{formatToken(m.output_tokens)}</b>
                 </span>
               </div>
               {Object.entries(m.latencies || {}).map(([metric, value]) => (
@@ -144,6 +169,28 @@ export function RunDetails({ run }: { run: Run }) {
               ))}
             </section>
           ))}
+          {!!result.quality?.length && (
+            <>
+              <h4>Supplied quality evaluation</h4>
+              {result.quality.map((quality) => (
+                <section className="detail-card" key={quality.customer_ref}>
+                  <div className="split">
+                    <strong>{quality.customer_ref}</strong>
+                    <Badge value={quality.status} />
+                  </div>
+                  <p>
+                    {quality.evaluator} · {quality.notes}
+                  </p>
+                  {Object.entries(quality.scores || {}).map(([name, value]) => (
+                    <div className="key-value" key={name}>
+                      <span>{name}</span>
+                      <b>{value}</b>
+                    </div>
+                  ))}
+                </section>
+              ))}
+            </>
+          )}
           {result.invalid_reasons?.map((reason) => (
             <div className="notice error" key={reason}>
               {reason}
@@ -439,7 +486,11 @@ export default function Inspector({
             </div>
             {node.kind === 'run' ? (
               <>
-                <RunDetails run={node.document as unknown as Run} />
+                <RunDetails
+                  run={node.document as unknown as Run}
+                  source={(node.document._management as { source?: string })?.source}
+                  provenance={(node.document._management as { provenance?: string })?.provenance}
+                />
                 <button className="secondary full" onClick={() => onSnapshot(node.resource_id)}>
                   Explore frozen snapshot <ExternalLink size={14} />
                 </button>
@@ -691,6 +742,14 @@ export default function Inspector({
                       executable datasets.
                     </div>
                     <ConfigurationDetails kind={node.kind} document={data} />
+                  </>
+                )}
+                {['cluster', 'infrastructure-node'].includes(node.kind) && (
+                  <>
+                    <a className="text-button" href="/integrations">
+                      Inspect integration readiness →
+                    </a>
+                    <ConfigurationDetails kind={node.kind} document={node.document} />
                   </>
                 )}
                 {node.kind === 'instance' && (
@@ -1013,6 +1072,11 @@ export function RunLauncher({
   busy: boolean;
 }) {
   const [outcome, setOutcome] = useState('passing');
+  const [preparedId, setPreparedId] = useState('');
+  const prepared = useQuery({
+    queryKey: ['prepared-runs'],
+    queryFn: () => unwrap(e.listPreparedRuns()),
+  });
   const [report, setReport] = useState<Doc | null>(null);
   const assignments = useQuery({
     queryKey: ['assignments'],
@@ -1054,6 +1118,7 @@ export function RunLauncher({
     );
   const body = {
     scenario_ref: `${scenario.id}@${scenario.revision}`,
+    prepared_run_id: preparedId || null,
     mode: 'simulation' as const,
     outcome: outcome as 'passing',
     group_ids: selectedGroups,
@@ -1065,12 +1130,38 @@ export function RunLauncher({
         Simulation uses compressed timing and labelled fixture results. Real execution remains
         subject to preflight.
       </div>
+      <label>
+        Prepared run bundle
+        <select
+          value={preparedId}
+          onChange={(event) => {
+            setPreparedId(event.target.value);
+            setReport(null);
+          }}
+        >
+          <option value="">Current catalogue · simulation</option>
+          {prepared.data
+            ?.filter(
+              (p) =>
+                p.snapshot.scenario.id === scenario.id &&
+                p.snapshot.scenario.revision === scenario.revision,
+            )
+            .map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.id} · {p.fixture ? 'synthetic' : 'external prepared inputs'}
+              </option>
+            ))}
+        </select>
+      </label>
       {refs.map((ref) => (
         <label key={ref}>
           Runtime group for {ref}
           <select
             value={selectedGroups[ref] || ''}
-            onChange={(v) => setChosen({ ...chosen, [ref]: v.target.value })}
+            onChange={(v) => {
+              setChosen({ ...chosen, [ref]: v.target.value });
+              setReport(null);
+            }}
           >
             <option value="">Select a ready group</option>
             {groups
@@ -1119,6 +1210,22 @@ export function RunLauncher({
           Simulate run
         </button>
       </div>
+      <button
+        className="secondary full"
+        disabled={busy || !preparedId || !report?.executable}
+        onClick={() =>
+          act(
+            () =>
+              unwrap(e.startRun({ headers: mutationHeaders(), body: { ...body, mode: 'real' } })),
+            'Real run accepted',
+          )
+        }
+      >
+        Launch real run
+      </button>
+      <a className="text-button" href="/integrations">
+        Inspect integration readiness →
+      </a>
       {!simulationReady && (
         <div className="notice" style={{ marginTop: 14 }}>
           Choose ready groups and deploy the assigned serving profiles before launching a
@@ -1127,12 +1234,16 @@ export function RunLauncher({
       )}
       {report && (
         <div className="readiness">
-          <h4>Real execution blocked</h4>
-          {[...report.contract_blockers, ...report.runtime_blockers].map((reason: string) => (
-            <p key={reason}>
-              <span>○</span>
-              {reason}
-            </p>
+          <h4>{report.executable ? 'Real execution ready' : 'Real execution blocked'}</h4>
+          {report.checks?.map((check: Doc) => (
+            <section className="detail-card" key={check.code}>
+              <div className="split">
+                <strong>{check.label}</strong>
+                <Badge value={check.status} />
+              </div>
+              <p>{check.detail}</p>
+              <small>{check.resource_ref}</small>
+            </section>
           ))}
         </div>
       )}

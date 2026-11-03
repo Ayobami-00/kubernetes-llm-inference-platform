@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { CreateWorkerGroupData, CreateWorkerGroupErrors, CreateWorkerGroupResponses, DeleteWorkerGroupData, DeleteWorkerGroupErrors, DeleteWorkerGroupResponses, DeployServingData, DeployServingErrors, DeployServingResponses, ExportConfigurationData, ExportConfigurationErrors, ExportConfigurationResponses, ExportCustomersData, ExportCustomersErrors, ExportCustomersResponses, ExportDatasetsData, ExportDatasetsErrors, ExportDatasetsResponses, ExportScenariosData, ExportScenariosErrors, ExportScenariosResponses, ExportServingProfilesData, ExportServingProfilesErrors, ExportServingProfilesResponses, ExportWorkerGroupSpecsData, ExportWorkerGroupSpecsErrors, ExportWorkerGroupSpecsResponses, GetCapacityData, GetCapacityErrors, GetCapacityResponses, GetOperationData, GetOperationErrors, GetOperationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetRunData, GetRunErrors, GetRunResponses, GetRunTopologyData, GetRunTopologyErrors, GetRunTopologyResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetTopologyData, GetTopologyErrors, GetTopologyResponses, HistoryCustomersData, HistoryCustomersErrors, HistoryCustomersResponses, HistoryDatasetsData, HistoryDatasetsErrors, HistoryDatasetsResponses, HistoryScenariosData, HistoryScenariosErrors, HistoryScenariosResponses, HistoryServingProfilesData, HistoryServingProfilesErrors, HistoryServingProfilesResponses, HistoryWorkerGroupSpecsData, HistoryWorkerGroupSpecsErrors, HistoryWorkerGroupSpecsResponses, ListAssignmentsData, ListAssignmentsErrors, ListAssignmentsResponses, ListCustomersData, ListCustomersErrors, ListCustomersResponses, ListDatasetsData, ListDatasetsErrors, ListDatasetsResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListScenariosData, ListScenariosErrors, ListScenariosResponses, ListServingDeploymentsData, ListServingDeploymentsErrors, ListServingDeploymentsResponses, ListServingProfilesData, ListServingProfilesErrors, ListServingProfilesResponses, ListWorkerGroupsData, ListWorkerGroupsErrors, ListWorkerGroupSpecsData, ListWorkerGroupSpecsErrors, ListWorkerGroupSpecsResponses, ListWorkerGroupsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, PreflightRunData, PreflightRunErrors, PreflightRunResponses, PublishCustomersData, PublishCustomersErrors, PublishCustomersResponses, PublishDatasetsData, PublishDatasetsErrors, PublishDatasetsResponses, PublishScenariosData, PublishScenariosErrors, PublishScenariosResponses, PublishServingProfilesData, PublishServingProfilesErrors, PublishServingProfilesResponses, PublishWorkerGroupSpecsData, PublishWorkerGroupSpecsErrors, PublishWorkerGroupSpecsResponses, RefreshCapacityData, RefreshCapacityErrors, RefreshCapacityResponses, RenewWorkerGroupData, RenewWorkerGroupErrors, RenewWorkerGroupResponses, SaveAssignmentData, SaveAssignmentErrors, SaveAssignmentResponses, SaveCustomersDraftData, SaveCustomersDraftErrors, SaveCustomersDraftResponses, SaveDatasetsDraftData, SaveDatasetsDraftErrors, SaveDatasetsDraftResponses, SavePreferencesData, SavePreferencesErrors, SavePreferencesResponses, SaveScenariosDraftData, SaveScenariosDraftErrors, SaveScenariosDraftResponses, SaveServingProfilesDraftData, SaveServingProfilesDraftErrors, SaveServingProfilesDraftResponses, SaveWorkerGroupSpecsDraftData, SaveWorkerGroupSpecsDraftErrors, SaveWorkerGroupSpecsDraftResponses, SetSimulationFaultData, SetSimulationFaultErrors, SetSimulationFaultResponses, StartRunData, StartRunErrors, StartRunResponses, StopRunData, StopRunErrors, StopRunResponses } from './types.gen';
+import type { CreateWorkerGroupData, CreateWorkerGroupErrors, CreateWorkerGroupResponses, DeleteWorkerGroupData, DeleteWorkerGroupErrors, DeleteWorkerGroupResponses, DeployServingData, DeployServingErrors, DeployServingResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, ExportConfigurationData, ExportConfigurationErrors, ExportConfigurationResponses, ExportCustomersData, ExportCustomersErrors, ExportCustomersResponses, ExportDatasetsData, ExportDatasetsErrors, ExportDatasetsResponses, ExportScenariosData, ExportScenariosErrors, ExportScenariosResponses, ExportServingProfilesData, ExportServingProfilesErrors, ExportServingProfilesResponses, ExportWorkerGroupSpecsData, ExportWorkerGroupSpecsErrors, ExportWorkerGroupSpecsResponses, GetCapacityData, GetCapacityErrors, GetCapacityResponses, GetImportData, GetImportErrors, GetImportResponses, GetIntegrationsData, GetIntegrationsErrors, GetIntegrationsResponses, GetInventoryData, GetInventoryErrors, GetInventoryResponses, GetOperationData, GetOperationErrors, GetOperationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetRunData, GetRunErrors, GetRunResponses, GetRunTopologyData, GetRunTopologyErrors, GetRunTopologyResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetTopologyData, GetTopologyErrors, GetTopologyResponses, HistoryCustomersData, HistoryCustomersErrors, HistoryCustomersResponses, HistoryDatasetsData, HistoryDatasetsErrors, HistoryDatasetsResponses, HistoryScenariosData, HistoryScenariosErrors, HistoryScenariosResponses, HistoryServingProfilesData, HistoryServingProfilesErrors, HistoryServingProfilesResponses, HistoryWorkerGroupSpecsData, HistoryWorkerGroupSpecsErrors, HistoryWorkerGroupSpecsResponses, ImportDatasetData, ImportDatasetErrors, ImportDatasetResponses, ImportHistoricalRunData, ImportHistoricalRunErrors, ImportHistoricalRunResponses, ImportInventoryData, ImportInventoryErrors, ImportInventoryResponses, ImportPreparedRunData, ImportPreparedRunErrors, ImportPreparedRunResponses, ListArtifactsData, ListArtifactsErrors, ListArtifactsResponses, ListAssignmentsData, ListAssignmentsErrors, ListAssignmentsResponses, ListCustomersData, ListCustomersErrors, ListCustomersResponses, ListDatasetsData, ListDatasetsErrors, ListDatasetsResponses, ListImportsData, ListImportsErrors, ListImportsResponses, ListInventoryData, ListInventoryErrors, ListInventoryResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListPreparedRunsData, ListPreparedRunsErrors, ListPreparedRunsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListScenariosData, ListScenariosErrors, ListScenariosResponses, ListServingDeploymentsData, ListServingDeploymentsErrors, ListServingDeploymentsResponses, ListServingProfilesData, ListServingProfilesErrors, ListServingProfilesResponses, ListWorkerGroupsData, ListWorkerGroupsErrors, ListWorkerGroupSpecsData, ListWorkerGroupSpecsErrors, ListWorkerGroupSpecsResponses, ListWorkerGroupsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, PreflightRunData, PreflightRunErrors, PreflightRunResponses, PublishCustomersData, PublishCustomersErrors, PublishCustomersResponses, PublishDatasetsData, PublishDatasetsErrors, PublishDatasetsResponses, PublishScenariosData, PublishScenariosErrors, PublishScenariosResponses, PublishServingProfilesData, PublishServingProfilesErrors, PublishServingProfilesResponses, PublishWorkerGroupSpecsData, PublishWorkerGroupSpecsErrors, PublishWorkerGroupSpecsResponses, RefreshCapacityData, RefreshCapacityErrors, RefreshCapacityResponses, RenewWorkerGroupData, RenewWorkerGroupErrors, RenewWorkerGroupResponses, SaveAssignmentData, SaveAssignmentErrors, SaveAssignmentResponses, SaveCustomersDraftData, SaveCustomersDraftErrors, SaveCustomersDraftResponses, SaveDatasetsDraftData, SaveDatasetsDraftErrors, SaveDatasetsDraftResponses, SavePreferencesData, SavePreferencesErrors, SavePreferencesResponses, SaveScenariosDraftData, SaveScenariosDraftErrors, SaveScenariosDraftResponses, SaveServingProfilesDraftData, SaveServingProfilesDraftErrors, SaveServingProfilesDraftResponses, SaveWorkerGroupSpecsDraftData, SaveWorkerGroupSpecsDraftErrors, SaveWorkerGroupSpecsDraftResponses, SetSimulationFaultData, SetSimulationFaultErrors, SetSimulationFaultResponses, StartRunData, StartRunErrors, StartRunResponses, StopRunData, StopRunErrors, StopRunResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -17,6 +17,32 @@ export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends 
      */
     meta?: keyof ClientMeta extends never ? Record<string, unknown> : ClientMeta;
 };
+
+/**
+ * Artifacts
+ */
+export const listArtifacts = <ThrowOnError extends boolean = false>(options?: Options<ListArtifactsData, ThrowOnError>): RequestResult<ListArtifactsResponses, ListArtifactsErrors, ThrowOnError> => (options?.client ?? client).get<ListArtifactsResponses, ListArtifactsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/artifacts',
+    ...options
+});
+
+/**
+ * Download
+ */
+export const downloadArtifact = <ThrowOnError extends boolean = false>(options: Options<DownloadArtifactData, ThrowOnError>): RequestResult<DownloadArtifactResponses, DownloadArtifactErrors, ThrowOnError> => (options.client ?? client).get<DownloadArtifactResponses, DownloadArtifactErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/artifacts/{identity}',
+    ...options
+});
 
 /**
  * Assignments
@@ -272,6 +298,139 @@ export const historyDatasets = <ThrowOnError extends boolean = false>(options: O
 });
 
 /**
+ * List Imports
+ */
+export const listImports = <ThrowOnError extends boolean = false>(options?: Options<ListImportsData, ThrowOnError>): RequestResult<ListImportsResponses, ListImportsErrors, ThrowOnError> => (options?.client ?? client).get<ListImportsResponses, ListImportsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/imports',
+    ...options
+});
+
+/**
+ * Import Dataset
+ */
+export const importDataset = <ThrowOnError extends boolean = false>(options: Options<ImportDatasetData, ThrowOnError>): RequestResult<ImportDatasetResponses, ImportDatasetErrors, ThrowOnError> => (options.client ?? client).post<ImportDatasetResponses, ImportDatasetErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/imports/datasets',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Import Inventory
+ */
+export const importInventory = <ThrowOnError extends boolean = false>(options: Options<ImportInventoryData, ThrowOnError>): RequestResult<ImportInventoryResponses, ImportInventoryErrors, ThrowOnError> => (options.client ?? client).post<ImportInventoryResponses, ImportInventoryErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/imports/inventory',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Import Prepared
+ */
+export const importPreparedRun = <ThrowOnError extends boolean = false>(options: Options<ImportPreparedRunData, ThrowOnError>): RequestResult<ImportPreparedRunResponses, ImportPreparedRunErrors, ThrowOnError> => (options.client ?? client).post<ImportPreparedRunResponses, ImportPreparedRunErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/imports/prepared-runs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Import Run
+ */
+export const importHistoricalRun = <ThrowOnError extends boolean = false>(options: Options<ImportHistoricalRunData, ThrowOnError>): RequestResult<ImportHistoricalRunResponses, ImportHistoricalRunErrors, ThrowOnError> => (options.client ?? client).post<ImportHistoricalRunResponses, ImportHistoricalRunErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/imports/runs',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Get Import
+ */
+export const getImport = <ThrowOnError extends boolean = false>(options: Options<GetImportData, ThrowOnError>): RequestResult<GetImportResponses, GetImportErrors, ThrowOnError> => (options.client ?? client).get<GetImportResponses, GetImportErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/imports/{identity}',
+    ...options
+});
+
+/**
+ * Integrations
+ */
+export const getIntegrations = <ThrowOnError extends boolean = false>(options?: Options<GetIntegrationsData, ThrowOnError>): RequestResult<GetIntegrationsResponses, GetIntegrationsErrors, ThrowOnError> => (options?.client ?? client).get<GetIntegrationsResponses, GetIntegrationsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/integrations',
+    ...options
+});
+
+/**
+ * List Inventory
+ */
+export const listInventory = <ThrowOnError extends boolean = false>(options?: Options<ListInventoryData, ThrowOnError>): RequestResult<ListInventoryResponses, ListInventoryErrors, ThrowOnError> => (options?.client ?? client).get<ListInventoryResponses, ListInventoryErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/inventory',
+    ...options
+});
+
+/**
+ * Get Inventory
+ */
+export const getInventory = <ThrowOnError extends boolean = false>(options: Options<GetInventoryData, ThrowOnError>): RequestResult<GetInventoryResponses, GetInventoryErrors, ThrowOnError> => (options.client ?? client).get<GetInventoryResponses, GetInventoryErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/inventory/{identity}',
+    ...options
+});
+
+/**
  * Operations
  */
 export const listOperations = <ThrowOnError extends boolean = false>(options?: Options<ListOperationsData, ThrowOnError>): RequestResult<ListOperationsResponses, ListOperationsErrors, ThrowOnError> => (options?.client ?? client).get<ListOperationsResponses, ListOperationsErrors, ThrowOnError>({
@@ -325,6 +484,19 @@ export const savePreferences = <ThrowOnError extends boolean = false>(options: O
         'Content-Type': 'application/json',
         ...options.headers
     }
+});
+
+/**
+ * Prepared Runs
+ */
+export const listPreparedRuns = <ThrowOnError extends boolean = false>(options?: Options<ListPreparedRunsData, ThrowOnError>): RequestResult<ListPreparedRunsResponses, ListPreparedRunsErrors, ThrowOnError> => (options?.client ?? client).get<ListPreparedRunsResponses, ListPreparedRunsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/prepared-runs',
+    ...options
 });
 
 /**

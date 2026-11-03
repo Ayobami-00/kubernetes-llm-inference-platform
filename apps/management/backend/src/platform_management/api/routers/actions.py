@@ -3,7 +3,7 @@ from datetime import datetime
 from typing import Annotated
 
 from fastapi import APIRouter, Depends, Header, Response
-from platform_contracts import Run, WorkerGroup, validate_for_execution
+from platform_contracts import Run, WorkerGroup
 from sqlalchemy import select
 
 from platform_management.api.dependencies import Db, administrator
@@ -26,6 +26,7 @@ from platform_management.jobs.queue import submit
 from platform_management.jobs.reconciliation import refresh_capacity
 from platform_management.services.catalog import catalog, snapshot
 from platform_management.services.common import AppError, digest, now
+from platform_management.services.readiness import assess
 
 router = APIRouter(dependencies=[Depends(administrator)], tags=["Workflows"])
 Idempotency = Annotated[str, Header(alias="Idempotency-Key", min_length=8, max_length=200)]
@@ -217,37 +218,6 @@ def deploy(body: DeploymentWrite, db: Db, response: Response, key: Idempotency):
     )
 
 
-def assess(db, body, snap):
-    contract = []
-    try:
-        validate_for_execution(snap)
-    except ValueError as exc:
-        contract = str(exc).split("\n- ")[1:] or [str(exc)]
-    runtime = ["Real runner, live cluster and artifact readiness integrations are not configured."]
-    for spec in snap.worker_groups:
-        group_id = body.group_ids.get(spec.ref)
-        row = db.get(Resource, group_id) if group_id else None
-        if (
-            not row
-            or row.kind != "worker_group"
-            or row.payload["group"]["spec"] != spec.model_dump(mode="json")
-        ):
-            runtime.append(f"{spec.ref}: select a runtime group using this exact specification")
-        elif row.payload["group"]["status"]["phase"] != "ready" or row.active_operation_id:
-            runtime.append(f"{spec.ref}: selected worker group is not ready")
-    for binding in snap.bindings:
-        row = db.get(Resource, binding.deployment_id)
-        if not row or row.kind != "deployment" or row.payload["status"] != "ready":
-            runtime.append(f"{binding.deployment_id}: serving deployment is not ready")
-        elif row.payload["profile"] != next(
-            p.model_dump(mode="json")
-            for p in snap.serving_profiles
-            if p.ref == binding.serving_profile_ref
-        ) or row.payload["group_id"] != body.group_ids.get(binding.worker_group_ref):
-            runtime.append(f"{binding.deployment_id}: deployment differs from frozen assignment")
-    return Preflight(executable=False, contract_blockers=contract, runtime_blockers=runtime)
-
-
 @router.post("/runs/preflight", response_model=Preflight, operation_id="preflightRun")
 def preflight(body: RunLaunch, db: Db):
     return assess(db, body, snapshot(db, body))
@@ -256,7 +226,15 @@ def preflight(body: RunLaunch, db: Db):
 @router.get("/runs", response_model=list[RunView], operation_id="listRuns")
 def runs(db: Db):
     return [
-        RunView(run=r.payload, mode=r.context["mode"], group_ids=r.context.get("group_ids", {}))
+        RunView(
+            run=r.payload,
+            mode=r.context["mode"],
+            group_ids=r.context.get("group_ids", {}),
+            source=r.context.get("source", "management"),
+            provenance=r.context.get(
+                "provenance", "synthetic" if r.payload.get("fixture") else "unverified"
+            ),
+        )
         for r in db.scalars(select(RunRow).order_by(RunRow.id))
     ]
 
@@ -267,7 +245,13 @@ def get_run(identity: str, db: Db):
     if not row:
         raise AppError(404, "Run not found")
     return RunView(
-        run=row.payload, mode=row.context["mode"], group_ids=row.context.get("group_ids", {})
+        run=row.payload,
+        mode=row.context["mode"],
+        group_ids=row.context.get("group_ids", {}),
+        source=row.context.get("source", "management"),
+        provenance=row.context.get(
+            "provenance", "synthetic" if row.payload.get("fixture") else "unverified"
+        ),
     )
 
 
@@ -278,27 +262,39 @@ def start_run(body: RunLaunch, db: Db, response: Response, key: Idempotency):
     def mutate(op_id):
         snap = snapshot(db, body)
         report = assess(db, body, snap)
-        if body.mode == "real":
+        if body.mode == "real" and not report.executable:
             raise AppError(
                 422,
                 "Real execution blocked: "
                 + "; ".join(report.contract_blockers + report.runtime_blockers),
                 "preflight_failed",
             )
-        if len(report.runtime_blockers) > 1:
+        if body.mode == "simulation" and not report.simulation_available:
             raise AppError(
                 422,
-                "Simulation needs ready simulated resources: "
-                + "; ".join(report.runtime_blockers[1:]),
+                "Simulation needs ready simulated resources: " + "; ".join(report.runtime_blockers),
                 "runtime_not_ready",
             )
-        run = Run(id=identity, fixture=True, status="queued", created_at=now(), snapshot=snap)
+        run = Run(
+            id=identity,
+            fixture=body.mode == "simulation",
+            status="queued",
+            created_at=now(),
+            snapshot=snap,
+        )
         db.add(
             RunRow(
                 id=identity,
                 snapshot=snap.model_dump(mode="json"),
                 payload=run.model_dump(mode="json"),
-                context={"mode": body.mode, "outcome": body.outcome, "group_ids": body.group_ids},
+                context={
+                    "mode": body.mode,
+                    "outcome": body.outcome,
+                    "group_ids": body.group_ids,
+                    "source": "management",
+                    "provenance": "synthetic" if body.mode == "simulation" else "measured",
+                    "prepared_run_id": body.prepared_run_id,
+                },
             )
         )
 

@@ -8,7 +8,7 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from platform_management.api.routers import actions, auth, specifications, topology
+from platform_management.api.routers import actions, auth, imports, specifications, topology
 from platform_management.api.schemas import ErrorEnvelope
 from platform_management.db.session import session
 from platform_management.observability import RequestLogging
@@ -25,14 +25,55 @@ async def lifespan(application):
 app = FastAPI(
     title="Inference Platform Management",
     lifespan=lifespan,
-    responses={code: {"model": ErrorEnvelope} for code in (400, 401, 403, 404, 409, 422, 429)},
-    version="0.1.0",
+    responses={code: {"model": ErrorEnvelope} for code in (400, 401, 403, 404, 409, 413, 422, 429)},
+    version="0.2.0",
     docs_url="/api/docs",
     openapi_url="/api/openapi.json",
 )
 app.add_middleware(RequestLogging)
-for router in (auth.router, specifications.router, actions.router, topology.router):
+for router in (auth.router, specifications.router, actions.router, topology.router, imports.router):
     app.include_router(router, prefix="/api/v1")
+
+
+@app.middleware("http")
+async def bounded_import(request: Request, call_next):
+    from platform_management.settings import get_settings
+
+    if request.method == "POST" and request.url.path.startswith("/api/v1/imports/"):
+        limit = get_settings().import_max_bytes
+        try:
+            advertised = int(request.headers.get("content-length", "0"))
+        except ValueError:
+            advertised = limit + 1
+        if advertised > limit:
+            return JSONResponse(
+                status_code=413,
+                content={
+                    "error": {
+                        "code": "import_too_large",
+                        "message": "Import exceeds the size limit",
+                        "details": [],
+                    }
+                },
+            )
+        # Bound chunked bodies too; never accumulate an unbounded upload.
+        chunks, size = [], 0
+        async for chunk in request.stream():
+            size += len(chunk)
+            if size > limit:
+                return JSONResponse(
+                    status_code=413,
+                    content={
+                        "error": {
+                            "code": "import_too_large",
+                            "message": "Import exceeds the size limit",
+                            "details": [],
+                        }
+                    },
+                )
+            chunks.append(chunk)
+        request._body = b"".join(chunks)
+    return await call_next(request)
 
 
 @app.exception_handler(AppError)
@@ -98,6 +139,11 @@ def live():
 
 @app.get("/health/ready", include_in_schema=False)
 def ready():
-    with session() as db:
-        db.execute(text("SELECT 1"))
+    try:
+        with session() as db:
+            version = db.scalar(text("SELECT version_num FROM alembic_version"))
+        if version != "0002":
+            return JSONResponse(status_code=503, content={"status": "migration_required"})
+    except Exception:
+        return JSONResponse(status_code=503, content={"status": "database_unavailable"})
     return {"status": "ok"}

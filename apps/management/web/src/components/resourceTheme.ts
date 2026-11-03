@@ -8,6 +8,8 @@ export const colours: Record<string, string> = {
   instance: 'var(--resource-instance)',
   scenario: 'var(--resource-scenario)',
   run: 'var(--resource-run)',
+  cluster: 'var(--resource-scenario)',
+  'infrastructure-node': 'var(--resource-worker)',
 };
 export const icons = {
   customer: Users,
@@ -18,6 +20,8 @@ export const icons = {
   instance: Cpu,
   scenario: Network,
   run: FlaskConical,
+  cluster: Network,
+  'infrastructure-node': Cpu,
 };
 export const names: Record<string, string> = {
   'dataset-manifest': 'Dataset',
@@ -28,4 +32,6 @@ export const names: Record<string, string> = {
   instance: 'GPU instance',
   scenario: 'Scenario',
   run: 'Run',
+  cluster: 'Cluster',
+  'infrastructure-node': 'Infrastructure node',
 };

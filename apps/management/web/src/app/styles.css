@@ -3012,3 +3012,154 @@ select:focus-visible {
     flex-wrap: wrap;
   }
 }
+
+/* Integration evidence and import review share the existing appearance tokens. */
+.integration-page > h4 {
+  margin: 24px 0 12px;
+  font-size: 14px;
+  font-weight: 600;
+}
+.import-layout {
+  display: grid;
+  grid-template-columns: minmax(260px, 1fr) minmax(280px, 1fr);
+  gap: 24px;
+  margin-bottom: 32px;
+}
+.import-form,
+.import-review {
+  border: 1px solid var(--border);
+  background: var(--input);
+  padding: 22px;
+  border-radius: 10px;
+  min-width: 0;
+}
+.import-form > h4,
+.import-review > h4 {
+  margin: 0 0 18px;
+  font-size: 14px;
+}
+.import-form label {
+  margin: 14px 0;
+}
+.import-form .notice {
+  margin-top: 18px;
+}
+.import-upload {
+  border: 1px dashed var(--border-strong);
+  border-radius: 8px;
+  padding: 18px;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  color: var(--text-primary);
+}
+.import-upload svg {
+  color: var(--accent-text);
+}
+.import-upload small {
+  color: var(--text-muted);
+}
+.import-upload input {
+  max-width: 100%;
+  font-size: 11px;
+  padding: 8px;
+}
+.import-placeholder {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  min-height: 240px;
+  gap: 18px;
+  color: var(--text-muted);
+  text-align: center;
+  font-size: 12px;
+}
+.import-review .settings-list {
+  margin-bottom: 18px;
+}
+.import-review .primary {
+  margin-top: 22px;
+}
+.import-receipt > small {
+  display: block;
+  margin-top: 8px;
+  color: var(--text-muted);
+}
+.import-receipt {
+  margin-bottom: 12px;
+}
+.readiness-grid,
+.adapter-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 270px), 1fr));
+  gap: 14px;
+}
+.adapter-list {
+  margin-bottom: 30px;
+}
+.readiness-check {
+  display: flex;
+  gap: 12px;
+}
+.readiness-check > svg {
+  flex-shrink: 0;
+  color: var(--accent-text);
+  margin-top: 3px;
+}
+.readiness-check > div {
+  flex: 1;
+  min-width: 0;
+}
+.integration-page .detail-card > small {
+  font-size: 11px;
+  color: var(--text-muted);
+}
+.integration-page .detail-card {
+  margin-bottom: 12px;
+}
+.artifact-root {
+  margin-bottom: 16px;
+  font-size: 12px;
+  color: var(--text-secondary);
+}
+.artifact-root code,
+.artifact-uri {
+  overflow-wrap: anywhere;
+}
+.badge.blocked {
+  color: var(--danger-text);
+  background: var(--danger-bg);
+  border-color: var(--danger-border);
+}
+.badge.unverified,
+.badge.partial {
+  color: var(--warning-text);
+  background: var(--warning-bg);
+  border-color: var(--warning-border);
+}
+.badge.verified,
+.badge.measured,
+.badge.configured {
+  color: var(--success-text);
+  background: var(--success-bg);
+  border-color: var(--success-border);
+}
+.provenance.imported {
+  color: var(--resource-serving);
+}
+.navigation nav {
+  min-height: 0;
+  overflow-y: auto;
+}
+@media (max-width: 1050px) {
+  .import-layout {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+@media (max-width: 600px) {
+  .import-form,
+  .import-review {
+    padding: 16px;
+  }
+}

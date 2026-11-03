@@ -42,19 +42,36 @@ test('graph, revision editing, durable allocation, serving, simulated run and re
     'gpu readiness',
     { timeout: 30000 },
   );
-  execFileSync(
-    'docker',
-    [
-      'compose',
-      ...(process.env.MANAGEMENT_E2E_PROJECT ? ['-p', process.env.MANAGEMENT_E2E_PROJECT] : []),
-      '-f',
-      resolve('../../../dev/compose.yaml'),
-      ...(process.env.MANAGEMENT_E2E_OVERRIDE ? ['-f', process.env.MANAGEMENT_E2E_OVERRIDE] : []),
-      'restart',
-      'worker',
-    ],
-    { stdio: 'pipe' },
-  );
+  if (process.env.MANAGEMENT_E2E_KUBECONFIG) {
+    const args = [
+      '--kubeconfig',
+      process.env.MANAGEMENT_E2E_KUBECONFIG,
+      '-n',
+      process.env.MANAGEMENT_E2E_NAMESPACE || 'klip',
+    ];
+    execFileSync('kubectl', [...args, 'rollout', 'restart', 'deployment/klip-worker'], {
+      stdio: 'pipe',
+    });
+    execFileSync(
+      'kubectl',
+      [...args, 'rollout', 'status', 'deployment/klip-worker', '--timeout=120s'],
+      { stdio: 'pipe' },
+    );
+  } else {
+    execFileSync(
+      'docker',
+      [
+        'compose',
+        ...(process.env.MANAGEMENT_E2E_PROJECT ? ['-p', process.env.MANAGEMENT_E2E_PROJECT] : []),
+        '-f',
+        resolve('../../../dev/compose.yaml'),
+        ...(process.env.MANAGEMENT_E2E_OVERRIDE ? ['-f', process.env.MANAGEMENT_E2E_OVERRIDE] : []),
+        'restart',
+        'worker',
+      ],
+      { stdio: 'pipe' },
+    );
+  }
   await page.reload();
   await expect(page.locator('.operation-card').filter({ hasText: groupName })).toContainText(
     'completed',
