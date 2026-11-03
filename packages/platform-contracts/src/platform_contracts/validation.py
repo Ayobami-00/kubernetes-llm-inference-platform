@@ -80,6 +80,30 @@ def validate_snapshot(snapshot: RunSnapshot) -> None:
     profiles = _indexed(snapshot.serving_profiles, "serving-profile")
     groups = _indexed(snapshot.worker_groups, "worker-group")
     datasets = _indexed(snapshot.datasets, "dataset-manifest")
+    if snapshot.target and set(snapshot.target.credential_env) - {c.id for c in snapshot.customers}:
+        raise ValueError("credential reference belongs to a customer outside the snapshot")
+    if snapshot.preparation:
+        preparations = {p.customer_ref: p for p in snapshot.preparation}
+        if len(preparations) != len(snapshot.preparation):
+            raise ValueError("duplicate preparation customer reference")
+        if len({p.id for p in snapshot.preparation}) != len(snapshot.preparation):
+            raise ValueError("duplicate preparation identity")
+        expected = {snapshot.derivation.get(c.ref) for c in snapshot.customers}
+        if expected != set(preparations):
+            raise ValueError("preparation references disagree with customer derivation")
+        for customer in snapshot.customers:
+            prepared = preparations[snapshot.derivation[customer.ref]]
+            if customer.workload.dataset_ref != prepared.id + "@1":
+                raise ValueError("customer dataset differs from preparation identity")
+            dataset = datasets[customer.workload.dataset_ref]
+            if (
+                dataset.prepared is None
+                or dataset.prepared.sha256 != prepared.artifact.sha256
+                or dataset.prepared.uri != prepared.artifact.uri
+            ):
+                raise ValueError("snapshot dataset differs from preparation artifact")
+            if prepared.prompt_template_sha256 != customer.workload.prompt_template_digest:
+                raise ValueError("preparation prompt template differs from customer")
     if set(customers) != set(snapshot.scenario.participants):
         raise ValueError("snapshot customers differ from scenario participants")
     _validate_scenario(snapshot.scenario, customers, datasets)
@@ -96,6 +120,16 @@ def validate_snapshot(snapshot: RunSnapshot) -> None:
     reservations = defaultdict(int)
     for binding in snapshot.bindings:
         customer = customers[binding.customer_ref]
+        source_ref = snapshot.derivation.get(customer.ref, customer.ref)
+        for manifest in snapshot.preparation:
+            if (
+                manifest.customer_ref == source_ref
+                and manifest.chat_template_kwargs
+                != profiles[binding.serving_profile_ref].engine.chat_template_kwargs
+            ):
+                raise ValueError(
+                    f"{manifest.id}: prepared data uses different chat-template settings"
+                )
         profile = profiles[binding.serving_profile_ref]
         group = groups[binding.worker_group_ref]
         if customer.model_alias != profile.model.alias:
@@ -140,6 +174,8 @@ def validate_run_result(snapshot: RunSnapshot, result: RunResult) -> None:
     customers = {customer.ref: customer for customer in snapshot.customers}
     if set(result.customer_requests) != set(customers):
         raise ValueError("per-customer request counts must cover exactly the run participants")
+    if result.customer_sessions and set(result.customer_sessions) != set(customers):
+        raise ValueError("session accounting must cover exactly the run participants")
     expected = {(c.ref, target.metric) for c in snapshot.customers for target in c.slo.targets}
     actual = {(a.customer_ref, a.metric) for a in result.slo_assessments}
     if result.validity == "valid" and actual != expected:
@@ -170,7 +206,12 @@ def validate_run_result(snapshot: RunSnapshot, result: RunResult) -> None:
         )
         if {window.offset_s for window in assessment.windows} != expected_offsets:
             raise ValueError("SLO assessment omits a measurement window")
-        counts = result.customer_requests[customer.ref]
+        if assessment.metric == "session_latency_ms":
+            counts = result.customer_sessions.get(customer.ref)
+            if counts is None:
+                raise ValueError("session SLO requires session accounting")
+        else:
+            counts = result.customer_requests[customer.ref]
         if (
             sum(window.eligible_requests for window in assessment.windows)
             != counts.eligible_for_slo
@@ -237,6 +278,13 @@ def validate_for_execution(snapshot: RunSnapshot) -> None:
     for binding in snapshot.bindings:
         customer = customers[binding.customer_ref]
         refs = [customer.workload.dataset_ref]
+        source_ref = snapshot.derivation.get(customer.ref, customer.ref)
+        for manifest in snapshot.preparation:
+            if (
+                manifest.customer_ref == source_ref
+                and manifest.tokenizer_id != profiles[binding.serving_profile_ref].model.repository
+            ):
+                errors.append(f"{manifest.id}: tokenizer repository differs from serving model")
         if warmup_ref := snapshot.scenario.warmup.datasets.get(customer.id):
             refs.append(warmup_ref)
         for ref in refs:
@@ -259,7 +307,12 @@ def validate_for_execution(snapshot: RunSnapshot) -> None:
         "evaluator": versions.evaluator_version,
         **{
             key: versions.platform_versions.get(key)
-            for key in ("kubernetes", "cilium", "llm-d", "vllm", "model-pool-chart")
+            for key in ("kubernetes", "cilium", "vllm")
+            + (
+                ("serving-chart",)
+                if snapshot.target and snapshot.target.serving_stack == "direct-vllm"
+                else ("model-pool-chart", "llm-d")
+            )
         },
     }
     for name, version in version_values.items():

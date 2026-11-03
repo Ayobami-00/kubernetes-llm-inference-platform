@@ -1,0 +1,64 @@
+name: Workload execution
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  cpu-integration:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {python-version: '3.12', enable-cache: true}
+      - run: uv sync --locked --all-packages --all-extras
+      - run: uv run --locked --all-packages --all-extras pytest
+      - run: uv run --locked --all-packages --all-extras pytest workload-runner/tests/test_aiperf_integration.py
+        env:
+          RUN_AIPERF_INTEGRATION: '1'
+      - run: bash scripts/check-generated.sh
+      - if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workload-test-diagnostics
+          path: /tmp/pytest-of-*/pytest-*/**/execution/
+  containers:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@v4
+      - run: docker build -f workload-runner/Dockerfile -t workload-runner:test .
+      - run: docker run --rm workload-runner:test --help
+      - run: docker build -f dev/inference-stub/Dockerfile -t inference-stub:test .
+      - run: docker run --rm inference-stub:test --help
+  management-jobs:
+    runs-on: ubuntu-latest
+    timeout-minutes: 35
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {python-version: '3.12', enable-cache: true}
+      - uses: actions/setup-node@v4
+        with: {node-version: '24', cache: npm, cache-dependency-path: apps/management/web/package-lock.json}
+      - uses: azure/setup-helm@v4.3.0
+        with: {version: 'v3.17.1'}
+      - uses: azure/setup-kubectl@v4
+        with: {version: 'v1.34.0'}
+      - name: Install pinned kind
+        run: |
+          curl -fsSLo /tmp/kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64
+          curl -fsSLo /tmp/kind.sha256 https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64.sha256
+          printf '%s  /tmp/kind\n' "$(awk '{print $1}' /tmp/kind.sha256)" | sha256sum --check
+          chmod +x /tmp/kind
+          sudo mv /tmp/kind /usr/local/bin/kind
+      - run: npm ci --prefix apps/management/web
+      - run: npm exec --prefix apps/management/web -- playwright install --with-deps chromium
+      - run: ./dev/test-integration
+        env: {KLIP_WORKLOAD_INTEGRATION: '1'}
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: workload-management-proof
+          path: |
+            artifacts/workload-management-acceptance.json
+            artifacts/management
+            apps/management/web/test-results

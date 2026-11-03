@@ -1,10 +1,17 @@
 from datetime import datetime
 from typing import Annotated, Literal
 
-from platform_contracts import DatasetManifest, InfrastructureInventory, Run, RunSnapshot
+from platform_contracts import (
+    DatasetManifest,
+    InfrastructureInventory,
+    Run,
+    RunSnapshot,
+    ServingProfile,
+    WorkerGroup,
+)
 from platform_contracts.common import ContractModel, Slug, Timestamp
 from platform_contracts.inventory import NetworkInfo, NodeObservation
-from pydantic import Field
+from pydantic import Field, HttpUrl, model_validator
 
 from platform_management.api.schemas import ReadinessCheck
 
@@ -46,6 +53,70 @@ class PreparedImport(ImportMetadata):
 
 class RunImport(ImportMetadata):
     document: Run
+
+
+class ExternalGroup(ContractModel):
+    id: Slug
+    group: WorkerGroup
+
+
+class ExternalDeployment(ContractModel):
+    id: Slug
+    group_id: Slug
+    profile: ServingProfile
+    kubernetes_uid: Annotated[str, Field(min_length=1)]
+    endpoint: HttpUrl
+
+
+class ExternalCapacity(ContractModel):
+    id: Slug
+    inventory_id: Slug
+    worker_groups: Annotated[tuple[ExternalGroup, ...], Field(min_length=1)]
+    deployments: Annotated[tuple[ExternalDeployment, ...], Field(min_length=1)]
+
+    @model_validator(mode="after")
+    def check_handoff(self):
+        groups = {item.id: item.group for item in self.worker_groups}
+        ids = [item.id for item in (*self.worker_groups, *self.deployments)]
+        if len(ids) != len(set(ids)):
+            raise ValueError("external resource identities must be unique")
+        for group in groups.values():
+            if group.spec.desired_instances < 1:
+                raise ValueError("external capacity requires at least one desired instance")
+            if group.fixture or group.status.active_operation_id:
+                raise ValueError("external groups must be measured observations without operations")
+            if group.spec.instance_type is None or group.spec.region is None:
+                raise ValueError("external groups require verified provider selections")
+        used = {identity: 0 for identity in groups}
+        for item in self.deployments:
+            if item.group_id not in groups or item.profile.draft:
+                raise ValueError(
+                    "external deployments require an included group and pinned profile"
+                )
+            group, profile = groups[item.group_id].spec, item.profile
+            if (
+                profile.worker_class != group.worker_class
+                or profile.hardware.min_vram_gib_per_gpu > group.hardware.vram_gib_per_gpu
+                or profile.hardware.vendor != group.hardware.vendor
+                or (
+                    profile.hardware.gpu_model
+                    and profile.hardware.gpu_model != group.hardware.gpu_model
+                )
+                or profile.topology.gpus_per_replica > group.hardware.gpu_count
+            ):
+                raise ValueError("external serving profile does not fit supplied hardware")
+            used[item.group_id] += profile.topology.replicas * profile.topology.gpus_per_replica
+        if any(
+            used[i] > g.spec.desired_instances * g.spec.hardware.gpu_count
+            for i, g in groups.items()
+        ):
+            raise ValueError("external deployments exceed group GPU capacity")
+        return self
+
+
+class ExternalCapacityImport(ImportMetadata):
+    provenance: Literal["measured"] = "measured"
+    document: ExternalCapacity
 
 
 class ImportAccepted(ContractModel):

@@ -9,6 +9,7 @@ from sqlalchemy import select, text, update
 
 from platform_management.api.import_schemas import (
     DatasetImport,
+    ExternalCapacityImport,
     FoundationObservation,
     InventoryImport,
     PreparedImport,
@@ -37,6 +38,7 @@ MODELS = {
     "datasets": DatasetImport,
     "prepared-runs": PreparedImport,
     "runs": RunImport,
+    "external-capacity": ExternalCapacityImport,
 }
 
 
@@ -66,6 +68,31 @@ def validate(kind, payload):
         elif isinstance(value, list):
             for child in value:
                 reject_secrets(child)
+        elif (
+            isinstance(value, str)
+            and value.startswith(("http://", "https://"))
+            and not any(c.isspace() for c in value)
+        ):
+            from urllib.parse import parse_qs, urlsplit
+
+            url = urlsplit(value)
+            sensitive = {
+                "token",
+                "key",
+                "api_key",
+                "apikey",
+                "authorization",
+                "password",
+                "signature",
+            }
+            if (
+                url.username
+                or url.password
+                or sensitive & {key.lower() for key in parse_qs(url.query)}
+            ):
+                raise AppError(
+                    422, "Import URLs must use credential references, never embedded values"
+                )
 
     reject_secrets(model.model_dump(mode="json"))
     doc = model.document
@@ -230,6 +257,10 @@ def apply_import(db, row, checks):
                 )
             )
         result["resource_id"] = identity
+    elif kind == "external-capacity":
+        from platform_management.services.external_capacity import apply_capacity
+
+        result.update(apply_capacity(db, document))
     elif kind == "datasets":
         dataset = DatasetManifest.model_validate(document)
         key = "dataset-manifest:" + dataset.id

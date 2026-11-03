@@ -1,0 +1,23 @@
+[project]
+name = "workload-runner"
+version = "0.1.0"
+requires-python = ">=3.12,<3.14"
+dependencies = ["platform-contracts", "slo-evaluator", "httpx>=0.28,<1"]
+
+[project.optional-dependencies]
+benchmark = ["aiperf==0.13.0"]
+data = ["huggingface-hub>=0.30,<2", "transformers>=4.51,<6", "pyarrow>=19,<24"]
+
+[project.scripts]
+workload-runner = "workload_runner.cli:main"
+
+[project.entry-points."aiperf.plugins"]
+platform_workloads = "workload_runner.adapters:plugins.yaml"
+
+[tool.uv.sources]
+platform-contracts = { workspace = true }
+slo-evaluator = { workspace = true }
+
+[build-system]
+requires = ["hatchling>=1.26,<2"]
+build-backend = "hatchling.build"

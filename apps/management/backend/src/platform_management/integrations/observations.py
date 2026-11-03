@@ -47,6 +47,13 @@ def refresh_cluster():
                     .get("labels", {})
                     .get("klip.dev/deployment-id", d["metadata"]["name"]),
                     "uid": d["metadata"]["uid"],
+                    "images": [
+                        c["image"]
+                        for c in d["spec"].get("template", {}).get("spec", {}).get("containers", [])
+                    ],
+                    "profile_sha256": d["metadata"]
+                    .get("annotations", {})
+                    .get("klip.dev/serving-profile-sha256"),
                     "profile_ref": d["metadata"]
                     .get("annotations", {})
                     .get("klip.dev/serving-profile"),

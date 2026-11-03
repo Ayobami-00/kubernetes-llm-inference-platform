@@ -368,9 +368,16 @@
         "additionalProperties": false,
         "properties": {
           "cached_input_tokens": {
-            "minimum": 0.0,
-            "title": "Cached Input Tokens",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Cached Input Tokens"
           },
           "customer_ref": {
             "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
@@ -378,9 +385,16 @@
             "type": "string"
           },
           "input_tokens": {
-            "minimum": 0.0,
-            "title": "Input Tokens",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Input Tokens"
           },
           "latencies": {
             "additionalProperties": {
@@ -398,16 +412,20 @@
             "type": "object"
           },
           "output_tokens": {
-            "minimum": 0.0,
-            "title": "Output Tokens",
-            "type": "integer"
+            "anyOf": [
+              {
+                "minimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Output Tokens"
           }
         },
         "required": [
-          "customer_ref",
-          "input_tokens",
-          "cached_input_tokens",
-          "output_tokens"
+          "customer_ref"
         ],
         "title": "CustomerMeasurements",
         "type": "object"
@@ -729,9 +747,40 @@
         "title": "DatasetSource",
         "type": "object"
       },
+      "DeliveryPolicy": {
+        "additionalProperties": false,
+        "properties": {
+          "max_late_fraction": {
+            "default": 0.01,
+            "maximum": 1.0,
+            "minimum": 0.0,
+            "title": "Max Late Fraction",
+            "type": "number"
+          },
+          "max_scheduling_lag_ms": {
+            "default": 100.0,
+            "minimum": 0.0,
+            "title": "Max Scheduling Lag Ms",
+            "type": "number"
+          }
+        },
+        "title": "DeliveryPolicy",
+        "type": "object"
+      },
       "DeploymentView": {
         "additionalProperties": false,
         "properties": {
+          "endpoint": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Endpoint"
+          },
           "group_id": {
             "title": "Group Id",
             "type": "string"
@@ -740,10 +789,33 @@
             "title": "Id",
             "type": "string"
           },
+          "kubernetes_uid": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Kubernetes Uid"
+          },
           "mode": {
-            "const": "simulation",
             "default": "simulation",
+            "enum": [
+              "simulation",
+              "real"
+            ],
             "title": "Mode",
+            "type": "string"
+          },
+          "ownership": {
+            "default": "management",
+            "enum": [
+              "management",
+              "external"
+            ],
+            "title": "Ownership",
             "type": "string"
           },
           "profile": {
@@ -810,6 +882,13 @@
             "default": "vllm",
             "title": "Backend",
             "type": "string"
+          },
+          "chat_template_kwargs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Chat Template Kwargs",
+            "type": "object"
           },
           "dtype": {
             "default": "bfloat16",
@@ -993,6 +1072,66 @@
         "title": "ExecutionStatus",
         "type": "string"
       },
+      "ExecutionTarget": {
+        "additionalProperties": false,
+        "properties": {
+          "credential_env": {
+            "patternProperties": {
+              "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+                "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+                "type": "string"
+              }
+            },
+            "title": "Credential Env",
+            "type": "object"
+          },
+          "endpoint": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "mode": {
+            "enum": [
+              "local-stub",
+              "benchmark"
+            ],
+            "title": "Mode",
+            "type": "string"
+          },
+          "serving_stack": {
+            "default": "llm-d-vllm",
+            "enum": [
+              "direct-vllm",
+              "llm-d-vllm"
+            ],
+            "title": "Serving Stack",
+            "type": "string"
+          },
+          "stub_preset": {
+            "default": "healthy",
+            "enum": [
+              "healthy",
+              "slow-first",
+              "slow-completion",
+              "reject",
+              "error",
+              "timeout",
+              "interrupted",
+              "shared-overload"
+            ],
+            "title": "Stub Preset",
+            "type": "string"
+          }
+        },
+        "required": [
+          "mode",
+          "endpoint"
+        ],
+        "title": "ExecutionTarget",
+        "type": "object"
+      },
       "ExecutionVersions": {
         "additionalProperties": false,
         "properties": {
@@ -1044,6 +1183,129 @@
           }
         },
         "title": "ExecutionVersions",
+        "type": "object"
+      },
+      "ExternalCapacity": {
+        "additionalProperties": false,
+        "properties": {
+          "deployments": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalDeployment"
+            },
+            "minItems": 1,
+            "title": "Deployments",
+            "type": "array"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "inventory_id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Inventory Id",
+            "type": "string"
+          },
+          "worker_groups": {
+            "items": {
+              "$ref": "#/components/schemas/ExternalGroup"
+            },
+            "minItems": 1,
+            "title": "Worker Groups",
+            "type": "array"
+          }
+        },
+        "required": [
+          "id",
+          "inventory_id",
+          "worker_groups",
+          "deployments"
+        ],
+        "title": "ExternalCapacity",
+        "type": "object"
+      },
+      "ExternalCapacityImport": {
+        "additionalProperties": false,
+        "properties": {
+          "document": {
+            "$ref": "#/components/schemas/ExternalCapacity"
+          },
+          "provenance": {
+            "const": "measured",
+            "default": "measured",
+            "title": "Provenance",
+            "type": "string"
+          },
+          "source": {
+            "maxLength": 200,
+            "minLength": 1,
+            "title": "Source",
+            "type": "string"
+          }
+        },
+        "required": [
+          "source",
+          "document"
+        ],
+        "title": "ExternalCapacityImport",
+        "type": "object"
+      },
+      "ExternalDeployment": {
+        "additionalProperties": false,
+        "properties": {
+          "endpoint": {
+            "format": "uri",
+            "maxLength": 2083,
+            "minLength": 1,
+            "title": "Endpoint",
+            "type": "string"
+          },
+          "group_id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Group Id",
+            "type": "string"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "kubernetes_uid": {
+            "minLength": 1,
+            "title": "Kubernetes Uid",
+            "type": "string"
+          },
+          "profile": {
+            "$ref": "#/components/schemas/ServingProfile"
+          }
+        },
+        "required": [
+          "id",
+          "group_id",
+          "profile",
+          "kubernetes_uid",
+          "endpoint"
+        ],
+        "title": "ExternalDeployment",
+        "type": "object"
+      },
+      "ExternalGroup": {
+        "additionalProperties": false,
+        "properties": {
+          "group": {
+            "$ref": "#/components/schemas/WorkerGroup"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          }
+        },
+        "required": [
+          "id",
+          "group"
+        ],
+        "title": "ExternalGroup",
         "type": "object"
       },
       "Fault": {
@@ -1315,10 +1577,33 @@
             "title": "Id",
             "type": "string"
           },
+          "inventory_id": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Inventory Id"
+          },
           "mode": {
-            "const": "simulation",
             "default": "simulation",
+            "enum": [
+              "simulation",
+              "real"
+            ],
             "title": "Mode",
+            "type": "string"
+          },
+          "ownership": {
+            "default": "management",
+            "enum": [
+              "management",
+              "external"
+            ],
+            "title": "Ownership",
             "type": "string"
           }
         },
@@ -1662,6 +1947,7 @@
         "title": "InventoryView",
         "type": "object"
       },
+      "JsonValue": {},
       "KubernetesNode": {
         "additionalProperties": false,
         "properties": {
@@ -1699,17 +1985,17 @@
         "additionalProperties": false,
         "properties": {
           "p50_ms": {
-            "exclusiveMinimum": 0.0,
+            "minimum": 0.0,
             "title": "P50 Ms",
             "type": "number"
           },
           "p95_ms": {
-            "exclusiveMinimum": 0.0,
+            "minimum": 0.0,
             "title": "P95 Ms",
             "type": "number"
           },
           "p99_ms": {
-            "exclusiveMinimum": 0.0,
+            "minimum": 0.0,
             "title": "P99 Ms",
             "type": "number"
           },
@@ -1889,7 +2175,8 @@
           "managed_by": {
             "enum": [
               "foundation",
-              "management"
+              "management",
+              "external"
             ],
             "title": "Managed By",
             "type": "string"
@@ -2205,6 +2492,204 @@
           "runtime_blockers"
         ],
         "title": "Preflight",
+        "type": "object"
+      },
+      "PreparationManifest": {
+        "additionalProperties": false,
+        "properties": {
+          "adaptations": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "propertyNames": {
+              "minLength": 1
+            },
+            "title": "Adaptations",
+            "type": "object"
+          },
+          "artifact": {
+            "$ref": "#/components/schemas/Artifact"
+          },
+          "chat_template_kwargs": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Chat Template Kwargs",
+            "type": "object"
+          },
+          "customer_ref": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+            "title": "Customer Ref",
+            "type": "string"
+          },
+          "data_kind": {
+            "enum": [
+              "public",
+              "synthetic"
+            ],
+            "title": "Data Kind",
+            "type": "string"
+          },
+          "downloaded_bytes": {
+            "minimum": 0.0,
+            "title": "Downloaded Bytes",
+            "type": "integer"
+          },
+          "entry_count": {
+            "exclusiveMinimum": 0.0,
+            "title": "Entry Count",
+            "type": "integer"
+          },
+          "exclusions": {
+            "additionalProperties": {
+              "minimum": 0.0,
+              "type": "integer"
+            },
+            "propertyNames": {
+              "minLength": 1
+            },
+            "title": "Exclusions",
+            "type": "object"
+          },
+          "id": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Id",
+            "type": "string"
+          },
+          "license_evidence": {
+            "additionalProperties": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "License Evidence",
+            "type": "object"
+          },
+          "licenses": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Licenses",
+            "type": "object"
+          },
+          "max_rendered_input_tokens": {
+            "minimum": 0.0,
+            "title": "Max Rendered Input Tokens",
+            "type": "integer"
+          },
+          "prompt_template_sha256": {
+            "pattern": "^[a-f0-9]{64}$",
+            "title": "Prompt Template Sha256",
+            "type": "string"
+          },
+          "scanned": {
+            "minimum": 0.0,
+            "title": "Scanned",
+            "type": "integer"
+          },
+          "schema_version": {
+            "const": "0.1",
+            "default": "0.1",
+            "title": "Schema Version",
+            "type": "string"
+          },
+          "selection": {
+            "additionalProperties": {
+              "$ref": "#/components/schemas/JsonValue"
+            },
+            "title": "Selection",
+            "type": "object"
+          },
+          "source_manifest_refs": {
+            "items": {
+              "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+              "type": "string"
+            },
+            "minItems": 1,
+            "title": "Source Manifest Refs",
+            "type": "array"
+          },
+          "source_revisions": {
+            "additionalProperties": {
+              "anyOf": [
+                {
+                  "minLength": 1,
+                  "type": "string"
+                },
+                {
+                  "type": "null"
+                }
+              ]
+            },
+            "title": "Source Revisions",
+            "type": "object"
+          },
+          "source_urls": {
+            "additionalProperties": {
+              "minLength": 1,
+              "type": "string"
+            },
+            "title": "Source Urls",
+            "type": "object"
+          },
+          "token_accounting": {
+            "enum": [
+              "model_tokenizer",
+              "emulated"
+            ],
+            "title": "Token Accounting",
+            "type": "string"
+          },
+          "tokenizer_id": {
+            "minLength": 1,
+            "title": "Tokenizer Id",
+            "type": "string"
+          },
+          "tokenizer_revision": {
+            "minLength": 1,
+            "title": "Tokenizer Revision",
+            "type": "string"
+          },
+          "transform_version": {
+            "minLength": 1,
+            "title": "Transform Version",
+            "type": "string"
+          },
+          "warmup_count": {
+            "minimum": 0.0,
+            "title": "Warmup Count",
+            "type": "integer"
+          }
+        },
+        "required": [
+          "id",
+          "customer_ref",
+          "source_manifest_refs",
+          "data_kind",
+          "source_revisions",
+          "source_urls",
+          "licenses",
+          "transform_version",
+          "tokenizer_id",
+          "tokenizer_revision",
+          "token_accounting",
+          "prompt_template_sha256",
+          "artifact",
+          "entry_count",
+          "warmup_count",
+          "max_rendered_input_tokens",
+          "scanned",
+          "downloaded_bytes"
+        ],
+        "title": "PreparationManifest",
         "type": "object"
       },
       "PreparedBundle": {
@@ -2830,6 +3315,15 @@
             "title": "Customer Requests",
             "type": "object"
           },
+          "customer_sessions": {
+            "patternProperties": {
+              "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$": {
+                "$ref": "#/components/schemas/SessionCounts"
+              }
+            },
+            "title": "Customer Sessions",
+            "type": "object"
+          },
           "invalid_reasons": {
             "default": [],
             "items": {
@@ -2933,6 +3427,16 @@
             "title": "Datasets",
             "type": "array"
           },
+          "delivery_policy": {
+            "$ref": "#/components/schemas/DeliveryPolicy"
+          },
+          "derivation": {
+            "additionalProperties": {
+              "type": "string"
+            },
+            "title": "Derivation",
+            "type": "object"
+          },
           "inventory": {
             "anyOf": [
               {
@@ -2942,6 +3446,14 @@
                 "type": "null"
               }
             ]
+          },
+          "preparation": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/PreparationManifest"
+            },
+            "title": "Preparation",
+            "type": "array"
           },
           "scenario": {
             "$ref": "#/components/schemas/ScenarioSpec"
@@ -2958,6 +3470,16 @@
             },
             "title": "Serving Profiles",
             "type": "array"
+          },
+          "target": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/ExecutionTarget"
+              },
+              {
+                "type": "null"
+              }
+            ]
           },
           "versions": {
             "$ref": "#/components/schemas/ExecutionVersions"
@@ -3016,6 +3538,18 @@
             "default": "management",
             "title": "Source",
             "type": "string"
+          },
+          "timeline_origin_at": {
+            "anyOf": [
+              {
+                "format": "date-time",
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Timeline Origin At"
           }
         },
         "required": [
@@ -3317,6 +3851,49 @@
           "worker_class"
         ],
         "title": "ServingProfile",
+        "type": "object"
+      },
+      "SessionCounts": {
+        "additionalProperties": false,
+        "properties": {
+          "cancelled": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Cancelled",
+            "type": "integer"
+          },
+          "completed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Completed",
+            "type": "integer"
+          },
+          "cutoff": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Cutoff",
+            "type": "integer"
+          },
+          "eligible_for_slo": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Eligible For Slo",
+            "type": "integer"
+          },
+          "failed": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Failed",
+            "type": "integer"
+          },
+          "started": {
+            "default": 0,
+            "minimum": 0.0,
+            "title": "Started",
+            "type": "integer"
+          }
+        },
+        "title": "SessionCounts",
         "type": "object"
       },
       "SessionInfo": {
@@ -6492,6 +7069,135 @@
           }
         ],
         "summary": "Import Dataset",
+        "tags": [
+          "Integrations"
+        ]
+      }
+    },
+    "/api/v1/imports/external-capacity": {
+      "post": {
+        "operationId": "importExternalCapacity",
+        "parameters": [
+          {
+            "in": "header",
+            "name": "Idempotency-Key",
+            "required": true,
+            "schema": {
+              "maxLength": 200,
+              "minLength": 8,
+              "title": "Idempotency-Key",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/ExternalCapacityImport"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "202": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ImportAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Import External Capacity",
         "tags": [
           "Integrations"
         ]

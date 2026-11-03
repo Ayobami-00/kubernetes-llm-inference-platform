@@ -6,15 +6,22 @@ import json
 from pathlib import Path
 
 from platform_contracts import (
+    Admission,
     CustomerSpec,
     DatasetManifest,
+    ExecutionTarget,
     InfrastructureInventory,
     OperationStatus,
+    PreparationManifest,
+    PreparedEntry,
+    RequestRecord,
     Run,
+    RunnerObservation,
     RunResult,
     RunSnapshot,
     ScenarioSpec,
     ServingProfile,
+    SessionRecord,
     WorkerGroup,
     WorkerGroupSpec,
     WorkerGroupStatus,
@@ -33,6 +40,13 @@ SCHEMA_MODELS = {
     "operation": OperationStatus,
     "inventory": InfrastructureInventory,
     "dataset-manifest": DatasetManifest,
+    "execution-target": ExecutionTarget,
+    "preparation-manifest": PreparationManifest,
+    "prepared-entry": PreparedEntry,
+    "admission": Admission,
+    "request-record": RequestRecord,
+    "session-record": SessionRecord,
+    "runner-observation": RunnerObservation,
 }
 
 

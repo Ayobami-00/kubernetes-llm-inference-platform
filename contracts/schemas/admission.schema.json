@@ -1,0 +1,46 @@
+{
+  "$id": "https://schemas.inference-platform.example/0.1/admission.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "customer_ref": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+      "title": "Customer Ref",
+      "type": "string"
+    },
+    "entry_id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Entry Id",
+      "type": "string"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "phase": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Phase",
+      "type": "string"
+    },
+    "scheduled_offset_ms": {
+      "minimum": 0,
+      "title": "Scheduled Offset Ms",
+      "type": "number"
+    },
+    "warmup": {
+      "title": "Warmup",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "customer_ref",
+    "entry_id",
+    "scheduled_offset_ms",
+    "warmup",
+    "phase"
+  ],
+  "title": "Admission",
+  "type": "object"
+}

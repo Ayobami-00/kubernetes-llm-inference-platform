@@ -63,7 +63,9 @@ class CreateGroup(ContractModel):
 
 class GroupView(ContractModel):
     id: str
-    mode: Literal["simulation"] = "simulation"
+    mode: Literal["simulation", "real"] = "simulation"
+    ownership: Literal["management", "external"] = "management"
+    inventory_id: str | None = None
     group: WorkerGroup
     fault: Fault = "none"
 
@@ -84,7 +86,10 @@ class DeploymentView(ContractModel):
     profile: ServingProfile
     group_id: str
     status: Literal["deploying", "ready", "failed", "unavailable"]
-    mode: Literal["simulation"] = "simulation"
+    mode: Literal["simulation", "real"] = "simulation"
+    ownership: Literal["management", "external"] = "management"
+    kubernetes_uid: str | None = None
+    endpoint: str | None = None
 
 
 class RunLaunch(ContractModel):
@@ -102,6 +107,7 @@ class RunView(ContractModel):
     group_ids: dict[str, str] = Field(default_factory=dict)
     source: str = "management"
     provenance: Literal["synthetic", "measured", "unverified"] = "synthetic"
+    timeline_origin_at: datetime | None = None
 
 
 class ReadinessCheck(ContractModel):

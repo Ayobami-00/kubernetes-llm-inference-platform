@@ -1,0 +1,112 @@
+{
+  "$id": "https://schemas.inference-platform.example/0.1/session-record.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "customer_ref": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+      "title": "Customer Ref",
+      "type": "string"
+    },
+    "ended_offset_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Ended Offset Ms"
+    },
+    "expected_turns": {
+      "exclusiveMinimum": 0,
+      "title": "Expected Turns",
+      "type": "integer"
+    },
+    "id": {
+      "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+      "title": "Id",
+      "type": "string"
+    },
+    "outcome": {
+      "enum": [
+        "completed",
+        "failed",
+        "cancelled",
+        "cutoff",
+        "not_started"
+      ],
+      "title": "Outcome",
+      "type": "string"
+    },
+    "reason": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Reason"
+    },
+    "request_ids": {
+      "items": {
+        "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+        "type": "string"
+      },
+      "title": "Request Ids",
+      "type": "array"
+    },
+    "scheduled_offset_ms": {
+      "minimum": 0,
+      "title": "Scheduled Offset Ms",
+      "type": "number"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "source_entry_id": {
+      "minLength": 1,
+      "title": "Source Entry Id",
+      "type": "string"
+    },
+    "started_offset_ms": {
+      "anyOf": [
+        {
+          "minimum": 0,
+          "type": "number"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "title": "Started Offset Ms"
+    },
+    "warmup_cohort": {
+      "title": "Warmup Cohort",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "id",
+    "customer_ref",
+    "source_entry_id",
+    "warmup_cohort",
+    "scheduled_offset_ms",
+    "started_offset_ms",
+    "ended_offset_ms",
+    "expected_turns",
+    "request_ids",
+    "outcome"
+  ],
+  "title": "SessionRecord",
+  "type": "object"
+}

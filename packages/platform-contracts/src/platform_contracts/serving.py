@@ -2,7 +2,7 @@
 
 from typing import Annotated, Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, JsonValue, model_validator
 
 from .common import (
     ContractModel,
@@ -44,6 +44,7 @@ class EngineSettings(ContractModel):
     max_num_seqs: PositiveInt = 8
     gpu_memory_utilization: Annotated[float, Field(strict=True, gt=0, lt=1)] = 0.8
     prefix_caching: bool = False
+    chat_template_kwargs: dict[str, JsonValue] = Field(default_factory=dict)
     speculative_decoding: SpeculativeDecoding | None = None
 
 

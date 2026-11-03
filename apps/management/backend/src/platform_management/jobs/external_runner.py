@@ -5,11 +5,22 @@ import copy
 from platform_contracts import Run, RunSnapshot
 from sqlalchemy import select
 
-from platform_management.db.models import RunRow
+from platform_management.db.models import ArtifactCheck, RunRow
 from platform_management.db.session import session
 from platform_management.integrations import registry
 from platform_management.jobs.queue import owned
 from platform_management.services.common import now
+from platform_management.services.imports import inspect_artifacts
+
+
+def register_artifacts(data, operation_id, owner):
+    checks = inspect_artifacts(data.get("result") or {})
+    if any(c["status"] != "verified" for c in checks):
+        raise ValueError("Runner result contains unavailable or unverified artifacts")
+    with session() as db, db.begin():
+        owned(db, operation_id, owner)
+        for check in checks:
+            db.merge(ArtifactCheck(**check))
 
 
 def persist_context(run_id, operation_id, owner, values):
@@ -43,9 +54,13 @@ def external_step(op, data, context, checkpoint, config, owner):
                     return data, context, checkpoint, False, "Runner cancellation · cleanup pending"
                 else:
                     data.update(status="cancelled", stage=None, finished_at=now().isoformat())
+                    partial = adapter.saved_observation(handle)
+                    if partial and partial.result:
+                        data["result"] = partial.result.model_dump(mode="json")
             else:
                 data.update(status="cancelled", stage=None, finished_at=now().isoformat())
             context.update(cleanup_pending=False, ack_pending=bool(uid))
+            register_artifacts(data, op["id"], owner)
             return (
                 Run.model_validate(data).model_dump(mode="json"),
                 context,
@@ -78,6 +93,11 @@ def external_step(op, data, context, checkpoint, config, owner):
                 started_at=context.get("execution_started_at") or data["created_at"],
             )
         observation = adapter.observe(handle, uid)
+        if observation.timeline_origin_at:
+            origin = observation.timeline_origin_at.isoformat()
+            if context.get("timeline_origin_at") not in {None, origin}:
+                raise ValueError("Runner changed its immutable timeline origin")
+            context["timeline_origin_at"] = origin
         if observation.status in {"running", "queued"}:
             data["stage"] = observation.stage or "preparing"
             return data, context, checkpoint, False, data["stage"]
@@ -89,6 +109,7 @@ def external_step(op, data, context, checkpoint, config, owner):
             error=observation.error.model_dump(mode="json") if observation.error else None,
         )
         context["ack_pending"] = True
+        register_artifacts(data, op["id"], owner)
         return (
             Run.model_validate(data).model_dump(mode="json"),
             context,

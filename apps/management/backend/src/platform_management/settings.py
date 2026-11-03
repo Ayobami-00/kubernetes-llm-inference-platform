@@ -1,6 +1,9 @@
+import re
+from decimal import Decimal
 from functools import lru_cache
 from pathlib import Path
 
+from pydantic import field_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 
@@ -18,6 +21,10 @@ class Settings(BaseSettings):
     real_runner: str = "unconfigured:v1"
     runner_image: str = ""
     runner_command: list[str] = []
+    runner_resources: dict[str, dict[str, str]] = {
+        "requests": {"cpu": "100m", "memory": "128Mi"},
+        "limits": {"cpu": "2", "memory": "2Gi"},
+    }
     serving_namespace: str = "llm-d"
     runner_namespace: str = "klip"
     runner_secret_refs: list[str] = []
@@ -32,6 +39,36 @@ class Settings(BaseSettings):
     runner_startup_allowance_seconds: int = 300
     lease_seconds: int = 60
     heartbeat_seconds: int = 10
+
+    @field_validator("runner_resources")
+    @classmethod
+    def resource_bounds(cls, value):
+        if set(value) != {"requests", "limits"} or any(
+            set(v) != {"cpu", "memory"} for v in value.values()
+        ):
+            raise ValueError("runner resources require cpu/memory requests and limits")
+
+        def amount(name, raw):
+            pattern = (
+                r"([0-9]+(?:\.[0-9]+)?)(m?)"
+                if name == "cpu"
+                else r"([0-9]+(?:\.[0-9]+)?)([KMGTPE]i?)?"
+            )
+            match = re.fullmatch(pattern, raw)
+            if not match:
+                raise ValueError("invalid runner resource quantity")
+            number, unit = Decimal(match[1]), match[2] or ""
+            if name == "cpu":
+                return number / (1000 if unit == "m" else 1)
+            return number * (1024 if unit.endswith("i") else 1000) ** (
+                "KMGTPE".index(unit[0]) + 1 if unit else 0
+            )
+
+        for name in ("cpu", "memory"):
+            requested, limit = (amount(name, value[k][name]) for k in ("requests", "limits"))
+            if requested <= 0 or requested > limit:
+                raise ValueError("runner requests must be positive and no greater than limits")
+        return value
 
     def secret(self, path: Path, required: bool = False) -> str:
         value = path.read_text().strip() if path.exists() else ""

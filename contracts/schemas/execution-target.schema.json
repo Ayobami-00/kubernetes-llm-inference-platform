@@ -1,0 +1,62 @@
+{
+  "$id": "https://schemas.inference-platform.example/0.1/execution-target.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "credential_env": {
+      "patternProperties": {
+        "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$": {
+          "pattern": "^[A-Za-z_][A-Za-z0-9_]*$",
+          "type": "string"
+        }
+      },
+      "title": "Credential Env",
+      "type": "object"
+    },
+    "endpoint": {
+      "format": "uri",
+      "maxLength": 2083,
+      "minLength": 1,
+      "title": "Endpoint",
+      "type": "string"
+    },
+    "mode": {
+      "enum": [
+        "local-stub",
+        "benchmark"
+      ],
+      "title": "Mode",
+      "type": "string"
+    },
+    "serving_stack": {
+      "default": "llm-d-vllm",
+      "enum": [
+        "direct-vllm",
+        "llm-d-vllm"
+      ],
+      "title": "Serving Stack",
+      "type": "string"
+    },
+    "stub_preset": {
+      "default": "healthy",
+      "enum": [
+        "healthy",
+        "slow-first",
+        "slow-completion",
+        "reject",
+        "error",
+        "timeout",
+        "interrupted",
+        "shared-overload"
+      ],
+      "title": "Stub Preset",
+      "type": "string"
+    }
+  },
+  "required": [
+    "mode",
+    "endpoint"
+  ],
+  "title": "ExecutionTarget",
+  "type": "object"
+}

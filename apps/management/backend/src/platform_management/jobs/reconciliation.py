@@ -63,6 +63,8 @@ def reconcile_expiry():
             .where(Resource.kind == "worker_group")
             .with_for_update(skip_locked=True)
         ):
+            if row.payload.get("ownership") == "external":
+                continue  # Expiry blocks readiness; it never implies provider termination.
             group = row.payload["group"]
             status = group["status"]
             if status["phase"] in {"expired", "deleted"} or row.active_operation_id:

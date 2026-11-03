@@ -27,6 +27,13 @@ from .common import (
 from .customers import CustomerSpec
 from .datasets import DatasetManifest
 from .inventory import InfrastructureInventory
+from .measurements import (
+    DeliveryPolicy,
+    ExecutionTarget,
+    Milliseconds,
+    PreparationManifest,
+    SessionCounts,
+)
 from .scenarios import ScenarioSpec
 from .serving import ServingProfile
 from .worker_groups import WorkerGroupSpec
@@ -60,6 +67,10 @@ class RunSnapshot(ContractModel):
     versions: ExecutionVersions = Field(default_factory=ExecutionVersions)
     inventory: InfrastructureInventory | None = None
     admission_schedule: Artifact | None = None
+    target: ExecutionTarget | None = None
+    preparation: tuple[PreparationManifest, ...] = ()
+    delivery_policy: DeliveryPolicy = Field(default_factory=DeliveryPolicy)
+    derivation: dict[str, str] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def validate_relationships(self) -> Self:
@@ -152,9 +163,9 @@ class SLOAssessment(ContractModel):
 
 class LatencySummary(ContractModel):
     sample_count: PositiveInt
-    p50_ms: PositiveNumber
-    p95_ms: PositiveNumber
-    p99_ms: PositiveNumber
+    p50_ms: Milliseconds
+    p95_ms: Milliseconds
+    p99_ms: Milliseconds
 
     @model_validator(mode="after")
     def ordered_quantiles(self) -> Self:
@@ -165,14 +176,18 @@ class LatencySummary(ContractModel):
 
 class CustomerMeasurements(ContractModel):
     customer_ref: RevisionRef
-    input_tokens: Count
-    cached_input_tokens: Count
-    output_tokens: Count
+    input_tokens: Count | None = None
+    cached_input_tokens: Count | None = None
+    output_tokens: Count | None = None
     latencies: dict[LatencyMetric, LatencySummary] = Field(default_factory=dict)
 
     @model_validator(mode="after")
     def check_cached_tokens(self) -> Self:
-        if self.cached_input_tokens > self.input_tokens:
+        if (
+            self.cached_input_tokens is not None
+            and self.input_tokens is not None
+            and self.cached_input_tokens > self.input_tokens
+        ):
             raise ValueError("cached input tokens exceed input tokens")
         return self
 
@@ -198,6 +213,7 @@ class RunResult(ContractModel):
     invalid_reasons: tuple[NonEmpty, ...] = ()
     requests: RequestCounts
     customer_requests: dict[RevisionRef, RequestCounts]
+    customer_sessions: dict[RevisionRef, SessionCounts] = Field(default_factory=dict)
     measurements: tuple[CustomerMeasurements, ...] = ()
     slo_assessments: tuple[SLOAssessment, ...] = ()
     slo_verdict: SLOVerdict
@@ -240,6 +256,14 @@ class RunResult(ContractModel):
             if len({record.customer_ref for record in records}) != len(records):
                 raise ValueError("duplicate customer measurements or quality results")
         return self
+
+
+class RunnerObservation(ContractModel):
+    status: ExecutionStatus
+    stage: Literal["preparing", "warming_up", "measuring", "draining", "finalizing"] | None = None
+    result: RunResult | None = None
+    error: ErrorInfo | None = None
+    timeline_origin_at: Timestamp | None = None
 
 
 class Run(RuntimeRecord):

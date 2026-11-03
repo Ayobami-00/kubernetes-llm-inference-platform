@@ -217,7 +217,7 @@ export type CustomerMeasurements = {
     /**
      * Cached Input Tokens
      */
-    cached_input_tokens: number;
+    cached_input_tokens?: number | null;
     /**
      * Customer Ref
      */
@@ -225,7 +225,7 @@ export type CustomerMeasurements = {
     /**
      * Input Tokens
      */
-    input_tokens: number;
+    input_tokens?: number | null;
     /**
      * Latencies
      */
@@ -235,7 +235,7 @@ export type CustomerMeasurements = {
     /**
      * Output Tokens
      */
-    output_tokens: number;
+    output_tokens?: number | null;
 };
 
 /**
@@ -392,9 +392,27 @@ export type DatasetSource = {
 };
 
 /**
+ * DeliveryPolicy
+ */
+export type DeliveryPolicy = {
+    /**
+     * Max Late Fraction
+     */
+    max_late_fraction?: number;
+    /**
+     * Max Scheduling Lag Ms
+     */
+    max_scheduling_lag_ms?: number;
+};
+
+/**
  * DeploymentView
  */
 export type DeploymentView = {
+    /**
+     * Endpoint
+     */
+    endpoint?: string | null;
     /**
      * Group Id
      */
@@ -404,9 +422,17 @@ export type DeploymentView = {
      */
     id: string;
     /**
+     * Kubernetes Uid
+     */
+    kubernetes_uid?: string | null;
+    /**
      * Mode
      */
-    mode?: 'simulation';
+    mode?: 'simulation' | 'real';
+    /**
+     * Ownership
+     */
+    ownership?: 'management' | 'external';
     profile: ServingProfile;
     /**
      * Status
@@ -444,6 +470,12 @@ export type EngineSettings = {
      * Backend
      */
     backend?: 'vllm';
+    /**
+     * Chat Template Kwargs
+     */
+    chat_template_kwargs?: {
+        [key: string]: JsonValue;
+    };
     /**
      * Dtype
      */
@@ -544,6 +576,34 @@ export type EventView = {
 export type ExecutionStatus = 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
 
 /**
+ * ExecutionTarget
+ */
+export type ExecutionTarget = {
+    /**
+     * Credential Env
+     */
+    credential_env?: {
+        [key: string]: unknown | string;
+    };
+    /**
+     * Endpoint
+     */
+    endpoint: string;
+    /**
+     * Mode
+     */
+    mode: 'local-stub' | 'benchmark';
+    /**
+     * Serving Stack
+     */
+    serving_stack?: 'direct-vllm' | 'llm-d-vllm';
+    /**
+     * Stub Preset
+     */
+    stub_preset?: 'healthy' | 'slow-first' | 'slow-completion' | 'reject' | 'error' | 'timeout' | 'interrupted' | 'shared-overload';
+};
+
+/**
  * ExecutionVersions
  */
 export type ExecutionVersions = {
@@ -565,6 +625,77 @@ export type ExecutionVersions = {
      * Runner Image
      */
     runner_image?: string | null;
+};
+
+/**
+ * ExternalCapacity
+ */
+export type ExternalCapacity = {
+    /**
+     * Deployments
+     */
+    deployments: Array<ExternalDeployment>;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Inventory Id
+     */
+    inventory_id: string;
+    /**
+     * Worker Groups
+     */
+    worker_groups: Array<ExternalGroup>;
+};
+
+/**
+ * ExternalCapacityImport
+ */
+export type ExternalCapacityImport = {
+    document: ExternalCapacity;
+    /**
+     * Provenance
+     */
+    provenance?: 'measured';
+    /**
+     * Source
+     */
+    source: string;
+};
+
+/**
+ * ExternalDeployment
+ */
+export type ExternalDeployment = {
+    /**
+     * Endpoint
+     */
+    endpoint: string;
+    /**
+     * Group Id
+     */
+    group_id: string;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Kubernetes Uid
+     */
+    kubernetes_uid: string;
+    profile: ServingProfile;
+};
+
+/**
+ * ExternalGroup
+ */
+export type ExternalGroup = {
+    group: WorkerGroup;
+    /**
+     * Id
+     */
+    id: string;
 };
 
 /**
@@ -746,9 +877,17 @@ export type GroupView = {
      */
     id: string;
     /**
+     * Inventory Id
+     */
+    inventory_id?: string | null;
+    /**
      * Mode
      */
-    mode?: 'simulation';
+    mode?: 'simulation' | 'real';
+    /**
+     * Ownership
+     */
+    ownership?: 'management' | 'external';
 };
 
 /**
@@ -959,6 +1098,8 @@ export type InventoryView = {
     source: string;
 };
 
+export type JsonValue = unknown;
+
 /**
  * KubernetesNode
  */
@@ -1089,7 +1230,7 @@ export type NodeObservation = {
     /**
      * Managed By
      */
-    managed_by: 'foundation' | 'management';
+    managed_by: 'foundation' | 'management' | 'external';
     /**
      * Observed At
      */
@@ -1247,6 +1388,121 @@ export type Preflight = {
      * Simulation Available
      */
     simulation_available?: boolean;
+};
+
+/**
+ * PreparationManifest
+ */
+export type PreparationManifest = {
+    /**
+     * Adaptations
+     */
+    adaptations?: {
+        [key: string]: number;
+    };
+    artifact: Artifact;
+    /**
+     * Chat Template Kwargs
+     */
+    chat_template_kwargs?: {
+        [key: string]: JsonValue;
+    };
+    /**
+     * Customer Ref
+     */
+    customer_ref: string;
+    /**
+     * Data Kind
+     */
+    data_kind: 'public' | 'synthetic';
+    /**
+     * Downloaded Bytes
+     */
+    downloaded_bytes: number;
+    /**
+     * Entry Count
+     */
+    entry_count: number;
+    /**
+     * Exclusions
+     */
+    exclusions?: {
+        [key: string]: number;
+    };
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * License Evidence
+     */
+    license_evidence?: {
+        [key: string]: string;
+    };
+    /**
+     * Licenses
+     */
+    licenses: {
+        [key: string]: string | null;
+    };
+    /**
+     * Max Rendered Input Tokens
+     */
+    max_rendered_input_tokens: number;
+    /**
+     * Prompt Template Sha256
+     */
+    prompt_template_sha256: string;
+    /**
+     * Scanned
+     */
+    scanned: number;
+    /**
+     * Schema Version
+     */
+    schema_version?: '0.1';
+    /**
+     * Selection
+     */
+    selection?: {
+        [key: string]: JsonValue;
+    };
+    /**
+     * Source Manifest Refs
+     */
+    source_manifest_refs: Array<string>;
+    /**
+     * Source Revisions
+     */
+    source_revisions: {
+        [key: string]: string | null;
+    };
+    /**
+     * Source Urls
+     */
+    source_urls: {
+        [key: string]: string;
+    };
+    /**
+     * Token Accounting
+     */
+    token_accounting: 'model_tokenizer' | 'emulated';
+    /**
+     * Tokenizer Id
+     */
+    tokenizer_id: string;
+    /**
+     * Tokenizer Revision
+     */
+    tokenizer_revision: string;
+    /**
+     * Transform Version
+     */
+    transform_version: string;
+    /**
+     * Warmup Count
+     */
+    warmup_count: number;
 };
 
 /**
@@ -1608,6 +1864,12 @@ export type RunResult = {
         [key: string]: unknown | RequestCounts;
     };
     /**
+     * Customer Sessions
+     */
+    customer_sessions?: {
+        [key: string]: unknown | SessionCounts;
+    };
+    /**
      * Invalid Reasons
      */
     invalid_reasons?: Array<string>;
@@ -1652,7 +1914,18 @@ export type RunSnapshot = {
      * Datasets
      */
     datasets: Array<DatasetManifest>;
+    delivery_policy?: DeliveryPolicy;
+    /**
+     * Derivation
+     */
+    derivation?: {
+        [key: string]: string;
+    };
     inventory?: InfrastructureInventory | null;
+    /**
+     * Preparation
+     */
+    preparation?: Array<PreparationManifest>;
     scenario: ScenarioSpec;
     /**
      * Schema Version
@@ -1662,6 +1935,7 @@ export type RunSnapshot = {
      * Serving Profiles
      */
     serving_profiles: Array<ServingProfile>;
+    target?: ExecutionTarget | null;
     versions?: ExecutionVersions;
     /**
      * Worker Groups
@@ -1692,6 +1966,10 @@ export type RunView = {
      * Source
      */
     source?: string;
+    /**
+     * Timeline Origin At
+     */
+    timeline_origin_at?: string | null;
 };
 
 /**
@@ -1854,6 +2132,36 @@ export type ServingProfile = {
      * Worker Class
      */
     worker_class: string;
+};
+
+/**
+ * SessionCounts
+ */
+export type SessionCounts = {
+    /**
+     * Cancelled
+     */
+    cancelled?: number;
+    /**
+     * Completed
+     */
+    completed?: number;
+    /**
+     * Cutoff
+     */
+    cutoff?: number;
+    /**
+     * Eligible For Slo
+     */
+    eligible_for_slo?: number;
+    /**
+     * Failed
+     */
+    failed?: number;
+    /**
+     * Started
+     */
+    started?: number;
 };
 
 /**
@@ -3407,6 +3715,65 @@ export type ImportDatasetResponses = {
 };
 
 export type ImportDatasetResponse = ImportDatasetResponses[keyof ImportDatasetResponses];
+
+export type ImportExternalCapacityData = {
+    body: ExternalCapacityImport;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/imports/external-capacity';
+};
+
+export type ImportExternalCapacityErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ImportExternalCapacityError = ImportExternalCapacityErrors[keyof ImportExternalCapacityErrors];
+
+export type ImportExternalCapacityResponses = {
+    /**
+     * Successful Response
+     */
+    202: ImportAccepted;
+};
+
+export type ImportExternalCapacityResponse = ImportExternalCapacityResponses[keyof ImportExternalCapacityResponses];
 
 export type ImportInventoryData = {
     body: InventoryImport;

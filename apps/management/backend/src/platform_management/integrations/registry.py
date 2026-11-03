@@ -21,6 +21,7 @@ def configuration(mode="simulation"):
         "runner": s.simulation_runner if mode == "simulation" else s.real_runner,
         "runner_image": s.runner_image,
         "runner_command": s.runner_command,
+        "runner_resources": s.runner_resources,
         "namespace": s.runner_namespace,
         "serving_namespace": s.serving_namespace,
         "service_account": s.runner_service_account,
@@ -93,7 +94,7 @@ def runner(payload, run_id, outcome="passing"):
         from platform_management.integrations.runner import SimulatedRunner
 
         return SimulatedRunner()
-    if name in {"kubernetes:v1", "kubernetes-fixture:v1"}:
+    if name in {"kubernetes:v1", "kubernetes-fixture:v1", "kubernetes-workload-stub:v1"}:
         if name == "kubernetes:v1" and (
             payload["mode"] != "real"
             or not is_image_pin(payload.get("runner_image"))
@@ -104,7 +105,10 @@ def runner(payload, run_id, outcome="passing"):
                 "A real runner requires a pinned image and execute-only command",
                 "adapter_unavailable",
             )
-        if name == "kubernetes-fixture:v1" and payload["mode"] != "simulation":
+        if (
+            name in {"kubernetes-fixture:v1", "kubernetes-workload-stub:v1"}
+            and payload["mode"] != "simulation"
+        ):
             raise AppError(422, "Fixture runners cannot execute real runs", "adapter_unavailable")
         from platform_management.integrations.job_runner import KubernetesJobRunner
 

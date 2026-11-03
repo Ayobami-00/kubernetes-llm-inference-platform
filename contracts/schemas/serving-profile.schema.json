@@ -46,6 +46,13 @@
           "title": "Backend",
           "type": "string"
         },
+        "chat_template_kwargs": {
+          "additionalProperties": {
+            "$ref": "#/$defs/JsonValue"
+          },
+          "title": "Chat Template Kwargs",
+          "type": "object"
+        },
         "dtype": {
           "default": "bfloat16",
           "enum": [
@@ -144,6 +151,7 @@
       "title": "GPURequirements",
       "type": "object"
     },
+    "JsonValue": {},
     "ModelSource": {
       "additionalProperties": false,
       "properties": {

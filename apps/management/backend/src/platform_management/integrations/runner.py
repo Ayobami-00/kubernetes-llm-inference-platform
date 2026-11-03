@@ -1,19 +1,12 @@
-from typing import Literal, Protocol
+from typing import Protocol
 
-from platform_contracts import RunResult, RunSnapshot
-from platform_contracts.common import ContractModel, ErrorInfo, ExecutionStatus
+from platform_contracts import RunnerObservation, RunSnapshot
+from platform_contracts.common import ErrorInfo
 from sqlalchemy import select
 
 from platform_management.db.models import RunRow
 from platform_management.db.session import session
 from platform_management.services.synthetic import result_for
-
-
-class RunnerObservation(ContractModel):
-    status: ExecutionStatus
-    stage: Literal["preparing", "warming_up", "measuring", "draining", "finalizing"] | None = None
-    result: RunResult | None = None
-    error: ErrorInfo | None = None
 
 
 class RunnerAdapter(Protocol):

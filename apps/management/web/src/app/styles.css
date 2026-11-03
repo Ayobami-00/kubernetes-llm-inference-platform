@@ -1218,6 +1218,7 @@ input[type='number'] {
 }
 .artifact {
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 9px;
   color: var(--accent-text);
@@ -1226,6 +1227,10 @@ input[type='number'] {
   border-radius: 6px;
   margin-top: 9px;
   font-size: 10px;
+}
+.artifact > span {
+  flex: 1;
+  min-width: 0;
 }
 .artifact small {
   display: block;

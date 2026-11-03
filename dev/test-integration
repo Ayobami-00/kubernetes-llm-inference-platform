@@ -47,6 +47,11 @@ kind create cluster --name "$qa_cluster" --kubeconfig "$KUBECONFIG" --config "$q
 docker image inspect postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5 >/dev/null 2>&1 || docker pull postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
 docker tag postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5 klip-integration-postgres:local
 kind load docker-image --name "$qa_cluster" klip-integration-backend:local klip-integration-web:local klip-integration-postgres:local
+if [[ "${KLIP_WORKLOAD_INTEGRATION:-0}" == 1 ]]; then
+  docker build -f workload-runner/Dockerfile -t klip-integration-workloads:local .
+  docker build -f dev/inference-stub/Dockerfile -t klip-integration-stub:local .
+  kind load docker-image --name "$qa_cluster" klip-integration-workloads:local klip-integration-stub:local
+fi
 kubectl create namespace "$qa_namespace"
 kubectl create namespace llm-d
 python3 scripts/management/integration_smoke.py setup "$qa_directory"
@@ -64,4 +69,9 @@ python3 scripts/management/integration_smoke.py verify-restore "$qa_directory"
 kubectl -n "$qa_namespace" delete pod klip-db-0 --wait=true
 kubectl -n "$qa_namespace" rollout status statefulset/klip-db --timeout=180s
 python3 scripts/management/integration_smoke.py verify "$qa_directory"
+if [[ "${KLIP_WORKLOAD_INTEGRATION:-0}" == 1 ]]; then
+  uv run --locked --all-packages python scripts/workloads/management_smoke.py "$qa_directory"
+  MANAGEMENT_WORKLOAD_PLAN_FILE="$qa_directory/data/artifacts/plans/writer-assist-baseline/snapshot.json" \
+    npm --prefix apps/management/web run test:e2e -- workloads.spec.ts
+fi
 echo "Integration proof passed: imports, fixture Jobs, recovery, browser workflows, upgrade, restore and PVC persistence."
