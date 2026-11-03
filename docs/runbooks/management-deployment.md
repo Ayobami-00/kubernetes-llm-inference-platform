@@ -14,6 +14,7 @@ make management-init-admin
 make management-stage
 make management-plan RECEIPTS=<downloaded-private-image-receipt-directory>
 make management-deploy PLAN_SHA=<reviewed-release-plan-digest>
+make management-verify
 ```
 
 Initialization creates a strong credential only when no local admin file or live
@@ -89,6 +90,15 @@ inspection. Keep the complete scan receipts alongside the release evidence.
 
 Verify certificate issuance/rotation, all replicas' placement and runtime
 configuration, authenticated reads/writes, EFS access and PostgreSQL connections.
+The encoded verifier checks spread replicas and deployed digests, uses each API
+Pod's actual connector to prove verified PostgreSQL TLS/non-superuser access,
+and authenticates through the native HTTPS Service over a private SSM/API tunnel.
+It preserves the intended hostname/SNI and verifies the internal CA without
+changing system trust or using an insecure TLS mode. Cookies/CSRF values stay in
+memory and the proof logs out its own session. A bounded synthetic file verifies
+shared artifacts across all API/worker Pods, with exact-content cleanup.
+The bundle records explicit exclusions: external frontend, failure recovery,
+certificate rotation and GPU/inference acceptance still require separate tests.
 Then test API/worker loss and PostgreSQL failover using the objectives in
 `docs/architecture/platform-availability.md`. Record recovery times, Job UIDs,
 execution timelines and partial artifacts. The external frontend, real Lambda

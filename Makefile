@@ -87,7 +87,7 @@ infra-registry-apply:
 registry-verify:
 	$(PYTHON) scripts/infrastructure/platform_registry.py
 
-.PHONY: management-init-admin management-stage management-plan management-deploy
+.PHONY: management-init-admin management-stage management-plan management-deploy management-verify
 management-init-admin:
 	$(PYTHON) scripts/infrastructure/management_release.py init-admin
 
@@ -101,6 +101,9 @@ management-plan:
 management-deploy:
 	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed management release digest'; exit 1)
 	$(PYTHON) scripts/infrastructure/management_release.py deploy --approve-plan "$(PLAN_SHA)"
+
+management-verify:
+	$(PYTHON) scripts/infrastructure/management_acceptance.py
 
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
