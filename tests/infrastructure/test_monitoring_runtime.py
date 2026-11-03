@@ -125,6 +125,7 @@ def test_only_proven_pre_helm_failures_can_be_retired(monkeypatch, tmp_path):
 
 def test_postcondition_failure_needs_observed_deployed_values(monkeypatch, tmp_path):
     monkeypatch.setattr(runtime, "folder", lambda: tmp_path)
+    monkeypatch.setattr(runtime, "tool", lambda _name: "synthetic-helm-not-executed")
     monkeypatch.setattr(runtime, "archive_current", Mock())
     monkeypatch.setattr(runtime, "observe", lambda: {"ready": True})
     monkeypatch.setattr(cluster, "kubectl", Mock(return_value=""))
