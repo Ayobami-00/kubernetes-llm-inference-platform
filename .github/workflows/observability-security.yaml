@@ -69,7 +69,13 @@ jobs:
               'limitations': 'Scanner findings require runtime review; zero findings are not a security guarantee.'
           }
           critical = 0
-          for index, (reference, item) in enumerate(lock['images'].items()):
+          images = [(name, item, False) for name, item in lock['images'].items()]
+          # Reviewed upstream patch candidate, not a deployment authorization.
+          images.append(('quay.io/thanos/thanos:v0.42.5', {
+              'digest': 'sha256:a13aade5af3866e40d0f01c17750ad4decbb500fdb6a37a54b8348d4dfa09f49',
+              'platform': 'linux/amd64',
+          }, True))
+          for index, (reference, item, candidate) in enumerate(images):
               if item['platform'] != 'linux/amd64' or not item['digest'].startswith('sha256:'):
                   raise SystemExit('Missing immutable Linux AMD64 identity')
               pinned = reference + '@' + item['digest']
@@ -89,6 +95,7 @@ jobs:
               critical += counts.get('CRITICAL', 0)
               report['images'].append({
                   'reference': reference, **item, 'raw_report': path.name,
+                  'candidate_only': candidate,
                   'report_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
                   'severity_counts': counts,
                   'coverage': [{'target': r['Target'], 'class': r.get('Class'),
@@ -107,5 +114,60 @@ jobs:
         with:
           name: observability-security-${{ github.sha }}
           path: artifacts/security/observability/
+          if-no-files-found: error
+          retention-days: 90
+
+  exporter-source-analysis:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - name: node-exporter-1.12.1
+            repository: prometheus/node_exporter
+            revision: 6044da783597cc3b57aef7580ddcdcff58a4ee99
+            go: '1.26.5'
+            package: '.'
+          - name: kube-state-metrics-2.20.0
+            repository: kubernetes/kube-state-metrics
+            revision: 4ffeda2ef866b0fef372849825a803296483b336
+            go: '1.26.6'
+            package: '.'
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          repository: ${{ matrix.repository }}
+          ref: ${{ matrix.revision }}
+          persist-credentials: false
+      - uses: actions/setup-go@924ae3a1cded613372ab5595356fb5720e22ba16 # v6
+        with:
+          go-version: ${{ matrix.go }}
+          cache: false
+      - name: Analyze exact upstream source with its image toolchain
+        env:
+          EXPECTED_REVISION: ${{ matrix.revision }}
+          SOURCE_REPOSITORY: ${{ matrix.repository }}
+          SCAN_PACKAGE: ${{ matrix.package }}
+          GOTOOLCHAIN: local
+          GOOS: linux
+          GOARCH: amd64
+        shell: bash
+        run: |
+          set -euo pipefail
+          test "$(git rev-parse HEAD)" = "$EXPECTED_REVISION"
+          go install golang.org/x/vuln/cmd/govulncheck@v1.9.0
+          mkdir -p "$RUNNER_TEMP/source-analysis"
+          go version > "$RUNNER_TEMP/source-analysis/go-version.txt"
+          govulncheck -version > "$RUNNER_TEMP/source-analysis/scanner-version.txt"
+          printf '%s\n%s\n' "$SOURCE_REPOSITORY" "$EXPECTED_REVISION" > "$RUNNER_TEMP/source-analysis/source.txt"
+          govulncheck -json "$SCAN_PACKAGE" > "$RUNNER_TEMP/source-analysis/findings.json"
+          # JSON mode exits zero even when findings exist. Preserve all findings
+          # for explicit runtime review; this job never approves deployment.
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: observability-source-${{ matrix.name }}-${{ github.sha }}
+          path: ${{ runner.temp }}/source-analysis/
           if-no-files-found: error
           retention-days: 90
