@@ -13,6 +13,37 @@ move between AZs; another replica serves after failover. See the initial
 [availability objectives](../architecture/platform-availability.md). Replica
 counts and Ready conditions do not prove application failover or backup recovery.
 
+## Isolated primary failure acceptance
+
+After verifying a real restore, create a fresh external backup and use its exact
+operation identity for the failure test:
+
+```sh
+make database-backup OPERATION=<backup-12-hex-id>
+make management-verify-postgresql-recovery OPERATION=<fault-12-hex-id> BACKUP_OPERATION=<backup-12-hex-id>
+```
+
+This operator-only procedure runs outside the management backend. It requires
+three Ready database instances on separate protected workers, the unchanged
+required `ANY 1` synchronous/quorum policy and a completed backup whose WAL was
+verified within the last day. It commits a synthetic marker before deleting only
+the current primary Pod, with an API-side UID precondition. It never deletes PVCs,
+stops CPU hosts, forces promotion or changes durability settings.
+
+The [CloudNativePG automatic failover path](https://cloudnative-pg.io/docs/1.30/failover/)
+must promote a different primary. The procedure verifies the acknowledged marker,
+commits another marker on that primary, waits for three Ready instances and verifies
+WAL archiving on the new timeline. Independent public HTTPS probes retain the
+session acknowledged before the fault and read the same history afterward. The
+database write and application recovery objectives are both 120 seconds; timers,
+probe cadence, errors and partial records remain in the evidence. Interruption
+does not authorize a second deletion or a new unobserved fault clock.
+
+Repeating a completed operation reuses its original evidence. Conflicting backup
+identities and incomplete probe evidence require inspection. This is an isolated
+primary-Pod loss, not a CPU-host, disk-loss, network-partition or workload-delivery
+test. Run those separately, after all replicas and archival health recover.
+
 The CNPG controller has two replicas. The pinned Barman manager intentionally has
 one recoverable replica: its leader-gated gRPC server and health-only readiness
 probe do not support advertising a standby as a healthy plugin endpoint. Database

@@ -23,22 +23,43 @@ const config = JSON.parse(
   await readFile(resolve(root, "infra/terraform/project.json"), "utf8"),
 );
 const origin = `https://management.${config.domain}`;
+const faultModes = {
+  "--restart-api": {
+    prefix: "api",
+    script: "management_api_failure.py",
+    objective: 60,
+    deadline: 180000,
+    description: "one API Pod restart under authenticated traffic",
+  },
+  "--fail-primary": {
+    prefix: "postgresql",
+    script: "database_failover.py",
+    objective: 120,
+    deadline: 720000,
+    description: "one PostgreSQL primary Pod loss under authenticated traffic",
+  },
+};
 const args = process.argv.slice(2);
+const mode = faultModes[args[0]];
 if (
   args.length &&
-  (args.length !== 2 ||
-    args[0] !== "--restart-api" ||
-    !/^[a-f0-9]{12}$/.test(args[1]))
+  (!mode ||
+    !/^[a-f0-9]{12}$/.test(args[1] || "") ||
+    (args[0] === "--restart-api"
+      ? args.length !== 2
+      : args.length !== 4 ||
+        args[2] !== "--backup-operation" ||
+        !/^[a-f0-9]{12}$/.test(args[3] || "")))
 ) {
   throw new Error(
-    "Use no arguments for read-only verification, or --restart-api <12-hex-operation>.",
+    "Use no arguments, --restart-api <operation>, or --fail-primary <operation> --backup-operation <verified-backup>.",
   );
 }
 const output = resolve(root, "artifacts/platform/public-management-ui");
 await mkdir(output, { recursive: true, mode: 0o700 });
 if (args.length) {
   try {
-    const path = resolve(output, "api-failure-" + args[1] + ".json");
+    const path = resolve(output, mode.prefix + "-failure-" + args[1] + ".json");
     const previous = JSON.parse(await readFile(path, "utf8"));
     const intervention = Date.parse(previous.restart?.intervention_at);
     const covered =
@@ -49,7 +70,10 @@ if (args.length) {
       !previous.process_completed ||
       !Number.isFinite(previous.recovery_upper_bound_seconds) ||
       previous.recovery_upper_bound_seconds < 0 ||
-      previous.recovery_upper_bound_seconds > 60 ||
+      previous.recovery_upper_bound_seconds > mode.objective ||
+      (mode.prefix === "postgresql" &&
+        (previous.restart?.backup_operation !== args[3] ||
+          previous.restart?.database_write_objective_met !== true)) ||
       !covered
     ) {
       throw new Error("Existing incomplete fault proof requires inspection.");
@@ -61,7 +85,7 @@ if (args.length) {
   } catch (error) {
     if (error.code !== "ENOENT")
       throw new Error(
-        "Existing API fault evidence requires inspection; it will not be overwritten.",
+        "Existing fault evidence requires inspection; it will not be overwritten.",
       );
   }
 }
@@ -75,9 +99,10 @@ async function restartProof() {
   const child = spawn(
     resolve(root, ".venv/bin/python"),
     [
-      resolve(root, "scripts/infrastructure/management_api_failure.py"),
+      resolve(root, "scripts/infrastructure/" + mode.script),
       "--operation",
       operation,
+      ...(mode.prefix === "postgresql" ? ["--backup-operation", args[3]] : []),
     ],
     { cwd: root, stdio: ["ignore", "pipe", "pipe"] },
   );
@@ -101,7 +126,10 @@ async function restartProof() {
   const probes = [];
   let trailing = 0;
   try {
-    while (performance.now() - started < 180000 && (!ended || trailing < 5)) {
+    while (
+      performance.now() - started < mode.deadline &&
+      (!ended || trailing < 5)
+    ) {
       const sent = performance.now();
       const record = {
         sent_at: new Date().toISOString(),
@@ -146,7 +174,10 @@ async function restartProof() {
       Date.parse(result.restart.intervention_at) <=
         Date.parse(probes.at(-1).sent_at),
     );
-    const destination = resolve(output, "api-failure-" + operation + ".json");
+    const destination = resolve(
+      output,
+      mode.prefix + "-failure-" + operation + ".json",
+    );
     const temporary = destination + "." + randomUUID() + ".tmp";
     const file = await open(temporary, "wx", 0o600);
     try {
@@ -165,9 +196,11 @@ async function restartProof() {
       code !== 0 ||
       !result.intervention_observed ||
       recovery === undefined ||
-      recovery > 60
+      recovery > mode.objective ||
+      (mode.prefix === "postgresql" &&
+        result.restart?.database_write_objective_met !== true)
     )
-      throw new Error("API recovery");
+      throw new Error("recovery objective");
     return result;
   } finally {
     if (!ended) child.kill("SIGTERM");
@@ -236,7 +269,7 @@ try {
     throw new Error("cookie controls");
   let failure;
   if (args.length) {
-    stage = "one API Pod restart under authenticated traffic";
+    stage = mode.description;
     failure = await restartProof();
     const retained = await context.request.get(origin + "/api/v1/runs");
     if (retained.status() !== 200) throw new Error("history after recovery");
@@ -257,7 +290,8 @@ try {
     cookie_http_only: true,
     screenshots: ["topology.png", "runs.png"],
     scope: args.length
-      ? "One exact API Pod restart under authenticated reads; no worker, database, host-loss or inference resilience claim"
+      ? mode.description +
+        "; no worker, host-loss or inference resilience claim"
       : "UI authentication, topology/inspector and retained-history reads; no resource mutations or inference claims",
     failure,
   };

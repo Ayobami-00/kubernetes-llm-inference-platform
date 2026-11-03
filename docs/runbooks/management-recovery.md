@@ -78,7 +78,13 @@ leave a failed operation with a nonterminal, cleanup-pending run. Request Stop a
 connectivity/RBAC; do not mark it cancelled while Pods can still execute. Completed Jobs are retained
 until terminal data is committed, then receive a one-day TTL. Artifacts remain on the shared PVC.
 
-## Kubernetes backup and restore
+## Legacy development database backup and restore
+
+This subsection applies to the single-instance development chart. The live lab
+uses the three-instance `platform-data/klip-db` CloudNativePG deployment. Use
+[the replicated database runbook](management-postgresql.md) for its WAL backups,
+isolated restoration and failover tests; the commands below target the legacy
+`klip/klip-db-0` instance.
 
 Keep backups private and off the database PVC. The following uses the existing PostgreSQL Secret
 through its container environment, without printing credentials:
@@ -109,7 +115,7 @@ backup usable. For disaster recovery, stop writers, provision storage, restore d
 Secrets, and reconcile recorded external Job UIDs and provider intents before enabling workers.
 Never point recovered workers at a different cluster or duplicate an ambiguous allocation.
 
-The PostgreSQL chart uses one primary. Storage retention is not a backup or failover strategy.
+The legacy development PostgreSQL chart uses one primary. Storage retention is not a backup or failover strategy.
 Do not delete PVCs to resolve an application migration error. Inspect the migration hook and restore
 a verified backup if a schema/data recovery is required. Changes to major PostgreSQL versions need
 an explicit migration procedure; changing the image tag is insufficient.

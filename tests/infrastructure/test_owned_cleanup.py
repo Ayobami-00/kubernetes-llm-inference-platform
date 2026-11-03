@@ -20,6 +20,7 @@ import pytest
         "/apis/batch/v1/namespaces/klip/jobs/storage-test",
         "/apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db-restore",
         "/api/v1/namespaces/klip/pods/klip-api-1234-abcd",
+        "/api/v1/namespaces/platform-data/pods/klip-db-1",
     ],
 )
 def test_remote_cleanup_enforces_the_uid_and_never_hides_api_conflicts(monkeypatch, status, target):
@@ -91,6 +92,7 @@ def test_remote_cleanup_enforces_the_uid_and_never_hides_api_conflicts(monkeypat
         "/api/v1/namespaces/a/../b",
         "/api/v1/namespaces/klip/pods/klip-worker-1234-abcd",
         "/api/v1/namespaces/another/pods/klip-api-1234-abcd",
+        "/api/v1/namespaces/platform-data/pods/unrelated-db-1",
         "/apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db",
     ],
 )

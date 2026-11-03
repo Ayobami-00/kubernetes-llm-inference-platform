@@ -370,6 +370,7 @@ def bundle() -> dict:
     for category, pattern, name in (
         ("renewal", "*/verification.json", "renewal"),
         ("failures", "*/api.json", "api-failure"),
+        ("failures", "*/postgresql.json", "postgresql-failure"),
     ):
         for path in (folder() / category).glob(pattern):
             if len(path.parent.name) == 12 and all(
@@ -377,6 +378,10 @@ def bundle() -> dict:
             ):
                 extras[name + "-" + path.parent.name + ".json"] = path
     for path in (ROOT / "artifacts/platform/public-management-ui").glob("api-failure-*.json"):
+        extras["public-" + path.name] = path
+    for path in (ROOT / "artifacts/platform/public-management-ui").glob(
+        "postgresql-failure-*.json"
+    ):
         extras["public-" + path.name] = path
     files.update({name: path for name, path in extras.items() if path.is_file()})
     output = ROOT / "artifacts/platform/management-verification" / result["operation"]

@@ -141,6 +141,11 @@ management-verify-api-recovery:
 	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
 	node scripts/management/public_read_smoke.mjs --restart-api "$(OPERATION)"
 
+.PHONY: management-verify-postgresql-recovery
+management-verify-postgresql-recovery:
+	@test -n "$(OPERATION)" -a -n "$(BACKUP_OPERATION)" || (echo 'Set OPERATION and the completed BACKUP_OPERATION'; exit 1)
+	node scripts/management/public_read_smoke.mjs --fail-primary "$(OPERATION)" --backup-operation "$(BACKUP_OPERATION)"
+
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
 	$(PYTHON) scripts/infrastructure/image_credentials.py prepare
