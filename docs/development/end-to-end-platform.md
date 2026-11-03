@@ -272,3 +272,28 @@ to review. The full newer Nginx image still had vulnerable unused packages, so t
 frontend now selects its pinned upstream slim variant pending a fresh scan and
 runtime/browser checks. Management application deployment and HA acceptance remain
 outstanding; none of these isolated checks are live inference/SLO evidence.
+
+The subsequent slim-runtime scan has zero critical findings in all four images;
+the remaining high findings have a package/version-specific applicability review
+with a 2026-12-03 deadline. They remain visible. New/unreviewed findings, incomplete
+coverage, stale scans or weaker runtime controls prevent deployment. The review
+excludes arbitrary scripts and workstation preparation.
+
+A further layer-toggle browser failure was traced to discarding React Flow's
+controlled-node measurements during layout. The corrected update preserves node
+state, with a repeated layer-toggle browser regression. Backend runtime Pods and
+runner Jobs now use RuntimeDefault seccomp and fixed C locale settings. The lab
+management chart supports internal HTTPS and cert-manager renewal through Nginx's
+native variable-certificate cache, without adding a watcher or API privileges.
+
+Management release preparation/deployment is encoded with source/image checks,
+node/namespace/Secret identity guards and atomic Helm deployment. The previously
+absent admin credential was initialized once after checking all worktrees and the
+live namespace; no service/auth Secret or active legacy session existed. Its value
+stays in the ignored private file. Three immutable application/CA Secrets are now
+staged, and the dedicated namespace enforces restricted Pods. No worker was started
+and no GPU rented by staging. See [management deployment](../runbooks/management-deployment.md).
+Local verification passes 560 root tests (17 optional skips), 71 backend tests in
+a disposable database and 17 frontend tests/build/format checks, with current
+schemas/OpenAPI. Live application deployment, TLS/renewal and HA failure acceptance
+still require their own evidence.

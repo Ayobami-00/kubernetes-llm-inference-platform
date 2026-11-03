@@ -185,6 +185,7 @@ class KubernetesJobRunner:
                             "runAsUser": 10001,
                             "runAsGroup": 10001,
                             "fsGroup": 10001,
+                            "seccompProfile": {"type": "RuntimeDefault"},
                         },
                         "containers": [
                             {
@@ -198,10 +199,13 @@ class KubernetesJobRunner:
                                     str(directory / "manifest.json"),
                                 ],
                                 "env": [
+                                    {"name": "LANG", "value": "C.UTF-8"},
+                                    {"name": "LC_ALL", "value": "C.UTF-8"},
+                                    {"name": "LANGUAGE", "value": "C"},
                                     {
                                         "name": "KLIP_POD_UID",
                                         "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}},
-                                    }
+                                    },
                                 ],
                                 "resources": self.binding.get("runner_resources")
                                 or {

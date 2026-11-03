@@ -182,15 +182,19 @@ function Canvas({
         const calculated = Object.fromEntries(
           (layout.children || []).map((n) => [n.id, { x: n.x || 0, y: n.y || 0 }]),
         );
-        setNodes(
-          available.map((n) => ({
+        setNodes((previous) => {
+          const measuredNodes = new Map(previous.map((node) => [node.id, node]));
+          return available.map((n) => ({
+            // React Flow stores dimensions in controlled nodes. Removing them
+            // hides an unchanged DOM element that may never resize again.
+            ...measuredNodes.get(n.id),
             id: n.id,
             type: 'resource',
             position: positions.current[n.id] || calculated[n.id] || { x: 0, y: 0 },
             data: { ...n, dimmed: false },
             selected: n.id === selected,
-          })),
-        );
+          }));
+        });
       });
     return () => {
       cancelled = true;

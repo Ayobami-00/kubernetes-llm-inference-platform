@@ -6,6 +6,9 @@ eks.amazonaws.com/ecr-role-arn: {{ .Values.imagePullRoleArn | quote }}
 {{- end -}}
 {{- define "klip.artifacts" -}}{{ default (printf "%s-artifacts" .Release.Name) .Values.artifacts.existingClaim }}{{- end -}}
 {{- define "klip.env" -}}
+- {name: LANG, value: C.UTF-8}
+- {name: LC_ALL, value: C.UTF-8}
+- {name: LANGUAGE, value: C}
 - name: MANAGEMENT_DATABASE_URL
   valueFrom:
     secretKeyRef:

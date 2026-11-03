@@ -118,7 +118,7 @@ between completed Pod and delayed Job status was corrected with a regression
 test; the earlier test objects were also cleaned up.
 
 ```sh
-uv run --locked --group infra python scripts/infrastructure/image_pull_acceptance.py \
+uv run --locked --group infrastructure python scripts/infrastructure/image_pull_acceptance.py \
   --image <verified-backend-repository@sha256:digest>
 ```
 

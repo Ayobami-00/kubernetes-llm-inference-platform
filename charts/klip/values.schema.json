@@ -22,6 +22,22 @@
     },
     "terminationGracePeriodSeconds": {"type": "integer", "minimum": 30},
     "imagePullRoleArn": {"type": "string", "pattern": "^$|^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$"},
+    "web": {
+      "type": "object",
+      "properties": {
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {"type": "boolean"},
+            "existingSecret": {"type": "string", "minLength": 1},
+            "createCertificate": {"type": "boolean"},
+            "dnsNames": {"type": "array", "items": {"type": "string", "minLength": 1}, "uniqueItems": true}
+          },
+          "required": ["enabled", "existingSecret", "createCertificate", "dnsNames"]
+        }
+      }
+    },
     "database": {
       "type": "object",
       "properties": {

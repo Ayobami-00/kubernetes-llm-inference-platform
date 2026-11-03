@@ -87,6 +87,21 @@ infra-registry-apply:
 registry-verify:
 	$(PYTHON) scripts/infrastructure/platform_registry.py
 
+.PHONY: management-init-admin management-stage management-plan management-deploy
+management-init-admin:
+	$(PYTHON) scripts/infrastructure/management_release.py init-admin
+
+management-stage:
+	$(PYTHON) scripts/infrastructure/management_release.py stage
+
+management-plan:
+	@test -n "$(RECEIPTS)" || (echo 'Set RECEIPTS to the downloaded immutable CI image receipts'; exit 1)
+	$(PYTHON) scripts/infrastructure/management_release.py prepare --receipts "$(RECEIPTS)"
+
+management-deploy:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed management release digest'; exit 1)
+	$(PYTHON) scripts/infrastructure/management_release.py deploy --approve-plan "$(PLAN_SHA)"
+
 .PHONY: image-credentials-prepare image-credentials-apply
 image-credentials-prepare:
 	$(PYTHON) scripts/infrastructure/image_credentials.py prepare

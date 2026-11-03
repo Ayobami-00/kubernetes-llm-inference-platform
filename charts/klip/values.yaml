@@ -4,6 +4,11 @@ web:
   image: ""
   serviceType: ClusterIP
   nodePort: null
+  tls:
+    enabled: false
+    existingSecret: klip-web-tls
+    createCertificate: true
+    dnsNames: []
 replicas:
   api: 2
   worker: 2

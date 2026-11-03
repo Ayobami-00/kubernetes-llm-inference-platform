@@ -2,8 +2,12 @@ map $http_x_forwarded_proto $forwarded_proto {
   default $http_x_forwarded_proto;
   "" $scheme;
 }
+map $ssl_server_name $klip_tls_certificate_base {
+  default /run/secrets/web-tls/tls;
+}
 server {
   listen 8080;
+  include /etc/nginx/tls/*.conf;
   server_name _;
   root /usr/share/nginx/html;
   index index.html;

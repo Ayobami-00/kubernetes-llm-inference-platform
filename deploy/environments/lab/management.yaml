@@ -11,6 +11,10 @@ availability:
   minAvailable: 1
   spreadAcrossZones: true
 terminationGracePeriodSeconds: 60
+web:
+  tls:
+    enabled: true
+    dnsNames: [management.klip-lab.click, klip-web, klip-web.klip.svc, klip-web.klip.svc.cluster.local]
 database:
   requireTLS: true
   caSecret: klip-db-ca

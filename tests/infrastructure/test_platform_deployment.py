@@ -98,6 +98,29 @@ def test_private_pulls_use_explicit_accounts_and_prepare_migration_account_befor
             assert pod["serviceAccountName"] in accounts
 
 
+def test_management_tls_exposes_https_without_watching_secrets_or_sharing_processes():
+    docs = render("klip", ["web.serviceType=NodePort", "web.nodePort=30443"])
+    web = next(x for x in docs if x["kind"] == "Deployment" and x["metadata"]["name"] == "klip-web")
+    pod = web["spec"]["template"]["spec"]
+    assert not pod.get("shareProcessNamespace")
+    assert len(pod["containers"]) == 1
+    assert pod["securityContext"]["seccompProfile"]["type"] == "RuntimeDefault"
+    assert {v["name"] for v in pod["containers"][0]["ports"]} == {"http", "https"}
+    service = next(
+        x for x in docs if x["kind"] == "Service" and x["metadata"]["name"] == "klip-web"
+    )
+    assert service["spec"]["ports"] == [{"port": 8443, "targetPort": "https", "nodePort": 30443}]
+    config = next(
+        x for x in docs if x["kind"] == "ConfigMap" and x["metadata"]["name"] == "klip-web-tls"
+    )
+    assert "valid=30s" in config["data"]["server.conf"]
+    cert = next(
+        x for x in docs if x["kind"] == "Certificate" and x["metadata"]["name"] == "klip-web"
+    )
+    assert cert["spec"]["privateKey"]["rotationPolicy"] == "Always"
+    assert cert["spec"]["duration"] == "2160h" and cert["spec"]["renewBefore"] == "720h"
+
+
 @pytest.mark.parametrize(
     "override,reason",
     [
