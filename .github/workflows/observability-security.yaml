@@ -1,0 +1,111 @@
+name: Observability image security
+
+on:
+  push:
+    branches: [codex/end-to-end-platform]
+    paths:
+      - 'deploy/observability.lock.json'
+      - '.github/workflows/observability-security.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: observability-security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  pinned-monitoring-images:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install checksum-verified Trivy 0.76.1
+        shell: bash
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/klip-trivy"
+          mkdir -p "$scanner_dir"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_dir/trivy.tar.gz"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_dir/trivy.tar.gz" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_dir/trivy.tar.gz" --directory "$scanner_dir" trivy
+          printf '%s\n' "$scanner_dir" >> "$GITHUB_PATH"
+          "$scanner_dir/trivy" --version
+      - name: Scan exact Linux AMD64 manifests and retain complete findings
+        env:
+          TRIVY_CACHE_DIR: ${{ runner.temp }}/klip-trivy-cache
+          AWS_EC2_METADATA_DISABLED: 'true'
+        shell: bash
+        run: |
+          python3 - <<'PY'
+          import hashlib
+          import json
+          import os
+          import subprocess
+          from collections import Counter
+          from datetime import datetime, timezone
+          from pathlib import Path
+
+          lock_path = Path('deploy/observability.lock.json')
+          lock = json.loads(lock_path.read_text())
+          output = Path('artifacts/security/observability')
+          output.mkdir(parents=True, exist_ok=True)
+          version = subprocess.run(['trivy', '--version'], check=True, text=True,
+                                   capture_output=True).stdout
+          if not version.startswith('Version: 0.76.1'):
+              raise SystemExit('Scanner version differs from the reviewed pin')
+          subprocess.run(['trivy', 'image', '--download-db-only', '--timeout', '5m'], check=True)
+          database = json.loads((Path(os.environ['TRIVY_CACHE_DIR']) / 'db/metadata.json').read_text())
+          report = {
+              'source_commit': os.environ['GITHUB_SHA'],
+              'lock_sha256': hashlib.sha256(lock_path.read_bytes()).hexdigest(),
+              'scanner_version': version.strip(), 'database': database,
+              'started_at': datetime.now(timezone.utc).isoformat(), 'images': [],
+              'limitations': 'Scanner findings require runtime review; zero findings are not a security guarantee.'
+          }
+          critical = 0
+          for index, (reference, item) in enumerate(lock['images'].items()):
+              if item['platform'] != 'linux/amd64' or not item['digest'].startswith('sha256:'):
+                  raise SystemExit('Missing immutable Linux AMD64 identity')
+              pinned = reference + '@' + item['digest']
+              path = output / f'image-{index:02d}.json'
+              subprocess.run([
+                  'trivy', 'image', '--image-src', 'remote', '--platform', 'linux/amd64',
+                  '--scanners', 'vuln', '--skip-db-update', '--skip-java-db-update',
+                  '--ignorefile', '/dev/null', '--config', '/dev/null', '--list-all-pkgs',
+                  '--format', 'json', '--output', str(path), '--timeout', '4m', pinned,
+              ], check=True)
+              result = json.loads(path.read_text())
+              results = result.get('Results', [])
+              if not any(r.get('Type') == 'gobinary' for r in results):
+                  raise SystemExit('Expected Go-binary vulnerability coverage is missing: ' + reference)
+              findings = [v for r in results for v in r.get('Vulnerabilities', []) or []]
+              counts = dict(Counter(v['Severity'] for v in findings))
+              critical += counts.get('CRITICAL', 0)
+              report['images'].append({
+                  'reference': reference, **item, 'raw_report': path.name,
+                  'report_sha256': hashlib.sha256(path.read_bytes()).hexdigest(),
+                  'severity_counts': counts,
+                  'coverage': [{'target': r['Target'], 'class': r.get('Class'),
+                                'type': r.get('Type'), 'package_count': len(r.get('Packages', []))}
+                               for r in results],
+              })
+              (output / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+          report.update(completed_at=datetime.now(timezone.utc).isoformat(),
+                        critical_findings=critical)
+          (output / 'summary.json').write_text(json.dumps(report, indent=2) + '\n')
+          if critical:
+              raise SystemExit('Critical findings require remediation before deployment')
+          PY
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: observability-security-${{ github.sha }}
+          path: artifacts/security/observability/
+          if-no-files-found: error
+          retention-days: 90
