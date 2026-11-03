@@ -20,7 +20,7 @@ platform-check:
 platform-schema-fetch:
 	$(PYTHON) scripts/infrastructure/platform_checks.py --fetch-schemas
 
-.PHONY: infra-platform-preview infra-platform-plan infra-platform-apply cluster-platform-join
+.PHONY: infra-platform-preview infra-platform-plan infra-platform-apply cluster-platform-join cluster-verify-platform
 infra-platform-preview:
 	$(OPERATOR) plan --root platform --preview
 
@@ -33,6 +33,9 @@ infra-platform-apply:
 
 cluster-platform-join:
 	$(PYTHON) scripts/infrastructure/cluster.py platform-join
+
+cluster-verify-platform:
+	$(PYTHON) scripts/infrastructure/cluster.py verify-platform
 
 infra-lock:
 	$(PYTHON) scripts/infrastructure/checks.py --lock-platforms

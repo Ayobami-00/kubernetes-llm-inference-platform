@@ -18,6 +18,7 @@ from cluster_models import WorkerRequest
 from cluster_verification import foundation_nodes
 from common import CONFIG, ROOT, tool, write_private
 from inventory import build_observation
+from platform_acceptance import metadata_connection_blocked
 
 
 @pytest.fixture
@@ -418,6 +419,34 @@ def test_ansible_timeout_keeps_partial_logs_in_its_operation(tmp_path, monkeypat
 def test_static_release_reconciliation_rejects_unreviewed_names():
     with pytest.raises(ValueError, match="reviewed"):
         cluster.sync_release("untrusted")
+
+
+def test_operator_tunnel_has_a_dedicated_pinned_ssh_transport():
+    fields = {
+        "ansible_host": "i-123",
+        "ansible_user": "ubuntu",
+        "ansible_ssh_private_key_file": "/private/key",
+        "ansible_ssh_common_args": "-o UserKnownHostsFile=/private/pins",
+    }
+    arguments = cluster.Host(fields).ssh_arguments(reuse=False)
+    assert "ControlMaster=no" in arguments and "ControlPath=none" in arguments
+    assert "StrictHostKeyChecking=yes" in arguments
+    assert "UserKnownHostsFile=/private/pins" in arguments
+    assert arguments[-1] == "ubuntu@i-123"
+
+
+@pytest.mark.parametrize(
+    "message,blocked",
+    [
+        ("TIMEOUT\ncommand terminated with exit code 1", True),
+        ("dial tcp 169.254.169.254:80: connect: connection refused", True),
+        ("Error from server (Forbidden): pods/exec not permitted", False),
+        ("Error from server (Timeout): request failed", False),
+        ("command terminated with exit code 137", False),
+    ],
+)
+def test_metadata_probe_does_not_hide_transport_or_execution_errors(message, blocked):
+    assert metadata_connection_blocked(message) is blocked
 
 
 def test_cilium_uses_the_current_validated_private_api_endpoint(

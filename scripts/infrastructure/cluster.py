@@ -71,14 +71,7 @@ class Host:
     def __init__(self, fields: dict):
         self.fields = fields
 
-    def run(
-        self,
-        arguments: list[str],
-        *,
-        data: str | None = None,
-        timeout: int = 600,
-        secret: bool = False,
-    ) -> str:
+    def ssh_arguments(self, *, reuse: bool = True) -> list[str]:
         fields = self.fields
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", fields["ansible_host"]) or not re.fullmatch(
             r"[a-z_][a-z0-9_-]*", fields["ansible_user"]
@@ -87,36 +80,50 @@ class Host:
         # Reuse the authenticated SSM tunnel across short reconciliation commands.
         # Include pins/key/proxy settings in the socket identity, so changed access
         # configuration cannot silently reuse a session authenticated differently.
-        identity = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:16]
-        control_path = private_dir(state_home() / "ssh") / identity
-        # OpenSSH appends a temporary suffix when creating the master socket.
-        if len(str(control_path).encode()) > 85:
-            raise ValueError("Operator state path is too long for an SSH control socket")
-        return checked(
-            [
-                "ssh",
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "ConnectTimeout=45",
+        multiplex = ["-o", "ControlMaster=no", "-o", "ControlPath=none"]
+        if reuse:
+            identity = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:16]
+            control_path = private_dir(state_home() / "ssh") / identity
+            # OpenSSH appends a temporary suffix when creating the master socket.
+            if len(str(control_path).encode()) > 85:
+                raise ValueError("Operator state path is too long for an SSH control socket")
+            multiplex = [
                 "-o",
                 "ControlMaster=auto",
                 "-o",
                 "ControlPersist=60",
                 "-o",
                 f"ControlPath={control_path}",
-                "-o",
-                "ServerAliveInterval=15",
-                "-o",
-                "ServerAliveCountMax=2",
-                "-o",
-                "StrictHostKeyChecking=yes",
-                "-i",
-                fields["ansible_ssh_private_key_file"],
-                *shlex.split(fields.get("ansible_ssh_common_args", "")),
-                fields["ansible_user"] + "@" + fields["ansible_host"],
-                shlex.join(arguments),
-            ],
+            ]
+        return [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=45",
+            *multiplex,
+            "-o",
+            "ServerAliveInterval=15",
+            "-o",
+            "ServerAliveCountMax=2",
+            "-o",
+            "StrictHostKeyChecking=yes",
+            "-i",
+            fields["ansible_ssh_private_key_file"],
+            *shlex.split(fields.get("ansible_ssh_common_args", "")),
+            fields["ansible_user"] + "@" + fields["ansible_host"],
+        ]
+
+    def run(
+        self,
+        arguments: list[str],
+        *,
+        data: str | None = None,
+        timeout: int = 600,
+        secret: bool = False,
+    ) -> str:
+        return checked(
+            [*self.ssh_arguments(), shlex.join(arguments)],
             data=data,
             timeout=timeout,
             secret=secret,
@@ -446,19 +453,16 @@ def tunnel(host: str = "cp-01"):
     log_path = FOLDER / "tunnel.log"
     write_private(log_path, "")
     with log_path.open("a") as log:
+        transport = Host(hosts[host]).ssh_arguments(reuse=False)
         process = subprocess.Popen(
             [
-                Aws(PROFILES["foundation"]).executable,
-                "ssm",
-                "start-session",
-                "--target",
-                node["instance_id"],
-                "--document-name",
-                "AWS-StartPortForwardingSessionToRemoteHost",
-                "--parameters",
-                json.dumps(
-                    {"host": [hostname], "portNumber": ["6443"], "localPortNumber": ["16443"]}
-                ),
+                *transport[:-1],
+                "-o",
+                "ExitOnForwardFailure=yes",
+                "-N",
+                "-L",
+                f"127.0.0.1:16443:{hostname}:6443",
+                transport[-1],
             ],
             env=environment(PROFILES["foundation"]),
             stdout=log,
@@ -483,6 +487,7 @@ def tunnel(host: str = "cp-01"):
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 process.kill()
+                process.wait(timeout=10)
 
 
 def release_arguments(release: str) -> str:
@@ -773,6 +778,7 @@ def main() -> None:
             "probe-cleanup",
             "platform-join",
             "sync-release",
+            "verify-platform",
         ],
     )
     parser.add_argument("--registry", type=Path)
@@ -832,6 +838,10 @@ def main() -> None:
         result = join_platform()
     elif args.command == "sync-release":
         result = sync_release(args.release)
+    elif args.command == "verify-platform":
+        from platform_acceptance import verify_platform
+
+        result = verify_platform()
     else:
         from cluster_workers import operate_worker
 

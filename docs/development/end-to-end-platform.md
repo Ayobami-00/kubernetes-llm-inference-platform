@@ -8,7 +8,7 @@ rendering or a successful stub run does not satisfy a live gate.
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | In progress; HA charts implemented, live infrastructure pending |
+| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers live and joined; storage, management and PostgreSQL rollout pending |
 | Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
 | GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
@@ -21,7 +21,9 @@ rendering or a successful stub run does not satisfy a live gate.
 The additional CPU allocation is defined in a separate `platform` Terraform root;
 see the [worker allocation runbook](../runbooks/platform-workers.md). Its reviewed live
 plan was applied on 3 November 2026: three CPU workers, no control-plane mutations.
-Trusted host preparation and joining are in progress; allocation is not readiness. The Lambda
+All three passed trusted preparation, Kubernetes/Cilium readiness, kubelet certificate,
+route and resource-reservation checks. They carry placement/AZ labels and their bootstrap
+taints are removed. This does not establish storage or application HA. The Lambda
 credential is configured at the existing ignored secret path and read-only API checks
 confirmed A10 capacity and a plain Ubuntu image. Those observations are not reservations.
 The automatic-only regional IP increase to eight was approved; no support case was
@@ -83,3 +85,24 @@ database tests, four new Terraform provider-mock cases, TFLint for both new Terr
 units, Helm/custom-resource validation, Ruff/formatting and generated schema/OpenAPI
 checks. The earlier frontend checks remain unchanged and passing. Eighteen root tests
 are optional skips; these checks do not claim the full CPU integration or live gates.
+
+The worker rollout passed 442 root Python tests (17 optional skips), Ruff/formatting,
+Ansible checks and static Helm rendering. Cilium now tolerates the worker bootstrap
+taint and rolls at most one agent at a time. Its private API endpoint is generated
+from validated foundation allocation, avoiding a startup dependency on Service routing.
+
+One unjoined worker initially missed SSM enrollment during IAM credential propagation.
+Authenticated EC2 console evidence identified the failure. A recorded, one-time reboot
+was restricted to that exact unjoined instance after checking Kubernetes/mesh absence;
+it then registered and completed the normal checks. Encode bounded startup-enrollment
+recovery in the reproducible provisioning path before declaring the foundation gate
+complete. No account-wide SSM management role or broader SSH rule was enabled.
+
+Fresh live checks subsequently confirmed all six nodes Ready, the original three
+healthy etcd members, and foundation Pod-network/Hubble checks. A separate real-Pod
+verification passed Service/DNS access, all nine worker-to-worker Pod connections,
+metadata isolation and effective MTUs (interface 1420 / route 1370) on the three new
+workers. Its isolated test namespace was deleted and cleanup confirmed. The final
+Cilium release includes the generated private API endpoint. Operator tunnels use
+dedicated, pinned SSH-over-SSM sessions, retain Kubernetes CA/SNI verification and
+bind loopback only. The final local Python run passed 448 tests with 17 optional skips.

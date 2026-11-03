@@ -12,7 +12,8 @@ allocator must exclude them, including before the hosts become Ready. Persistent
 workers are not Lambda worker groups and have no GPU lease.
 
 This root was applied on 3 November 2026 after a reviewed create-only plan and live
-quota checks. Host rollout is in progress. Storage, scoped workload identity,
+quota checks. All three hosts subsequently joined and passed the trusted host,
+network, certificate and resource-reservation checks. Storage, scoped workload identity,
 application HA and recovery gates remain pending. An allocation output does not
 claim joined or healthy Kubernetes workers.
 
@@ -98,6 +99,18 @@ Explicit retries recheck identities
 and reconcile existing membership; they never run kubeadm reset or initialize etcd.
 Foundation verification continues to report only its three control-plane hosts
 when known worker identities are also present; worker readiness is a separate proof.
+Operator Helm/kubectl access uses a dedicated SSH local forward over the same
+SSM-backed, host-key-pinned transport. It binds loopback only, does not share a
+persistent SSH master, verifies the Kubernetes CA/SNI before use and closes the
+owned forward on exit. The Kubernetes API remains private.
+
+After joining, run `make cluster-verify-platform`. It creates an isolated test
+namespace and one small, digest-pinned test Pod per platform worker. It verifies
+Service/DNS access and Pod connections across workers, the effective Pod route MTU,
+and metadata isolation. Transport/authentication failures cannot count as a successful
+metadata-denial check. It checks namespace ownership before cleanup and waits for
+deletion. The latest report is private `cluster/platform-network-verification.json`;
+each verification also retains its own report under `cluster/operations/`.
 
 ## Teardown boundary
 
