@@ -1,0 +1,139 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadDnsStateBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2"
+      ]
+    },
+    {
+      "Sid": "ReadWriteDnsState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/inference-dns/terraform.tfstate"
+      ]
+    },
+    {
+      "Sid": "ManageDnsStateLock",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/inference-dns/terraform.tfstate.tflock"
+      ]
+    },
+    {
+      "Sid": "InspectOnlyExistingZone",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetHostedZone",
+        "route53:ListResourceRecordSets",
+        "route53:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:route53:::hostedzone/Z06158312NEW6IHHPH5XV"
+      ]
+    },
+    {
+      "Sid": "ChangeOnlyInferenceARecords",
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeResourceRecordSets"
+      ],
+      "Resource": [
+        "arn:aws:route53:::hostedzone/Z06158312NEW6IHHPH5XV"
+      ],
+      "Condition": {
+        "ForAllValues:StringEquals": {
+          "route53:ChangeResourceRecordSetsNormalizedRecordNames": [
+            "inference.klip-lab.click"
+          ],
+          "route53:ChangeResourceRecordSetsRecordTypes": [
+            "A"
+          ],
+          "route53:ChangeResourceRecordSetsActions": [
+            "CREATE",
+            "UPSERT",
+            "DELETE"
+          ]
+        }
+      }
+    },
+    {
+      "Sid": "ReadDnsChangeStatus",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetChange"
+      ],
+      "Resource": [
+        "arn:aws:route53:::change/*"
+      ]
+    },
+    {
+      "Sid": "CreateHealthChecks",
+      "Effect": "Allow",
+      "Action": [
+        "route53:CreateHealthCheck"
+      ],
+      "Resource": [
+        "*"
+      ]
+    },
+    {
+      "Sid": "ReadHealthChecks",
+      "Effect": "Allow",
+      "Action": [
+        "route53:GetHealthCheck",
+        "route53:GetHealthCheckStatus",
+        "route53:ListTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:route53:::healthcheck/*"
+      ]
+    },
+    {
+      "Sid": "TagProjectHealthChecks",
+      "Effect": "Allow",
+      "Action": [
+        "route53:ChangeTagsForResource"
+      ],
+      "Resource": [
+        "arn:aws:route53:::healthcheck/*"
+      ]
+    },
+    {
+      "Sid": "ManageProjectHealthChecks",
+      "Effect": "Allow",
+      "Action": [
+        "route53:UpdateHealthCheck",
+        "route53:DeleteHealthCheck"
+      ],
+      "Resource": [
+        "arn:aws:route53:::healthcheck/*"
+      ]
+    },
+    {
+      "Sid": "IdentifySession",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ]
+}

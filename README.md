@@ -95,6 +95,7 @@ deployment readiness.
 - [Customer defaults and scenario mappings](configs/customers/README.md)
 - [Dataset provenance and preparation boundaries](datasets/README.md)
 - [Runtime fixtures and schema conventions](contracts/README.md)
+- [AWS access bootstrap and API DNS decisions](docs/runbooks/aws-access.md)
 
 Author configurations under `configs/` and source manifests under `datasets/manifests/`. Generate
 JSON Schemas from the Python models; do not edit the exported schemas by hand:
@@ -105,3 +106,30 @@ uv run --locked --package platform-contracts python scripts/export-contracts.py
 
 CI runs the same checks and rejects schema drift. Management OpenAPI and a generated TypeScript
 client will be added when the management API routes exist.
+
+## AWS foundation
+
+Stream B's Terraform slice prepares three continuously running CPU hosts in London for a later
+self-managed Kubernetes bootstrap. It includes native S3 state locking, imported access-bootstrap
+IAM, a private API NLB, dedicated etcd disks and a separately authorized inference DNS root.
+Host WireGuard, kubeadm, containerd, Cilium, Helm releases and GPU software follow in Ansible and
+platform deployment work. Terraform does not provision Lambda GPU VMs.
+
+```bash
+make infra-tools
+make infra-check
+make infra-profiles
+make infra-bootstrap-plan
+make infra-preview
+make infra-dns-preview ORIGINS_FILE=infra/terraform/environments/inference-dns/origins.example.tfvars.json
+```
+
+Preview plans cannot be applied. Review the [provisioning workflow](docs/runbooks/aws-foundation.md)
+and its cost estimate before authorizing live creation. All mutable commands use explicit AWS
+identities and saved-plan digests. Private credentials, recovery state and reports stay outside Git.
+
+- [Foundation architecture and addressing](docs/architecture/aws-foundation.md)
+- [State recovery](docs/runbooks/terraform-state.md)
+- [Inference origin updates](docs/runbooks/inference-dns.md)
+- [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
+- [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)

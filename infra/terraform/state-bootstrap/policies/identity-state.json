@@ -1,0 +1,145 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "ReadFoundationStateBucket",
+      "Effect": "Allow",
+      "Action": [
+        "s3:ListBucket",
+        "s3:GetBucketLocation"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2"
+      ]
+    },
+    {
+      "Sid": "ReadWriteFoundationState",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/aws-foundation/terraform.tfstate"
+      ]
+    },
+    {
+      "Sid": "ManageFoundationStateLock",
+      "Effect": "Allow",
+      "Action": [
+        "s3:GetObject",
+        "s3:PutObject",
+        "s3:DeleteObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-tfstate-127811062476-eu-west-2/aws-foundation/terraform.tfstate.tflock"
+      ]
+    },
+    {
+      "Sid": "CreateBoundedNodeRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateRole",
+        "iam:PutRolePermissionsBoundary"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PermissionsBoundary": "arn:aws:iam::127811062476:policy/kubernetes-llm-inference-platform/kubernetes-llm-control-plane-boundary"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOnlyNodeRole",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetRole",
+        "iam:DeleteRole",
+        "iam:UpdateRole",
+        "iam:UpdateAssumeRolePolicy",
+        "iam:TagRole",
+        "iam:UntagRole",
+        "iam:ListRoleTags",
+        "iam:ListAttachedRolePolicies",
+        "iam:ListRolePolicies",
+        "iam:GetRolePolicy",
+        "iam:ListInstanceProfilesForRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+      ]
+    },
+    {
+      "Sid": "AttachOnlySsmCore",
+      "Effect": "Allow",
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+      ],
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        }
+      }
+    },
+    {
+      "Sid": "PassOnlyNodeRoleToEc2",
+      "Effect": "Allow",
+      "Action": [
+        "iam:PassRole"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "iam:PassedToService": "ec2.amazonaws.com"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOnlyNodeProfile",
+      "Effect": "Allow",
+      "Action": [
+        "iam:CreateInstanceProfile",
+        "iam:GetInstanceProfile",
+        "iam:DeleteInstanceProfile",
+        "iam:AddRoleToInstanceProfile",
+        "iam:RemoveRoleFromInstanceProfile",
+        "iam:TagInstanceProfile",
+        "iam:UntagInstanceProfile",
+        "iam:ListInstanceProfileTags"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-control-plane"
+      ]
+    },
+    {
+      "Sid": "ReadNodePolicyVersions",
+      "Effect": "Allow",
+      "Action": [
+        "iam:GetPolicy",
+        "iam:GetPolicyVersion"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:policy/kubernetes-llm-inference-platform/kubernetes-llm-control-plane-boundary",
+        "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+      ]
+    },
+    {
+      "Sid": "IdentifySession",
+      "Effect": "Allow",
+      "Action": [
+        "sts:GetCallerIdentity"
+      ],
+      "Resource": [
+        "*"
+      ]
+    }
+  ]
+}

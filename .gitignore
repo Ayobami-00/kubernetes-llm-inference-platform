@@ -11,3 +11,12 @@ datasets/raw/
 datasets/prepared/
 .env
 .DS_Store
+/terraform-ref/
+.terraform/
+*.tfstate
+*.tfstate.*
+*.tfplan
+*.auto.tfvars
+*_backend_override.tf
+crash.log
+.tflint.d/

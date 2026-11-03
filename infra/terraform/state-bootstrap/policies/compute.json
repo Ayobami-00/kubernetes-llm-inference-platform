@@ -1,0 +1,161 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "CreateTaggedVolumes",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateVolume"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:volume/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "CreateTaggedInterfaces",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateNetworkInterface"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:network-interface/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "UseOwnedInterfaceNetwork",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:CreateNetworkInterface"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:subnet/*",
+        "arn:aws:ec2:eu-west-2:127811062476:security-group/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "ImportTaggedPublicKey",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:ImportKeyPair"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:key-pair/klip-*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "LaunchTaggedInstancesAndVolumes",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:instance/*",
+        "arn:aws:ec2:eu-west-2:127811062476:volume/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "aws:RequestTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "LaunchWithOwnedNetworkAndKey",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:network-interface/*",
+        "arn:aws:ec2:eu-west-2:127811062476:subnet/*",
+        "arn:aws:ec2:eu-west-2:127811062476:security-group/*",
+        "arn:aws:ec2:eu-west-2:127811062476:key-pair/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    },
+    {
+      "Sid": "UseRegionalImages",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:RunInstances"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2::image/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2"
+        }
+      }
+    },
+    {
+      "Sid": "ManageOwnedCompute",
+      "Effect": "Allow",
+      "Action": [
+        "ec2:StartInstances",
+        "ec2:StopInstances",
+        "ec2:RebootInstances",
+        "ec2:TerminateInstances",
+        "ec2:ModifyInstanceAttribute",
+        "ec2:ModifyInstanceMetadataOptions",
+        "ec2:ModifyInstanceCreditSpecification",
+        "ec2:DescribeInstanceAttribute",
+        "ec2:GetConsoleOutput",
+        "ec2:GetConsoleScreenshot",
+        "ec2:AttachVolume",
+        "ec2:DetachVolume",
+        "ec2:DeleteVolume",
+        "ec2:ModifyVolume",
+        "ec2:AttachNetworkInterface",
+        "ec2:DetachNetworkInterface",
+        "ec2:DeleteNetworkInterface",
+        "ec2:ModifyNetworkInterfaceAttribute",
+        "ec2:AssociateIamInstanceProfile",
+        "ec2:DisassociateIamInstanceProfile",
+        "ec2:ReplaceIamInstanceProfileAssociation",
+        "ec2:DeleteKeyPair"
+      ],
+      "Resource": [
+        "arn:aws:ec2:eu-west-2:127811062476:instance/*",
+        "arn:aws:ec2:eu-west-2:127811062476:volume/*",
+        "arn:aws:ec2:eu-west-2:127811062476:network-interface/*",
+        "arn:aws:ec2:eu-west-2:127811062476:key-pair/*"
+      ],
+      "Condition": {
+        "StringEquals": {
+          "aws:RequestedRegion": "eu-west-2",
+          "ec2:ResourceTag/Project": "kubernetes-llm-inference-platform"
+        }
+      }
+    }
+  ]
+}

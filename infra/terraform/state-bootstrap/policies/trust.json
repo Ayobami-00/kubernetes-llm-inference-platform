@@ -1,0 +1,18 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "OnlyProjectUserWithMfa",
+      "Effect": "Allow",
+      "Principal": {
+        "AWS": "arn:aws:iam::127811062476:user/kubernetes-llm-inference-platform"
+      },
+      "Action": "sts:AssumeRole",
+      "Condition": {
+        "Bool": {
+          "aws:MultiFactorAuthPresent": "true"
+        }
+      }
+    }
+  ]
+}

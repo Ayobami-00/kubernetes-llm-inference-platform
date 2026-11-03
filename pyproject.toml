@@ -14,7 +14,7 @@ members = ["packages/platform-contracts"]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1", "jsonschema>=4,<5"]
 
 [tool.pytest.ini_options]
-testpaths = ["packages/platform-contracts/tests"]
+testpaths = ["packages/platform-contracts/tests", "tests/infrastructure"]
 
 [tool.ruff]
 target-version = "py312"
