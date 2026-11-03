@@ -156,14 +156,44 @@ keeps its optional YAML parser dependency current; the generated client is check
 Verified locally on 3 November 2026:
 
 - 171 Python tests, including the original contract suite and management integration tests.
-- Three frontend result-presentation tests and successful production builds on host and Node 24 Docker.
-- Desktop graph/inspector/edit/allocation/worker-restart/serving/run/history smoke test and mobile
-  insufficient-data navigation test; the graph workflow was rerun after the final backend changes.
+- Nine frontend presentation tests and successful production builds on host and Node 24 Docker.
+- Ten browser tests cover both appearances, system preference changes, readable configuration/history,
+  form/advanced editing, draft publication, keyboard interaction and mobile layouts. Automated WCAG
+  checks cover login, topology, customers, capacity, results, operations and simulation. The complete
+  allocation/worker-restart/serving/run/history workflow and insufficient-data navigation also pass.
 - Alembic upgrade/downgrade/upgrade, repeatable seeding, concurrent claims, stale owners, ambiguous and
   unresolved allocation outcomes, termination failure, expiry during preparation and serving replacement.
 - Ruff lint/format, contract schemas, management OpenAPI and deterministic generation of 16 SDK files.
 - Docker startup and matching API/worker image identity; npm audit reported no vulnerabilities.
 
-Live Lambda account verification was not performed because no account key was supplied. HTTP mocks
-cover read-only requests, safe payload persistence, refresh errors and stale observations. Real runner,
+Automated Lambda checks use HTTP mocks for read-only requests, safe payload persistence, refresh
+errors and stale observations. UI tests use an isolated account integration with an empty credential,
+preserving the connected workspace and its live observations. Real runner,
 bootstrap, Kubernetes and dynamic Helm integration remain the downstream dependencies described above.
+
+## Appearance and readable specifications
+
+Use the sun, moon or monitor controls in the top bar (also available on the login page) to select
+light, dark or system appearance. The browser remembers the preference across reloads and sign-ins;
+system appearance follows OS changes. The graph, inspector, forms and result states share the theme.
+
+The inspector presents specifications as expandable sections with labels, units, prompt text,
+traffic phase summaries, provenance and preparation status. Revision history uses the same readable
+presentation. Raw JSON is available only through the advanced configuration editor. Switching back
+to the form preserves valid JSON changes; save the draft before publishing further edits.
+
+For browser tests alongside a connected workspace, use the isolated Docker test command:
+
+```bash
+# Prerequisites: Node 24, npm ci in apps/management/web, and Playwright Chromium installed.
+./dev/test-ui
+```
+
+This starts a disposable application on localhost:5174 with its own database, image names and secrets.
+Its Lambda key is empty. It builds the production bundle and runs frontend tests in Node 24 Docker,
+then tests both themes, system preference changes, structured specifications,
+editing, keyboard interaction, desktop/mobile layouts and automated WCAG accessibility rules, plus
+the complete simulated lifecycle workflow. Its containers and test volume are removed on exit.
+Ports 5174, 58001 and 55433 must be free. Docker Compose 2.24.4 or newer is required for the override.
+Screenshots are saved under `artifacts/management/`. The connected workspace and its secrets are kept
+separate. To run one case, pass Playwright arguments, e.g. `./dev/test-ui --grep accessibility`.

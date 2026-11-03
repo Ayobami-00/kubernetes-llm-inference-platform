@@ -11,53 +11,17 @@ import {
   ReactFlowProvider,
   useEdgesState,
   useNodesState,
+  useNodesInitialized,
   useReactFlow,
 } from '@xyflow/react';
 import type { Edge, Node, NodeProps, Viewport } from '@xyflow/react';
-import ELK from 'elkjs/lib/elk.bundled.js';
-import {
-  ArrowUpRight,
-  Boxes,
-  Cpu,
-  Database,
-  FlaskConical,
-  Layers3,
-  Network,
-  Users,
-} from 'lucide-react';
+import type { ELK } from 'elkjs/lib/elk-api';
+import { ArrowUpRight, Boxes } from 'lucide-react';
 import { endpoints, unwrap } from '../api/client';
 import type { GraphNode, Topology } from '../api/client';
 
-export const colours: Record<string, string> = {
-  'dataset-manifest': '#64b99e',
-  customer: '#ab96ee',
-  'serving-profile': '#82adf8',
-  'worker-group': '#d7b67c',
-  group: '#76c5ce',
-  instance: '#76c5ce',
-  scenario: '#ad9eaf',
-  run: '#dc92b6',
-};
-export const icons = {
-  customer: Users,
-  'dataset-manifest': Database,
-  'serving-profile': Layers3,
-  'worker-group': Cpu,
-  group: Boxes,
-  instance: Cpu,
-  scenario: Network,
-  run: FlaskConical,
-};
-export const names: Record<string, string> = {
-  'dataset-manifest': 'Dataset',
-  customer: 'Customer',
-  'serving-profile': 'Serving',
-  'worker-group': 'Worker profile',
-  group: 'Worker group',
-  instance: 'GPU instance',
-  scenario: 'Scenario',
-  run: 'Run',
-};
+import { colours, icons, names } from './resourceTheme';
+import { useTheme } from '../app/theme';
 type VisualNode = Node<GraphNode & { dimmed: boolean }, 'resource'>;
 function ResourceNode({ data, selected }: NodeProps<VisualNode>) {
   const Icon = icons[data.kind as keyof typeof icons] || Boxes;
@@ -92,7 +56,9 @@ function ResourceNode({ data, selected }: NodeProps<VisualNode>) {
   );
 }
 const nodeTypes = { resource: ResourceNode };
-const elk = new ELK();
+let layoutEngine: Promise<ELK> | undefined;
+const getLayoutEngine = () =>
+  (layoutEngine ??= import('elkjs/lib/elk.bundled.js').then(({ default: Engine }) => new Engine()));
 function Canvas({
   topology,
   selected,
@@ -106,6 +72,7 @@ function Canvas({
   visibleKinds: Set<string>;
   search: string;
 }) {
+  const { resolved } = useTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState<VisualNode>([]);
   const [edges, setEdges, onEdgesChange] = useEdgesState<Edge>([]);
   const { fitView, setViewport } = useReactFlow();
@@ -113,6 +80,16 @@ function Canvas({
   const [expanded, setExpanded] = useState(new Set<string>());
   const positions = useRef<Record<string, { x: number; y: number }>>({});
   const initialized = useRef(false);
+  const measured = useNodesInitialized();
+  const [layoutReady, setLayoutReady] = useState(false);
+  useEffect(() => {
+    if (!measured || initialized.current) return;
+    initialized.current = true;
+    const position = viewport.current
+      ? setViewport(viewport.current)
+      : fitView({ padding: 0.12, maxZoom: 1 });
+    void position.finally(() => setLayoutReady(true));
+  }, [measured, setViewport, fitView]);
   const [preferencesReady, setPreferencesReady] = useState(false);
   useEffect(() => {
     unwrap(endpoints.getPreferences())
@@ -121,6 +98,7 @@ function Canvas({
         viewport.current = (p.viewport || null) as Viewport | null;
         setExpanded(new Set((p.expanded || []) as string[]));
       })
+      .catch(() => {})
       .finally(() => setPreferencesReady(true));
   }, []);
   const visible = (node: GraphNode) =>
@@ -175,22 +153,24 @@ function Canvas({
     const available = topology.nodes.filter(visible);
     const ids = new Set(available.map((n) => n.id));
     const links = topology.edges.filter((e) => ids.has(e.source) && ids.has(e.target));
-    elk
-      .layout({
-        id: 'root',
-        layoutOptions: {
-          'elk.algorithm': 'layered',
-          'elk.direction': 'RIGHT',
-          'elk.spacing.nodeNode': '30',
-          'elk.layered.spacing.nodeNodeBetweenLayers': '90',
-        },
-        children: available.map((n) => ({ id: n.id, width: 245, height: 126 })),
-        edges: links.map((e) => ({
-          id: e.id,
-          sources: [e.source],
-          targets: [e.target],
-        })),
-      })
+    getLayoutEngine()
+      .then((engine) =>
+        engine.layout({
+          id: 'root',
+          layoutOptions: {
+            'elk.algorithm': 'layered',
+            'elk.direction': 'RIGHT',
+            'elk.spacing.nodeNode': '30',
+            'elk.layered.spacing.nodeNodeBetweenLayers': '90',
+          },
+          children: available.map((n) => ({ id: n.id, width: 245, height: 126 })),
+          edges: links.map((e) => ({
+            id: e.id,
+            sources: [e.source],
+            targets: [e.target],
+          })),
+        }),
+      )
       .then((layout) => {
         if (cancelled) return;
         const calculated = Object.fromEntries(
@@ -205,16 +185,6 @@ function Canvas({
             selected: n.id === selected,
           })),
         );
-        if (!initialized.current) {
-          initialized.current = true;
-          setTimeout(
-            () =>
-              viewport.current
-                ? setViewport(viewport.current)
-                : fitView({ padding: 0.12, maxZoom: 1 }),
-            80,
-          );
-        }
       });
     return () => {
       cancelled = true;
@@ -245,15 +215,15 @@ function Canvas({
           style: {
             stroke:
               selected && neighborhood?.has(e.source) && neighborhood?.has(e.target)
-                ? '#9d8ad4'
-                : '#363943',
+                ? 'var(--graph-edge-active)'
+                : 'var(--graph-edge)',
             strokeWidth: 1.2,
             opacity:
               !selected || (neighborhood?.has(e.source) && neighborhood?.has(e.target)) ? 1 : 0.15,
           },
-          markerEnd: { type: MarkerType.ArrowClosed, color: '#5c586b' },
-          labelStyle: { fill: '#c9c4d9', fontSize: 10 },
-          labelBgStyle: { fill: '#161820' },
+          markerEnd: { type: MarkerType.ArrowClosed, color: 'var(--graph-edge)' },
+          labelStyle: { fill: 'var(--text-secondary)', fontSize: 10 },
+          labelBgStyle: { fill: 'var(--surface)' },
         })),
     );
   }, [topology, selected, visibleKinds, matching, neighborhood, setNodes, setEdges]);
@@ -266,6 +236,7 @@ function Canvas({
   }, [expanded]);
   return (
     <ReactFlow
+      data-layout-ready={layoutReady ? 'true' : 'false'}
       nodes={nodes}
       edges={edges}
       nodeTypes={nodeTypes}
@@ -292,14 +263,14 @@ function Canvas({
       deleteKeyCode={null}
       minZoom={0.2}
       maxZoom={1.5}
-      colorMode="dark"
+      colorMode={resolved}
       proOptions={{ hideAttribution: false }}
     >
-      <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="#30323c" />
+      <Background variant={BackgroundVariant.Dots} gap={22} size={1} color="var(--graph-dot)" />
       <Controls showInteractive={false} />
       <MiniMap
         nodeColor={(node) => colours[node.data.kind as string] || '#aaa'}
-        maskColor="#0d0f17b0"
+        maskColor="var(--minimap-mask)"
         pannable
         zoomable
       />

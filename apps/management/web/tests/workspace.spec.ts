@@ -5,7 +5,10 @@ import { execFileSync } from 'node:child_process';
 
 const password = () =>
   process.env.MANAGEMENT_E2E_PASSWORD ||
-  readFileSync(resolve('../../../dev/.secrets/admin_password'), 'utf8').trim();
+  readFileSync(
+    process.env.MANAGEMENT_E2E_PASSWORD_FILE || resolve('../../../dev/.secrets/admin_password'),
+    'utf8',
+  ).trim();
 test('graph, revision editing, durable allocation, serving, simulated run and reload', async ({
   page,
 }) => {
@@ -41,7 +44,15 @@ test('graph, revision editing, durable allocation, serving, simulated run and re
   );
   execFileSync(
     'docker',
-    ['compose', '-f', resolve('../../../dev/compose.yaml'), 'restart', 'worker'],
+    [
+      'compose',
+      ...(process.env.MANAGEMENT_E2E_PROJECT ? ['-p', process.env.MANAGEMENT_E2E_PROJECT] : []),
+      '-f',
+      resolve('../../../dev/compose.yaml'),
+      ...(process.env.MANAGEMENT_E2E_OVERRIDE ? ['-f', process.env.MANAGEMENT_E2E_OVERRIDE] : []),
+      'restart',
+      'worker',
+    ],
     { stdio: 'pipe' },
   );
   await page.reload();
@@ -84,10 +95,8 @@ test('graph, revision editing, durable allocation, serving, simulated run and re
   await expect(page.getByRole('heading', { name: 'Frozen run snapshot' })).toBeVisible();
   await page.getByRole('button', { name: 'Return to current topology' }).click();
   await page.getByTestId('node-writer-assist').first().click();
-  await page
-    .getByRole('button', { name: 'Dismiss notification' })
-    .click()
-    .catch(() => {});
+  if (await page.getByRole('button', { name: 'Dismiss notification' }).isVisible())
+    await page.getByRole('button', { name: 'Dismiss notification' }).click();
   await page.screenshot({
     path: '../../../artifacts/management/workspace-details.png',
     fullPage: true,

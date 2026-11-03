@@ -16,7 +16,8 @@ import {
 import { useQuery } from '@tanstack/react-query';
 import { endpoints as e, message, mutationHeaders, unwrap } from '../api/client';
 import type { GraphNode, GroupView, OperationView, Run, SpecView, SpecWrite } from '../api/client';
-import { icons, names } from './Graph';
+import { icons, names } from './resourceTheme';
+import ConfigurationDetails from './ConfigurationDetails';
 
 // Dynamic form paths edit generated shared document types; validation is performed by the API.
 type Doc = Record<string, any>;
@@ -301,7 +302,7 @@ export default function Inspector({
   groups,
   operations,
   onSnapshot,
-  onSelectRun,
+  onPublished,
   newResource = false,
 }: {
   node: GraphNode;
@@ -311,7 +312,7 @@ export default function Inspector({
   groups: GroupView[];
   operations: OperationView[];
   onSnapshot: (id: string) => void;
-  onSelectRun: (run: Run) => void;
+  onPublished?: (specification: SpecView) => void;
   newResource?: boolean;
 }) {
   const configuration = node.document as unknown as SpecView;
@@ -350,6 +351,39 @@ export default function Inspector({
   const selectedApi = specApi[node.kind as keyof typeof specApi];
   const base = saved || configuration;
   const data = (configuration.document || {}) as Doc;
+  const savedDocument = base.draft || base.document || {};
+  let dirty = JSON.stringify(document) !== JSON.stringify(savedDocument);
+  if (advanced) {
+    try {
+      dirty = JSON.stringify(JSON.parse(raw)) !== JSON.stringify(savedDocument);
+    } catch {
+      dirty = true;
+    }
+  }
+  useEffect(() => {
+    const close = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && !event.defaultPrevented) {
+        event.preventDefault();
+        onClose();
+      }
+    };
+    window.addEventListener('keydown', close);
+    return () => window.removeEventListener('keydown', close);
+  }, [onClose]);
+  async function publish() {
+    await act(async () => {
+      const result = await unwrap(
+        selectedApi.publish({
+          path: { resource_id: document.id },
+          body: { expected_version: base.version },
+        }),
+      );
+      setSaved(result);
+      setDocument((result.document || {}) as Doc);
+      setTab('overview');
+      onPublished?.(result);
+    }, 'Revision published');
+  }
   const Icon = icons[node.kind as keyof typeof icons] || FileJson;
   async function save() {
     try {
@@ -447,30 +481,6 @@ export default function Inspector({
                     </button>
                     {node.kind === 'customer' && (
                       <>
-                        <h4>Service contract</h4>
-                        <div className="detail-card">
-                          <div className="key-value">
-                            <span>Tier</span>
-                            <b>{data.tier?.replace('_', ' ')}</b>
-                          </div>
-                          <div className="key-value">
-                            <span>Dataset</span>
-                            <b>{data.workload?.dataset_ref}</b>
-                          </div>
-                          <div className="key-value">
-                            <span>Input / output ceiling</span>
-                            <b>
-                              {data.limits?.max_rendered_input_tokens} /{' '}
-                              {data.generation?.max_output_tokens}
-                            </b>
-                          </div>
-                          {data.slo?.targets.map((t: Doc) => (
-                            <div className="key-value" key={t.metric}>
-                              <span>{t.metric.replaceAll('_', ' ')}</span>
-                              <b>{t.threshold_ms} ms</b>
-                            </div>
-                          ))}
-                        </div>
                         {node.provenance !== 'historical' && (
                           <Assignment customer={data} act={act} busy={busy} />
                         )}
@@ -535,23 +545,6 @@ export default function Inspector({
                     )}
                     {node.kind === 'serving-profile' && node.provenance !== 'historical' && (
                       <>
-                        <h4>Serving recipe</h4>
-                        <div className="detail-card">
-                          <div className="key-value">
-                            <span>Model</span>
-                            <b>{data.model?.repository}</b>
-                          </div>
-                          <div className="key-value">
-                            <span>Replicas × GPUs</span>
-                            <b>
-                              {data.topology?.replicas} × {data.topology?.gpus_per_replica}
-                            </b>
-                          </div>
-                          <div className="key-value">
-                            <span>Worker class</span>
-                            <b>{data.worker_class}</b>
-                          </div>
-                        </div>
                         <label>
                           GPU-ready worker group
                           <select value={groupId} onChange={(v) => setGroupId(v.target.value)}>
@@ -597,8 +590,7 @@ export default function Inspector({
                     {node.kind === 'scenario' && (
                       <RunLauncher scenario={data} groups={groups} act={act} busy={busy} />
                     )}
-                    <h4>Configuration document</h4>
-                    <pre className="json-preview">{JSON.stringify(data, null, 2)}</pre>
+                    <ConfigurationDetails kind={node.kind} document={data} />
                   </>
                 )}
                 {node.kind === 'group' && (
@@ -698,11 +690,11 @@ export default function Inspector({
                       Dataset preparation is supplied by Stream A. Source manifests are not
                       executable datasets.
                     </div>
-                    <pre className="json-preview">{JSON.stringify(data, null, 2)}</pre>
+                    <ConfigurationDetails kind={node.kind} document={data} />
                   </>
                 )}
                 {node.kind === 'instance' && (
-                  <pre className="json-preview">{JSON.stringify(node.document, null, 2)}</pre>
+                  <ConfigurationDetails kind={node.kind} document={node.document} />
                 )}
               </>
             )}
@@ -727,12 +719,22 @@ export default function Inspector({
                     <button
                       className="text-button"
                       onClick={() => {
-                        setRaw(JSON.stringify(document, null, 2));
-                        setAdvanced(!advanced);
+                        setLocalError('');
+                        if (advanced) {
+                          try {
+                            setDocument(JSON.parse(raw));
+                            setAdvanced(false);
+                          } catch {
+                            setLocalError('Fix the JSON syntax before returning to the form.');
+                          }
+                        } else {
+                          setRaw(JSON.stringify(document, null, 2));
+                          setAdvanced(true);
+                        }
                       }}
                     >
                       <FileJson size={14} />
-                      {advanced ? 'Form' : 'JSON'}
+                      {advanced ? 'Form editor' : 'Advanced JSON'}
                     </button>
                   </div>
                   {advanced ? (
@@ -814,7 +816,21 @@ export default function Inspector({
                       </label>
                     </>
                   )}
-                  {localError && <div className="notice error">{localError}</div>}
+                  <div className="editor-state" aria-live="polite">
+                    <span className={`status-dot ${dirty ? 'queued' : 'ready'}`} />
+                    {base.version === 0
+                      ? 'New specification · save a draft to begin'
+                      : dirty
+                        ? 'Unsaved changes'
+                        : base.draft
+                          ? 'Draft saved · ready to publish'
+                          : 'Published settings · edits create a new revision'}
+                  </div>
+                  {localError && (
+                    <div className="notice error" role="alert">
+                      {localError}
+                    </div>
+                  )}
                   <div className="button-row">
                     <button className="secondary" disabled={busy} onClick={save}>
                       {busy ? <Loader2 className="spin" size={14} /> : <Save size={14} />}
@@ -822,19 +838,15 @@ export default function Inspector({
                     </button>
                     <button
                       className="primary"
-                      disabled={busy || !(base.draft || saved?.draft)}
-                      onClick={() =>
-                        act(
-                          () =>
-                            unwrap(
-                              selectedApi.publish({
-                                path: { resource_id: document.id },
-                                body: { expected_version: base.version },
-                              }),
-                            ),
-                          'Revision published',
-                        )
+                      disabled={
+                        busy || base.version === 0 || !(base.draft || saved?.draft) || dirty
                       }
+                      title={
+                        dirty
+                          ? 'Save draft changes before publishing'
+                          : 'Publish a new immutable revision'
+                      }
+                      onClick={publish}
                     >
                       <Check size={14} />
                       Publish revision
@@ -865,8 +877,8 @@ export default function Inspector({
                   </div>
                   <p>{rev.document?.notes}</p>
                   <details>
-                    <summary>View immutable document</summary>
-                    <pre className="json-preview">{JSON.stringify(rev.document, null, 2)}</pre>
+                    <summary>Review this revision</summary>
+                    <ConfigurationDetails kind={node.kind} document={rev.document} />
                   </details>
                 </div>
               ))

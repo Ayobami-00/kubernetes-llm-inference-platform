@@ -1,0 +1,27 @@
+# Used by ./dev/test-ui. Ports, credentials, images and database are isolated from the live workspace.
+services:
+  db:
+    ports: !override ['127.0.0.1:55433:5432']
+  init:
+    image: inference-management-ui-tests-backend:local
+    environment:
+      MANAGEMENT_ALLOWED_ORIGIN: http://localhost:5174
+  api:
+    image: inference-management-ui-tests-backend:local
+    environment:
+      MANAGEMENT_ALLOWED_ORIGIN: http://localhost:5174
+    ports: !override ['127.0.0.1:58001:8000']
+  worker:
+    image: inference-management-ui-tests-backend:local
+    environment:
+      MANAGEMENT_ALLOWED_ORIGIN: http://localhost:5174
+  web:
+    image: inference-management-ui-tests-web:local
+    volumes:
+      - ../contracts:/contracts:ro
+    ports: !override ['127.0.0.1:5174:5173']
+secrets:
+  admin_password:
+    file: ${MANAGEMENT_QA_SECRET_DIR:?Run ./dev/test-ui}/admin_password
+  lambda_api_key:
+    file: ${MANAGEMENT_QA_SECRET_DIR:?Run ./dev/test-ui}/lambda_api_key

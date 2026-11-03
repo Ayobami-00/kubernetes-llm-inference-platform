@@ -8,6 +8,21 @@
       name="description"
       content="A connected workspace for customer workloads, GPU capacity and inference experiments."
     />
+    <script>
+      try {
+        const appearance = localStorage.getItem('stratum-appearance');
+        const theme =
+          appearance === 'system'
+            ? matchMedia('(prefers-color-scheme: dark)').matches
+              ? 'dark'
+              : 'light'
+            : appearance === 'light'
+              ? 'light'
+              : 'dark';
+        document.documentElement.dataset.theme = theme;
+        document.documentElement.style.colorScheme = theme;
+      } catch {}
+    </script>
     <title>Stratum · Inference Platform</title>
   </head>
   <body>

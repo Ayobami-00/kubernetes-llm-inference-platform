@@ -1,4 +1,5 @@
-import { useState } from 'react';
+import { lazy, Suspense, useEffect, useRef, useState } from 'react';
+import { ThemeControl } from './theme';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -31,7 +32,8 @@ import {
 } from 'lucide-react';
 import { endpoints as e, message, setCsrf, unwrap } from '../api/client';
 import type { GraphNode, Run, SpecView } from '../api/client';
-import Graph, { colours, icons, names } from '../components/Graph';
+import { colours, icons, names } from '../components/resourceTheme';
+const Graph = lazy(() => import('../components/Graph'));
 import Inspector, { Badge, OperationCard, RunLauncher, formatDate } from '../components/Inspector';
 import type { Act } from '../components/Inspector';
 
@@ -81,6 +83,9 @@ function Login() {
   const [busy, setBusy] = useState(false);
   return (
     <div className="login-shell">
+      <div className="login-appearance">
+        <ThemeControl />
+      </div>
       <div className="login-art">
         <Brand />
         <div className="login-copy">
@@ -202,6 +207,17 @@ function Workspace() {
     text: string;
     error: boolean;
   } | null>(null);
+  useEffect(() => {
+    if (!feedback || feedback.error) return;
+    const timer = window.setTimeout(() => setFeedback(null), 5000);
+    return () => window.clearTimeout(timer);
+  }, [feedback]);
+  const returnFocus = useRef<HTMLElement | null>(null);
+  function closeInspector() {
+    setSelection(null);
+    setIsNew(false);
+    requestAnimationFrame(() => returnFocus.current?.focus({ preventScroll: true }));
+  }
   const topology = useQuery({
     queryKey: ['topology', snapshot, history],
     queryFn: () =>
@@ -264,6 +280,7 @@ function Workspace() {
   const selected =
     (!isNew && topology.data?.nodes.find((n) => n.id === selection?.id)) || selection;
   function select(node: GraphNode) {
+    returnFocus.current = document.activeElement as HTMLElement | null;
     setIsNew(false);
     setSelection(node);
   }
@@ -431,6 +448,7 @@ function Workspace() {
             <b>{snapshot ? 'Run snapshot' : title}</b>
           </div>
           <div className="topbar-right">
+            <ThemeControl />
             <span className="environment">
               <span className="status-dot ready" />
               Local environment
@@ -636,13 +654,22 @@ function Workspace() {
                     </div>
                   ) : (
                     topology.data && (
-                      <Graph
-                        topology={topology.data}
-                        selected={selected?.id || null}
-                        onSelect={select}
-                        visibleKinds={kinds}
-                        search={search}
-                      />
+                      <Suspense
+                        fallback={
+                          <div className="canvas-state">
+                            <Loader2 className="spin" />
+                            <p>Preparing your platform graph…</p>
+                          </div>
+                        }
+                      >
+                        <Graph
+                          topology={topology.data}
+                          selected={selected?.id || null}
+                          onSelect={select}
+                          visibleKinds={kinds}
+                          search={search}
+                        />
+                      </Suspense>
                     )
                   )}
                   <div className="canvas-context">
@@ -716,7 +743,7 @@ function Workspace() {
                 )}
               </div>
             ) : pathname === '/operations' ? (
-              <div className="list-page">
+              <section className="list-page" tabIndex={0} aria-label="Operation activity">
                 <div className="section-title">
                   <div>
                     <h3>Operation activity</h3>
@@ -734,7 +761,7 @@ function Workspace() {
                     text="Create a simulated worker group to follow its lifecycle here."
                   />
                 )}
-              </div>
+              </section>
             ) : pathname === '/simulation' ? (
               <div className="list-page">
                 <div className="notice synthetic">
@@ -820,10 +847,7 @@ function Workspace() {
             <Inspector
               key={selected.id}
               node={selected}
-              onClose={() => {
-                setSelection(null);
-                setIsNew(false);
-              }}
+              onClose={closeInspector}
               act={act}
               busy={busy}
               groups={groups.data || []}
@@ -833,7 +857,20 @@ function Workspace() {
                 setSelection(null);
                 navigate('/');
               }}
-              onSelectRun={selectRun}
+              onPublished={(specification) => {
+                const doc = specification.document;
+                if (!doc) return;
+                const prefix = selected.kind === 'serving-profile' ? 'profile' : selected.kind;
+                setSelection({
+                  ...selected,
+                  id: `${prefix}:${doc.id}@${doc.revision}`,
+                  resource_id: doc.id,
+                  label: 'name' in doc ? doc.name : doc.id.replaceAll('-', ' '),
+                  status: 'published',
+                  document: specification as unknown as Record<string, unknown>,
+                });
+                setIsNew(false);
+              }}
               newResource={isNew}
             />
           )}

@@ -1,0 +1,23 @@
+#!/usr/bin/env bash
+# Disposable Docker workspace. The Lambda credential is deliberately empty.
+set -euo pipefail
+cd "$(dirname "$0")/.."
+umask 077
+qa_directory=$(mktemp -d "${TMPDIR:-/tmp}/management-ui-tests.XXXXXX")
+export MANAGEMENT_QA_SECRET_DIR="$qa_directory"
+compose=(docker compose -p inference-management-ui-tests -f dev/compose.yaml -f dev/compose.ui-test.yaml)
+cleanup() {
+  "${compose[@]}" down -v --remove-orphans || true
+  rm -rf "$qa_directory"
+}
+trap cleanup EXIT
+openssl rand -base64 32 > "$qa_directory/admin_password"
+touch "$qa_directory/lambda_api_key"
+"${compose[@]}" up --build -d --wait
+"${compose[@]}" exec -T web npm run build
+"${compose[@]}" exec -T web npm test
+MANAGEMENT_WEB_URL=http://localhost:5174 \
+MANAGEMENT_E2E_PASSWORD_FILE="$qa_directory/admin_password" \
+MANAGEMENT_E2E_PROJECT=inference-management-ui-tests \
+MANAGEMENT_E2E_OVERRIDE="$(pwd)/dev/compose.ui-test.yaml" \
+npm --prefix apps/management/web run test:e2e -- "$@"
