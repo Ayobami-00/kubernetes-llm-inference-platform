@@ -342,3 +342,23 @@ one-second samples and graceful Pod deletion; it does not establish worker
 ownership during a run, PostgreSQL failover, CPU loss or GPU resilience. Offline
 checks pass 592 tests (17 optional skips). The authorized alert receiver reference
 is retained privately; notification delivery remains unverified. No GPU is rented.
+
+Database-primary acceptance is now live-verified. A fresh external base backup and
+post-backup WAL marker (`a6e23d591fc0`) completed before testing. The first fault
+(`f1d820c7369a`) exposed the stock 180-second smart-shutdown wait with pooled
+connections: automatic promotion took about 184 seconds. The failed observer and
+later data/timeline reconciliation are retained separately; its timer was not reset.
+
+The chart now sets a five-second smart-shutdown window. A reviewed Helm upgrade
+proved that was its only manifest change, leaving all Pod identities, storage,
+images and synchronous quorum unchanged. The repeated fault (`c1a7f309e684`)
+restored committed new-primary writes in 36.043 seconds and the same authenticated
+application session within a conservative 43.080 seconds. All 21 histories and
+both markers survived; three Ready replicas and WAL on timeline 3 were verified.
+Its 29 failed probes remain visible. The required 120-second objective was retained.
+
+Local verification passes 615 tests (17 optional skips), with current schemas and
+clean formatting/lint. External alerts and the telemetry stack are next, before
+CPU-host loss, so subsequent debugging retains logs beyond Pod deletion. Management
+worker ownership during a real runner Job, GPU lifecycle/inference and the complete
+retained-state rebuild still remain required. No GPU has been allocated.

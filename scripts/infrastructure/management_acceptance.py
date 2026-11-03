@@ -366,6 +366,9 @@ def bundle() -> dict:
         "frontend-allocation.json": ROOT / "artifacts/platform/management-frontend-allocation.json",
         "public-ui-verification.json": ROOT
         / "artifacts/platform/public-management-ui/verification.json",
+        "database-tuning-plan.json": state_home() / "cluster/database/tuning/plan.json",
+        "database-tuning-values.yaml": state_home() / "cluster/database/tuning/values.yaml",
+        "database-tuning-manifest.yaml": state_home() / "cluster/database/tuning/rendered.yaml",
     }
     for category, pattern, name in (
         ("renewal", "*/verification.json", "renewal"),
@@ -377,6 +380,18 @@ def bundle() -> dict:
                 c in "0123456789abcdef" for c in path.parent.name
             ):
                 extras[name + "-" + path.parent.name + ".json"] = path
+                if name == "postgresql-failure":
+                    control = json.loads(path.read_text())
+                    op = control["backup_operation"]
+                    if len(op) != 12 or any(c not in "0123456789abcdef" for c in op):
+                        raise ValueError("Invalid database fault backup reference")
+                    backup = state_home() / "cluster/database/recovery" / op / "backup.json"
+                    if (
+                        hashlib.sha256(backup.read_bytes()).hexdigest()
+                        != control["backup"]["receipt_sha256"]
+                    ):
+                        raise ValueError("Database fault backup evidence changed")
+                    extras["database-backup-" + op + ".json"] = backup
     for path in (ROOT / "artifacts/platform/public-management-ui").glob("api-failure-*.json"):
         extras["public-" + path.name] = path
     for path in (ROOT / "artifacts/platform/public-management-ui").glob(

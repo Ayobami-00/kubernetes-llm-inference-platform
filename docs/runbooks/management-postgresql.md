@@ -73,6 +73,22 @@ owning Helm release. Bootstrap, images, storage, identities and quorum changes a
 rejected. Verify unchanged Pod UIDs and repeat the original 120-second fault test
 under a new operation identity; retain both outcomes.
 
+### Repeated live result
+
+The reviewed one-field upgrade completed at 2026-11-03 20:02:44 UTC with all Pod
+UIDs unchanged. The second primary-loss test (`c1a7f309e684`) started at 20:03:42 UTC.
+Committed writes on its automatically promoted primary returned in 36.043 seconds.
+The independent application's conservative recovery upper bound was 43.080 seconds,
+including preflight overhead. Of 64 probes, 29 failed during recovery; those errors
+remain recorded. The same session and all 21 historical runs survived.
+
+Both markers matched, the original system identifier remained unchanged and the
+timeline advanced from 2 to 3. Three Ready replicas and new-primary WAL archival
+were verified before completion at 20:04:37 UTC. This satisfies the isolated
+primary-Pod failure objective on this deployment. The earlier 184-second outcome
+remains a failed acceptance case; CPU-host loss, worker ownership during a run and
+GPU/inference resilience still require separate evidence.
+
 The CNPG controller has two replicas. The pinned Barman manager intentionally has
 one recoverable replica: its leader-gated gRPC server and health-only readiness
 probe do not support advertising a standby as a healthy plugin endpoint. Database

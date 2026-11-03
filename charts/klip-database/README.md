@@ -59,6 +59,13 @@ Cluster and ObjectStore resources carry Helm keep annotations. These annotations
 replace PV reclaim policies, namespace-deletion safeguards or independently retained S3
 backups. Planned primary upgrades are supervised; emergency failover remains operator-managed.
 
+`smartShutdownTimeout` defaults to five seconds. Connection pools otherwise keep
+the operator's default 180-second smart shutdown open, delaying primary replacement.
+After that window, fast shutdown disconnects remaining clients and rolls back
+unfinished transactions. Required synchronous quorum and checkpoint shutdown limits
+remain unchanged. Apply existing-cluster timing changes through the reviewed,
+single-field procedure in [the database runbook](../../docs/runbooks/management-postgresql.md).
+
 ## Verification
 
 ```sh
