@@ -203,6 +203,12 @@ transition, `make monitoring-reconcile PLAN_SHA=<original-sha>` archives that
 failed pre-Helm attempt without changing workloads. Prepare a new corrected plan.
 An interrupted Helm install/upgrade remains ambiguous and this command refuses
 to retire it or replay the transition automatically.
+A completed Helm command followed by an admission postcondition failure can be
+retired only after observing a Ready release, no pending Helm transition and a
+deployed Helm revision with exactly the attempted values. It remains a failed
+acceptance record; original values/logs are archived and a corrected plan gets a
+new identity. The chart's `IgnoreOnInstallOnly` setting is explicit because an
+empty failure-policy value with cert-manager otherwise remains `Ignore` on upgrade.
 
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and

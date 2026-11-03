@@ -148,7 +148,7 @@ def archive_current():
     original = folder() / (current["approval_sha256"] + ".json")
     plan = json.loads(original.read_text())
     values = folder() / "values.yaml"
-    applied = current["status"] == "installed"
+    applied = current["status"] == "installed" or current.get("failed_after_helm", False)
     if (
         applied
         and values.exists()
@@ -189,7 +189,7 @@ def archive_current():
 
 
 def reconcile(approval):
-    """Retire a proven pre-Helm failure; never replay or resolve an ambiguous upgrade."""
+    """Retire a proven stable failure; never replay an ambiguous Helm upgrade."""
     from cluster import kubectl
 
     path = folder() / "active.json"
@@ -203,7 +203,10 @@ def reconcile(approval):
         # Compatibility with the initial installer, which saved this timestamp
         # only after successful dry-run and before invoking Helm.
         stage = "installing-crds"
-    if current["status"] != "interrupted" or stage != "installing-crds":
+    if current["status"] != "interrupted" or stage not in {
+        "installing-crds",
+        "hardening-admission",
+    }:
         raise ValueError("An ambiguous Helm transition requires separate operator recovery")
     pending = kubectl(
         "-n",
@@ -218,11 +221,46 @@ def reconcile(approval):
     ).strip()
     if pending or not observe()["ready"]:
         raise ValueError("Existing monitoring release is not stable for pre-Helm reconciliation")
+    if stage == "hardening-admission":
+        # A postcondition failure can be retired only after observing a fully
+        # deployed Helm revision with the exact attempted values. Never replay it.
+        from cluster import FOLDER, checked, kubeconfigs, tunnel
+
+        plan = json.loads((folder() / (approval + ".json")).read_text())
+        if (
+            current.get("error_type") != "ValueError"
+            or not (folder() / "helm-admission.log").exists()
+        ):
+            raise ValueError("No proof that the original Helm hardening command completed")
+        kubeconfigs()
+        with tunnel():
+            status = json.loads(
+                checked(
+                    [
+                        tool("helm"),
+                        "status",
+                        RELEASE,
+                        "-n",
+                        NAMESPACE,
+                        "--kubeconfig",
+                        str(FOLDER / "operator.conf"),
+                        "--output",
+                        "json",
+                    ]
+                )
+            )
+        if status["info"]["status"] != "deployed" or sha(status["config"]) != plan["values_sha256"]:
+            raise ValueError("The observed Helm revision differs from the attempted configuration")
+        current.update(failed_after_helm=True, observed_helm_revision=status["version"])
     current.update(
         status="failed",
         reconciled_at=utc_now(),
-        failed_before_helm=True,
-        reason="Read-only validation failed before Helm; existing release retained",
+        failed_before_helm=stage == "installing-crds",
+        reason=(
+            "Read-only validation failed before Helm; existing release retained"
+            if stage == "installing-crds"
+            else "Helm deployed the reviewed values, but admission postcondition failed"
+        ),
     )
     write_private(path, current)
     archive_current()

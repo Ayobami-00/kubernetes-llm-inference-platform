@@ -2,6 +2,7 @@
 
 import copy
 import json
+from contextlib import nullcontext
 from unittest.mock import Mock
 
 import cluster
@@ -119,6 +120,35 @@ def test_only_proven_pre_helm_failures_can_be_retired(monkeypatch, tmp_path):
     current["interrupted_stage"] = "installing"
     path.write_text(json.dumps(current))
     with pytest.raises(ValueError, match="ambiguous Helm"):
+        runtime.reconcile("original")
+
+
+def test_postcondition_failure_needs_observed_deployed_values(monkeypatch, tmp_path):
+    monkeypatch.setattr(runtime, "folder", lambda: tmp_path)
+    monkeypatch.setattr(runtime, "archive_current", Mock())
+    monkeypatch.setattr(runtime, "observe", lambda: {"ready": True})
+    monkeypatch.setattr(cluster, "kubectl", Mock(return_value=""))
+    monkeypatch.setattr(cluster, "kubeconfigs", Mock())
+    monkeypatch.setattr(cluster, "tunnel", nullcontext)
+    values = {"synthetic": "attempted-values"}
+    current = {
+        "approval_sha256": "original",
+        "status": "interrupted",
+        "interrupted_stage": "hardening-admission",
+        "error_type": "ValueError",
+    }
+    path = tmp_path / "active.json"
+    path.write_text(json.dumps(current))
+    (tmp_path / "original.json").write_text(json.dumps({"values_sha256": runtime.sha(values)}))
+    (tmp_path / "helm-admission.log").write_text("synthetic completed Helm command")
+    status = {"info": {"status": "deployed"}, "version": 3, "config": values}
+    monkeypatch.setattr(cluster, "checked", lambda *_args, **_kwargs: json.dumps(status))
+    observed = runtime.reconcile("original")
+    assert observed["failed_after_helm"] and not observed["failed_before_helm"]
+    assert observed["observed_helm_revision"] == 3
+    path.write_text(json.dumps(current))
+    status["config"] = {"synthetic": "different-values"}
+    with pytest.raises(ValueError, match="differs from"):
         runtime.reconcile("original")
     current["interrupted_stage"] = "installing-crds"
     path.write_text(json.dumps(current))

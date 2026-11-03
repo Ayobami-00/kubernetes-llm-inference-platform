@@ -3,11 +3,13 @@
 import hashlib
 import io
 import json
+import subprocess
 import tarfile
 
 import observability_release as release
 import pytest
 import yaml
+from common import tool
 
 
 def test_upstream_operator_enum_uses_safe_yaml_scalar_compatibility():
@@ -46,10 +48,50 @@ def test_monitoring_uses_rotating_credentials_and_separate_scoped_roles():
     }
     assert prom["arbitraryFSAccessThroughSMs"] == {"deny": True}
     assert not values["kubelet"]["serviceMonitor"]["tlsConfig"]["insecureSkipVerify"]
+    assert (
+        values["prometheusOperator"]["admissionWebhooks"]["failurePolicy"] == "IgnoreOnInstallOnly"
+    )
     assert all(
         c["env"] == [{"name": "AWS_EC2_METADATA_DISABLED", "value": "true"}]
         for c in prom["containers"]
     )
+
+
+@pytest.mark.skipif(
+    not (release.CACHE / "kube-prometheus-stack/Chart.yaml").exists(),
+    reason="Requires the checksum-verified upstream monitoring chart",
+)
+def test_upstream_admission_is_ignore_only_during_first_install():
+    for upgrading, expected in [(False, "Ignore"), (True, "Fail")]:
+        command = [
+            tool("helm"),
+            "template",
+            "klip-monitoring",
+            str(release.CACHE / "kube-prometheus-stack"),
+            "--namespace",
+            "observability",
+            "--kube-version",
+            "1.36.5",
+            "--values",
+            "-",
+        ]
+        if upgrading:
+            command.append("--is-upgrade")
+        output = subprocess.run(
+            command,
+            input=yaml.safe_dump(release.monitoring_values()),
+            text=True,
+            capture_output=True,
+            check=True,
+        ).stdout
+        policies = [
+            hook["failurePolicy"]
+            for doc in yaml.safe_load_all(output)
+            if doc
+            and doc["kind"] in {"MutatingWebhookConfiguration", "ValidatingWebhookConfiguration"}
+            for hook in doc["webhooks"]
+        ]
+        assert len(policies) == 3 and set(policies) == {expected}
 
 
 @pytest.mark.parametrize(
