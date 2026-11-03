@@ -227,3 +227,9 @@ A retained private image registry is now applied and its live policies verified.
 The pinned upstream ECR helper passed its own tests/build on an existing bounded
 CPU Job, with verified export and cleanup. [Private image delivery](../runbooks/private-images.md)
 still needs host rollout, actual pulls and published management/runner images.
+
+The complete local infrastructure check now passes: Terraform validation/mock
+plans and linting, Ansible/Helm checks, 538 Python tests (17 optional skips), all
+19 schemas and Ruff/formatting. Private-branch CI exposed and now has fixes for
+OCI cache naming, the Kind checksum download and recursive Terraform formatting.
+Combined CI is being repeated; local success is not a substitute for that result.

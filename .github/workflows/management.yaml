@@ -77,9 +77,8 @@ jobs:
         with: {version: 'v1.34.0'}
       - name: Install pinned kind
         run: |
-          curl -fsSLo /tmp/kind https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64
-          curl -fsSLo /tmp/kind.sha256 https://kind.sigs.k8s.io/dl/v0.30.0/kind-linux-amd64.sha256
-          printf '%s  /tmp/kind\n' "$(awk '{print $1}' /tmp/kind.sha256)" | sha256sum --check
+          curl --retry 3 --connect-timeout 10 --max-time 120 -fsSLo /tmp/kind https://github.com/kubernetes-sigs/kind/releases/download/v0.30.0/kind-linux-amd64
+          printf '%s  /tmp/kind\n' '517ab7fc89ddeed5fa65abf71530d90648d9638ef0c4cde22c2c11f8097b8889' | sha256sum --check
           chmod +x /tmp/kind
           sudo mv /tmp/kind /usr/local/bin/kind
       - run: npm ci

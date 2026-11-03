@@ -4,9 +4,9 @@ override_data {
   values = {
     outputs = {
       identity_manifest = {
-        account_id = "127811062476", region = "eu-west-2", cluster_id = "klip",
-        project = "kubernetes-llm-inference-platform", issuer = "https://oidc.klip-lab.click",
-        audience = "sts.amazonaws.com",
+        account_id   = "127811062476", region = "eu-west-2", cluster_id = "klip",
+        project      = "kubernetes-llm-inference-platform", issuer = "https://oidc.klip-lab.click",
+        audience     = "sts.amazonaws.com",
         provider_arn = "arn:aws:iam::127811062476:oidc-provider/oidc.klip-lab.click"
       }
     }
@@ -36,9 +36,9 @@ run "reject_foreign_workload_identity" {
     values = {
       outputs = {
         identity_manifest = {
-          account_id = "000000000000", region = "eu-west-2", cluster_id = "klip",
-          project = "kubernetes-llm-inference-platform", issuer = "https://oidc.klip-lab.click",
-          audience = "sts.amazonaws.com",
+          account_id   = "000000000000", region = "eu-west-2", cluster_id = "klip",
+          project      = "kubernetes-llm-inference-platform", issuer = "https://oidc.klip-lab.click",
+          audience     = "sts.amazonaws.com",
           provider_arn = "arn:aws:iam::000000000000:oidc-provider/oidc.klip-lab.click"
         }
       }
