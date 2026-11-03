@@ -48,6 +48,13 @@ def operation_timeout(default: int) -> int:
     return min(default, remaining)
 
 
+class CommandFailure(RuntimeError):
+    def __init__(self, message: str, program: str, returncode: int):
+        self.program = program
+        self.returncode = returncode
+        super().__init__(message or f"{program} exited {returncode}; no diagnostic output")
+
+
 def checked(
     arguments: list[str], *, data: str | None = None, timeout: int = 600, secret: bool = False
 ) -> str:
@@ -62,8 +69,14 @@ def checked(
     )
     if result.returncode:
         if secret:
-            raise RuntimeError(f"{Path(arguments[0]).name} failed; secret-bearing output withheld")
-        raise RuntimeError((result.stderr or result.stdout).strip())
+            raise CommandFailure(
+                f"{Path(arguments[0]).name} failed; secret-bearing output withheld",
+                Path(arguments[0]).name,
+                result.returncode,
+            )
+        raise CommandFailure(
+            (result.stderr or result.stdout).strip(), Path(arguments[0]).name, result.returncode
+        )
     return result.stdout
 
 
@@ -121,9 +134,10 @@ class Host:
         data: str | None = None,
         timeout: int = 600,
         secret: bool = False,
+        reuse: bool = True,
     ) -> str:
         return checked(
-            [*self.ssh_arguments(), shlex.join(arguments)],
+            [*self.ssh_arguments(reuse=reuse), shlex.join(arguments)],
             data=data,
             timeout=timeout,
             secret=secret,
@@ -334,9 +348,20 @@ def kubeconfigs() -> None:
 
 
 def kubectl(*arguments: str, host: str = "cp-01") -> str:
-    return Host(load_hosts()[host]).run(
-        ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", *arguments]
+    readonly = bool(arguments) and (
+        arguments[0] == "get"
+        or (len(arguments) >= 3 and arguments[0] in {"-n", "--namespace"} and arguments[2] == "get")
     )
+    target = Host(load_hosts()[host])
+    command = ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", *arguments]
+    try:
+        return target.run(command)
+    except CommandFailure as error:
+        if not readonly or error.program != "ssh" or error.returncode not in {255, -13}:
+            raise
+        # A GET can be repeated after a lost multiplexed session. A new SSH
+        # connection retains exactly the same key pins/proxy/identity settings.
+        return target.run(command, reuse=False)
 
 
 def bootstrap() -> dict:
