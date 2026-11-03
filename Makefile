@@ -153,7 +153,7 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
-.PHONY: platform-resize-prepare platform-resize-apply platform-resize-observe
+.PHONY: platform-resize-prepare platform-resize-apply platform-resize-observe platform-resize-verify
 platform-resize-prepare:
 	@test -n "$(NODE)" -a -n "$(BACKUP_OPERATION)" || (echo 'Set NODE and a verified BACKUP_OPERATION'; exit 1)
 	$(PYTHON) scripts/infrastructure/platform_resize.py prepare --node "$(NODE)" --backup-operation "$(BACKUP_OPERATION)"
@@ -164,6 +164,9 @@ platform-resize-apply:
 
 platform-resize-observe:
 	$(PYTHON) scripts/infrastructure/platform_resize.py observe
+
+platform-resize-verify:
+	$(PYTHON) scripts/infrastructure/platform_resize.py verify
 
 .PHONY: management-verify-renewal
 management-verify-renewal:

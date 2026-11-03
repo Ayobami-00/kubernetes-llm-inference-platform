@@ -6,6 +6,7 @@ from datetime import UTC, datetime, timedelta
 from unittest.mock import Mock
 
 import cluster
+import image_credentials
 import manage
 import platform_frontend as frontend
 import platform_resize as resize
@@ -227,3 +228,70 @@ def test_frontend_never_deregisters_when_survivor_health_deadline_expires(monkey
     with pytest.raises(TimeoutError, match="deadline"):
         frontend.detach({})
     mutate.assert_not_called()
+
+
+def test_final_capacity_checks_actual_resources_identity_and_ec2_health(monkeypatch, tmp_path):
+    allocation = {
+        "nodes": {
+            name: {
+                "instance_id": "i-" + name,
+                "instance_type": "m7i.2xlarge",
+                "root_volume_id": "vol-" + name,
+                "availability_zone": "zone-" + name,
+            }
+            for name in sorted(resize.NODES)
+        }
+    }
+    nodes = {
+        name: {
+            "metadata": {
+                "uid": "uid-" + name,
+                "labels": {
+                    resize.PROTECTED: "true",
+                    "node.kubernetes.io/instance-type": "m7i.2xlarge",
+                },
+            },
+            "spec": {"providerID": "aws:///zone/i-" + name},
+            "status": {
+                "conditions": [{"type": "Ready", "status": "True"}],
+                "capacity": {"cpu": "8"},
+                "allocatable": {"cpu": "7500m", "memory": "30Gi"},
+            },
+        }
+        for name in resize.NODES
+    }
+    monkeypatch.setattr(
+        image_credentials,
+        "healthy_targets",
+        lambda: {name: {"uid": "uid-" + name} for name in nodes},
+    )
+    monkeypatch.setattr(resize, "allocation", lambda: allocation)
+    monkeypatch.setattr(resize, "node", nodes.__getitem__)
+    monkeypatch.setattr(resize, "desired_type", lambda: "m7i.2xlarge")
+    monkeypatch.setattr(resize, "source_digest", lambda: "source")
+    monkeypatch.setattr(resize, "folder", lambda: tmp_path)
+    statuses = [
+        {
+            "InstanceId": item["instance_id"],
+            "InstanceState": {"Name": "running"},
+            "SystemStatus": {"Status": "ok"},
+            "InstanceStatus": {"Status": "ok"},
+        }
+        for item in allocation["nodes"].values()
+    ]
+    aws = Mock()
+    aws.call.return_value = {"InstanceStatuses": statuses}
+    monkeypatch.setattr(resize, "Aws", Mock(return_value=aws))
+    assert len(resize.verify_capacity()["nodes"]) == 3
+    assert (tmp_path / "capacity-verification.json").exists()
+    statuses[0]["SystemStatus"]["Status"] = "initializing"
+    with pytest.raises(ValueError, match="system and guest"):
+        resize.verify_capacity()
+    statuses[0]["SystemStatus"]["Status"] = "ok"
+    nodes["platform-02"]["status"]["capacity"]["cpu"] = "4"
+    with pytest.raises(ValueError, match="desired capacity"):
+        resize.verify_capacity()
+    nodes["platform-02"]["status"]["capacity"]["cpu"] = "8"
+    nodes["platform-02"]["metadata"]["uid"] = "replacement"
+    with pytest.raises(ValueError, match="desired capacity"):
+        resize.verify_capacity()

@@ -8,13 +8,13 @@ rendering or a successful stub run does not satisfy a live gate.
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers, EFS/EBS, replicated PostgreSQL and migrated management history live; management deployment/failover pending |
+| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | Live, including management/API recovery, database promotion and isolated restore; durable worker ownership and unplanned CPU loss still pending |
 | Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
 | GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
 | WriterAssist | Real JFLEG canonical run, valid delivery, GLEU and reconciled SLO verdict | Pending |
-| Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | Pending |
-| Resilience | Stable run identity through management/database faults and sustained runs | Pending |
+| Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | External monitor/storage live and SNS receipt confirmed; in-cluster stack/views pending |
+| Resilience | Stable run identity through management/database faults and sustained runs | API/database faults verified; running-job, CPU/serving loss and sustained tests pending |
 | Rebuild | Actual retained-state teardown, restore, fresh UI-provisioned A10 and repeated run | Pending |
 | Expansion | Sequential A100 profiles, separate mixed capacity, all scenarios and failure campaign | Pending |
 
@@ -399,7 +399,7 @@ reserved on the platform workers. Full telemetry plus one runner forecasts 9.86
 CPU, exceeding the old seven-CPU single-worker-loss capacity. A versioned upgrade
 to three m7i.2xlarge workers is prepared, with at least 15 CPU/58 GiB remaining
 after one loss. Its incremental compute estimate is $510.49/month, within the
-authorized persistent tier envelope. No worker has been resized yet.
+authorized persistent tier envelope. At that planning stage no worker had been resized.
 
 The scoped CPU-options deployer permission is applied from a reviewed one-policy
 plan; an actual worker dry run succeeded and the authoritative control-plane dry
@@ -407,3 +407,26 @@ run was denied. Fresh backup `d1f7a82c4e90` and post-backup WAL were verified at
 20:55:22 UTC. The maintenance workflow preserves per-node allocation truth during
 rollout, respects PDBs and drains the selected ALB target before restart. Planned
 maintenance will not replace the separate unplanned host-loss test.
+
+The rolling upgrade completed at 21:31:09 UTC. Each exact worker retained its
+instance, Kubernetes UID, root disk, network identity and placement, and exposes
+eight CPUs with 7.5 CPU and about 29.07 GiB allocatable. Workers 01 and 03 completed
+first. The first worker-02 drain stopped before any EC2 mutation because ALB
+health had not converged after rescheduling; that failed receipt was retained,
+scheduling restored explicitly and all three database/target checks revalidated.
+A tested bounded health-observation wait now precedes target deregistration;
+identity errors and the two-healthy-target requirement remain unchanged.
+
+Post-maintenance check `1483b7bc92c1` passed management spreading, database TLS,
+all 21 historical runs and shared artifacts across four backend Pods. The public
+HTTPS frontend and all three exact ALB targets passed at 21:32:36 UTC. Fresh
+backup `8c49fd62a731` completed with backup ID `20261103T213229` and post-backup
+WAL `0000000400000000000000B7` on timeline 4. These are planned-maintenance proofs;
+the unplanned CPU-loss and restored-cluster gates remain separate.
+
+The full local suite then passed 646 tests (17 optional skips) and clean Ruff/
+format checks. Monitoring-image scan `41722600867` and exact exporter source
+analysis are retained as security evidence. No Critical findings were reported;
+High findings require individual runtime review before monitoring installation.
+The Thanos 0.42.5 candidate reduces the original scan's High count from 23 to 11;
+its image is not authorized merely by this scan. No GPU has been allocated.

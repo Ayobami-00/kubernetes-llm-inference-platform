@@ -399,6 +399,68 @@ def sufficient_capacity(value):
     return value["status"]["capacity"]["cpu"] == "8" and cpu >= 7.5 and memory_gib >= 29
 
 
+def verify_capacity():
+    """Check actual capacity after maintenance or a fresh desired-size rebuild."""
+    from image_credentials import healthy_targets
+
+    targets = healthy_targets()
+    declared = allocation()  # Rechecks the exact instances, ENIs and root disks.
+    observations = {}
+    for name, item in declared["nodes"].items():
+        value = node(name)
+        if (
+            value["metadata"]["uid"] != targets[name]["uid"]
+            or value["metadata"]["labels"].get(PROTECTED) != "true"
+            or value["metadata"]["labels"].get("node.kubernetes.io/instance-type") != desired_type()
+            or not value["spec"].get("providerID", "").endswith("/" + item["instance_id"])
+            or value["spec"].get("unschedulable")
+            or item["instance_type"] != desired_type()
+            or not ready(value)
+            or not sufficient_capacity(value)
+        ):
+            raise ValueError("Every original protected worker must expose the desired capacity")
+        observations[name] = {
+            "uid": value["metadata"]["uid"],
+            "instance_id": item["instance_id"],
+            "instance_type": item["instance_type"],
+            "root_volume_id": item["root_volume_id"],
+            "availability_zone": item["availability_zone"],
+            "capacity": value["status"]["capacity"],
+            "allocatable": value["status"]["allocatable"],
+        }
+    statuses = Aws(PROFILES["platform"]).call(
+        "ec2",
+        "describe-instance-status",
+        "--instance-ids",
+        *[item["instance_id"] for item in declared["nodes"].values()],
+        "--include-all-instances",
+    )["InstanceStatuses"]
+    if (
+        len(statuses) != 3
+        or {item["InstanceId"] for item in statuses}
+        != {item["instance_id"] for item in declared["nodes"].values()}
+        or any(
+            item["InstanceState"]["Name"] != "running"
+            or item["SystemStatus"]["Status"] != "ok"
+            or item["InstanceStatus"]["Status"] != "ok"
+            for item in statuses
+        )
+    ):
+        raise ValueError("All three exact EC2 workers must pass system and guest checks")
+    report = {
+        "schema_version": "klip-platform-capacity-verification.v1",
+        "verified_at": utc_now(),
+        "source_sha256": source_digest(),
+        "nodes": observations,
+        "limitations": [
+            "Verifies actual worker capacity and current database readiness only",
+            "Telemetry requests and unplanned worker-loss recovery need separate validation",
+        ],
+    }
+    write_private(folder() / "capacity-verification.json", report)
+    return report
+
+
 def abort_drain(approval):
     record = active()
     if approval != record["plan_sha256"]:
@@ -558,7 +620,7 @@ def apply(approval):
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("command", choices=["prepare", "apply", "observe", "abort-drain"])
+    parser.add_argument("command", choices=["prepare", "apply", "observe", "abort-drain", "verify"])
     parser.add_argument("--node", choices=sorted(NODES))
     parser.add_argument("--backup-operation")
     parser.add_argument("--approve-plan")
@@ -571,6 +633,8 @@ def main():
             result = apply(args.approve_plan)
         elif args.command == "abort-drain":
             result = abort_drain(args.approve_plan)
+        elif args.command == "verify":
+            result = verify_capacity()
         else:
             result = active()
         print(json.dumps(result, indent=2))

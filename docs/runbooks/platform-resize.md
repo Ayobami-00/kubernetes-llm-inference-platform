@@ -98,6 +98,11 @@ database PVCs, force promotion, or silently downgrade a partially changed worker
 After all three resizes, recheck authenticated management/history, database/WAL,
 artifact access, CSI and the full telemetry capacity envelope. Planned drained
 maintenance does not replace the separate unplanned CPU-worker-loss acceptance.
+`make platform-resize-verify` checks fresh Node leases, database readiness, exact
+EC2/ENI/root-disk ownership, instance-type labels, exposed and allocatable resources,
+and EC2 system/guest checks. It also works after a fresh rebuild at the desired
+size; it does not require historical maintenance receipts. The private capacity
+receipt is separate from the management/artifact and backup verification bundles.
 
 References: [EC2 CPU options](https://docs.aws.amazon.com/AWSEC2/latest/UserGuide/instance-cpu-options-rules.html),
 [CloudNativePG node maintenance](https://cloudnative-pg.io/docs/1.28/kubernetes_upgrade/).
