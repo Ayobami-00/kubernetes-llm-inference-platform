@@ -67,6 +67,7 @@ spec:
     parameters:
       password_encryption: scram-sha-256
       max_connections: "150"
+      archive_timeout: "60s"
     pg_hba:
       - hostnossl all all all reject
   bootstrap:
@@ -79,6 +80,13 @@ spec:
     {{- else }}
     recovery:
       source: source
+      database: {{ .Values.database | quote }}
+      owner: {{ .Values.owner | quote }}
+      secret:
+        name: {{ required "applicationSecret is required for recovery" .Values.applicationSecret }}
+      {{- with .Values.bootstrap.recovery.target }}
+      recoveryTarget: {{ toYaml . | nindent 8 }}
+      {{- end }}
     {{- end }}
   {{- if eq .Values.bootstrap.mode "recovery" }}
   externalClusters:
@@ -103,6 +111,10 @@ metadata:
   name: {{ .Release.Name }}-backups
   annotations: {helm.sh/resource-policy: keep}
 spec:
+  instanceSidecarConfiguration:
+    resources: {{ toYaml .Values.backup.sidecarResources | nindent 6 }}
+    env:
+      - {name: AWS_EC2_METADATA_DISABLED, value: "true"}
   retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
   configuration:
     destinationPath: {{ $destination | quote }}

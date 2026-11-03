@@ -14,8 +14,14 @@ import pytest
 
 
 @pytest.mark.parametrize("status", [200, 202, 404, 409, 403])
-def test_remote_cleanup_enforces_the_uid_and_never_hides_api_conflicts(monkeypatch, status):
-    target = "/apis/batch/v1/namespaces/klip/jobs/storage-test"
+@pytest.mark.parametrize(
+    "target",
+    [
+        "/apis/batch/v1/namespaces/klip/jobs/storage-test",
+        "/apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db-restore",
+    ],
+)
+def test_remote_cleanup_enforces_the_uid_and_never_hides_api_conflicts(monkeypatch, status, target):
     uid = "00000000-0000-0000-0000-000000000001"
     requests = []
     certificate = base64.b64encode(b"synthetic certificate fixture").decode()
@@ -77,7 +83,14 @@ def test_remote_cleanup_enforces_the_uid_and_never_hides_api_conflicts(monkeypat
     ]
 
 
-@pytest.mark.parametrize("path", ["/api/v1/nodes/other", "/api/v1/namespaces/a/../b"])
+@pytest.mark.parametrize(
+    "path",
+    [
+        "/api/v1/nodes/other",
+        "/api/v1/namespaces/a/../b",
+        "/apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db",
+    ],
+)
 def test_cleanup_cannot_be_redirected_to_another_resource_kind(path):
     with pytest.raises(ValueError, match="cleanup target"):
         cluster.delete_owned_resource(path, "00000000-0000-0000-0000-000000000001")

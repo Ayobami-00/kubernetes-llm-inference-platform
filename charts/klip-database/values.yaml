@@ -21,6 +21,7 @@ bootstrap:
   recovery:
     destinationPath: ""
     serverName: ""
+    target: {}
 backup:
   destinationPath: ""
   authentication: secret
@@ -28,6 +29,9 @@ backup:
   roleArn: ""
   retentionPolicy: 30d
   schedule: "0 0 2 * * *"
+  sidecarResources:
+    requests: {cpu: 50m, memory: 128Mi}
+    limits: {cpu: "1", memory: 512Mi}
 monitoring:
   enablePodMonitor: false
 networkPolicy:

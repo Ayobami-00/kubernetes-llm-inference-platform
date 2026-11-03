@@ -44,6 +44,13 @@ lag, failed archive operations and restore verification require alerts. The
 five-minute recovery-point objective depends on healthy archiving and must be
 measured by restoring a known committed marker.
 
+The pinned Barman plugin manager currently runs as one recoverable replica. Its
+CNPG-I gRPC service is leader-gated while the upstream readiness probe only checks
+the manager's health endpoint; increasing its replica count would advertise an
+inactive endpoint. WAL sidecars run with every database instance. Record manager
+replacement time and archive/reconcile behavior during its failure test. Do not
+describe this manager as HA or infer backup availability from database readiness.
+
 Management stores operation/attempt ownership durably. Idempotency prevents a
 restart from allocating another VM or creating another runner attempt. Ambiguous
 provider submissions require reconciliation, not a blind retry. Runner Pods use

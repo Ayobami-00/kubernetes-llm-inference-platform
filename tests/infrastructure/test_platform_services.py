@@ -102,6 +102,8 @@ def test_nonreviewed_roles_and_releases_fail_before_deployment():
         "aws-efs-csi-driver",
         "aws-ebs-csi-driver",
         "klip-storage",
+        "cloudnative-pg",
+        "plugin-barman-cloud",
     }
     assert len(pins["images"]) >= 9
 
@@ -168,3 +170,17 @@ def test_ebs_is_topology_aware_retained_and_has_no_static_or_metadata_credential
         "--metadata-sources=kubernetes" in node["spec"]["template"]["spec"]["containers"][0]["args"]
     )
     assert not [x for x in items if x["kind"] == "DaemonSet" and "windows" in x["metadata"]["name"]]
+
+
+def test_database_operators_use_pinned_images_and_truthful_replica_modes():
+    for release, replicas in [("cloudnative-pg", 2), ("plugin-barman-cloud", 1)]:
+        items = resources(release)
+        deployment = next(x for x in items if x["kind"] == "Deployment")
+        assert deployment["spec"]["replicas"] == replicas
+        pod = deployment["spec"]["template"]["spec"]
+        assert pod["nodeSelector"]["klip.dev.node-restriction.kubernetes.io/platform"] == "true"
+        assert all("@sha256:" in x["image"] for x in pod["containers"])
+        if release == "plugin-barman-cloud":
+            assert deployment["spec"]["strategy"]["type"] == "Recreate"
+            config = next(x for x in items if x["kind"] == "ConfigMap")
+            assert "@sha256:" in config["data"]["SIDECAR_IMAGE"]

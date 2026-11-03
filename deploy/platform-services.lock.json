@@ -12,7 +12,8 @@
     "efs_csi_driver": "3.5.4",
     "efs_csi_chart": "4.5.4",
     "ebs_csi_driver": "1.67.2",
-    "ebs_csi_chart": "2.67.2"
+    "ebs_csi_chart": "2.67.2",
+    "postgresql": "18.6-standard-trixie"
   },
   "schemas": {
     "postgresql.cnpg.io/v1/Cluster": {
@@ -58,6 +59,18 @@
       "url": "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-aws-ebs-csi-driver-2.67.2/aws-ebs-csi-driver-2.67.2.tgz",
       "file": "aws-ebs-csi-driver-2.67.2.tgz",
       "sha256": "514ed77d8c1450e64db0c18182a537ecb6fd88e96154c1ea7652205b29d5c6ae"
+    },
+    "cloudnative-pg": {
+      "version": "0.29.1",
+      "file": "cloudnative-pg-0.29.1.tgz",
+      "url": "https://github.com/cloudnative-pg/charts/releases/download/cloudnative-pg-v0.29.1/cloudnative-pg-0.29.1.tgz",
+      "sha256": "b53d3991fe84bcf38767e7702cae78666265427a127a26fff168ab4207d2b1df"
+    },
+    "plugin-barman-cloud": {
+      "version": "0.8.1",
+      "file": "plugin-barman-cloud-0.8.1.tgz",
+      "url": "https://github.com/cloudnative-pg/charts/releases/download/plugin-barman-cloud-v0.8.1/plugin-barman-cloud-0.8.1.tgz",
+      "sha256": "9ad0b9e56da2777a1a0269feaf7215e18297e9c8b5730e04acb27b5d462e9456"
     }
   },
   "images": {
@@ -127,6 +140,22 @@
     },
     "public.ecr.aws/ebs-csi-driver/volume-modifier-for-k8s:v0.9.6-eksbuild.4": {
       "digest": "sha256:3f4d177de43556359644e064e31fe696e0aaf24bed7ed6333140b6d1721cb25c",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1": {
+      "digest": "sha256:923c267ec29636db3bee20f993d0ec4973fa22998e1adad37da79e4d32b5bc07",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.15.1": {
+      "digest": "sha256:c75acad19a36e8176cfe2885761ff1b836c6ef977d7257e298c99a28b5c302ef",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.15.1": {
+      "digest": "sha256:2287a793a804db751edd0d07d44cd549e357677e98a800eb12e2cf7c0d53f9b0",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie": {
+      "digest": "sha256:5bf4a23aa13fb560903fba932676773ba4ba2729c162e587b09bf539a2e3df56",
       "platform": "linux/amd64"
     }
   }

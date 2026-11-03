@@ -41,8 +41,10 @@ not synchronous writes per request on EFS.
 
 PostgreSQL runs in `platform-data`; `klip-db` and the explicitly reserved
 `klip-db-restore` service accounts can assume the database archive role. The role can
-read/write/delete current archive objects only under `postgresql/` and list only that
-prefix. It cannot delete historical object versions. The role trust requires this
+read/write/delete current archive objects only under `postgresql/`. Barman's
+required HeadBucket probe uses the IAM ListBucket action, so bucket metadata/list
+permission covers this dedicated bucket; it does not grant access to other buckets
+or object content outside the archive prefix. It cannot delete historical object versions. The role trust requires this
 cluster's OIDC provider and the STS audience, with no wildcard subjects.
 
 Set the database chart's `backup.authentication=webIdentity`, `backup.roleArn` and

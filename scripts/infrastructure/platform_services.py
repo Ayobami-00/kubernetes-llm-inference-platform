@@ -27,6 +27,8 @@ RELEASES = {
     "aws-efs-csi-driver": "kube-system",
     "aws-ebs-csi-driver": "kube-system",
     "klip-storage": "klip",
+    "cloudnative-pg": "cnpg-system",
+    "plugin-barman-cloud": "cnpg-system",
 }
 PLACEMENT = {"klip.dev.node-restriction.kubernetes.io/platform": "true"}
 
@@ -50,6 +52,8 @@ def fetch() -> None:
                 sources = {
                     "aws-efs-csi-driver": "https://github.com/kubernetes-sigs/aws-efs-csi-driver/releases/download/helm-chart-",
                     "aws-ebs-csi-driver": "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-",
+                    "cloudnative-pg": "https://github.com/cloudnative-pg/charts/releases/download/cloudnative-pg-",
+                    "plugin-barman-cloud": "https://github.com/cloudnative-pg/charts/releases/download/plugin-barman-cloud-",
                 }
                 if name not in sources or not item["url"].startswith(sources[name]):
                     raise ValueError("Unexpected chart source")
@@ -90,6 +94,10 @@ def digest(image: str) -> str:
 def values_for(release: str, *, storage: dict | None = None) -> dict:
     if release not in RELEASES:
         raise ValueError("Unreviewed service release")
+    if release in {"cloudnative-pg", "plugin-barman-cloud"}:
+        from database_services import values_for_operator
+
+        return values_for_operator(release, digest)
     if release == "aws-ebs-csi-driver":
         from ebs_services import values_for_ebs
 
@@ -305,6 +313,24 @@ def deploy(release: str) -> dict:
                 or driver["status"].get("observedGeneration") != driver["metadata"]["generation"]
             ):
                 raise ValueError("All three EFS node plugins must be current and Ready")
+    if release == "cloudnative-pg":
+        from cluster import Host, load_hosts
+
+        namespace = yaml.safe_load((ROOT / "deploy/releases/platform-namespaces.yaml").read_text())
+        existing = kubectl(
+            "get", "namespace", "platform-data", "--ignore-not-found", "-o", "json"
+        ).strip()
+        if existing:
+            labels = json.loads(existing)["metadata"].get("labels", {})
+            if any(labels.get(k) != v for k, v in namespace["metadata"]["labels"].items()):
+                raise ValueError(
+                    "Existing data namespace does not match the reviewed project/security boundary"
+                )
+        else:
+            Host(load_hosts()["cp-01"]).run(
+                ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", "create", "-f", "-"],
+                data=yaml.safe_dump(namespace),
+            )
     values = values_for(release, storage=storage)
     rendered = render(release, values)
     path = FOLDER / "service-values" / (release + ".yaml")

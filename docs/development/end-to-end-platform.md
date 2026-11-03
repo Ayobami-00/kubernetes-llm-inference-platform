@@ -8,7 +8,7 @@ rendering or a successful stub run does not satisfy a live gate.
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers and retained RWX artifacts live; management, database and recovery tests pending |
+| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers, EFS/EBS and replicated PostgreSQL with external backup/restore live; management migration/failover pending |
 | Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
 | GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
@@ -190,3 +190,22 @@ following claim deletion, then confirmed deletion of only the synthetic volumes 
 CSI. The owned namespace/PVs and all three AWS volumes are gone; cleanup is complete.
 See the [EBS runbook](../runbooks/ebs-storage.md). Database deployment/restore and
 management HA remain pending. No GPU has been rented.
+
+CloudNativePG 1.30.1 / Barman 0.15.1 and PostgreSQL 18.6 standard Trixie are now
+deployed with pinned charts/images. The three database instances are Ready on
+distinct CPU hosts, using independent 40-GiB data and 20-GiB WAL volumes. The
+Barman archive safety probe required bucket-level ListBucket on the dedicated
+archive bucket; object access remains restricted to `postgresql/`. Actual WAL
+archiving recovered, retaining the earlier failure counters honestly.
+
+A real external base backup completed, followed by a separately committed and
+archived WAL marker. Isolated recovery to that named point produced three Ready
+instances and matching base/WAL markers in about 117 seconds. Exact UID/claim/disk
+cleanup removed all six temporary disks; the source database and archives remain.
+The application credential was age-encrypted into a versioned off-cluster object
+and download/decrypt checked using the existing independently retained recovery
+identity. See the [database runbook](../runbooks/management-postgresql.md).
+The pinned plugin manager is a single recoverable replica, not HA. Management data
+migration, client reconnection/failover and the retained-state environment rebuild
+remain unproven. Offline checks pass 527 tests (17 optional skips), all 19 schemas,
+strict initialization/recovery CRD rendering and Ruff/formatting.

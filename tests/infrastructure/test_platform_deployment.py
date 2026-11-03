@@ -136,8 +136,10 @@ def test_postgres_has_independent_storage_synchronous_replication_and_external_b
         "failoverQuorum": True,
     }
     assert spec["plugins"][0]["isWALArchiver"]
+    assert spec["postgresql"]["parameters"]["archive_timeout"] == "60s"
     assert "backup" not in spec  # No deprecated in-tree Barman configuration.
     store = next(item for item in resources if item["kind"] == "ObjectStore")
+    assert store["spec"]["instanceSidecarConfiguration"]["resources"]["limits"]["memory"] == "512Mi"
     credentials = store["spec"]["configuration"]["s3Credentials"]
     assert all(value["name"] == "aws-fixture" for value in credentials.values())
     assert (
@@ -151,13 +153,20 @@ def test_restore_preserves_original_archive_and_cannot_initialize_an_empty_datab
         "klip-database",
         [
             "bootstrap.mode=recovery",
-            "applicationSecret=",
+            "applicationSecret=management-db-app",
             "bootstrap.recovery.destinationPath=s3://backups-fixture/old-database",
             "bootstrap.recovery.serverName=previous-cluster",
         ],
     )
     cluster = next(item for item in resources if item["kind"] == "Cluster")
-    assert cluster["spec"]["bootstrap"] == {"recovery": {"source": "source"}}
+    assert cluster["spec"]["bootstrap"] == {
+        "recovery": {
+            "source": "source",
+            "database": "management",
+            "owner": "management",
+            "secret": {"name": "management-db-app"},
+        }
+    }
     assert cluster["spec"]["externalClusters"][0]["plugin"]["parameters"] == {
         "barmanObjectName": "klip-db-source",
         "serverName": "previous-cluster",

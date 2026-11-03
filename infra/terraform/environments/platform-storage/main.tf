@@ -110,9 +110,9 @@ resource "aws_iam_role_policy" "database" {
   name = "database-archive-only"
   role = aws_iam_role.storage["database"].id
   policy = jsonencode({ Version = "2012-10-17", Statement = [
-    { Effect = "Allow", Action = ["s3:GetBucketLocation"], Resource = aws_s3_bucket.database.arn },
+    { Effect = "Allow", Action = ["s3:GetBucketLocation", "s3:ListBucket"], Resource = aws_s3_bucket.database.arn },
     {
-      Effect    = "Allow", Action = ["s3:ListBucket", "s3:ListBucketMultipartUploads"], Resource = aws_s3_bucket.database.arn,
+      Effect    = "Allow", Action = ["s3:ListBucketMultipartUploads"], Resource = aws_s3_bucket.database.arn,
       Condition = { StringLike = { "s3:prefix" = ["${local.storage.database.archive_prefix}/*"] } }
     },
     {

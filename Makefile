@@ -20,6 +20,47 @@ platform-check:
 platform-schema-fetch:
 	$(PYTHON) scripts/infrastructure/platform_checks.py --fetch-schemas
 
+.PHONY: database-prepare database-initialize database-verify database-backup database-restore-prepare database-restore database-verify-restore
+database-prepare:
+	$(PYTHON) scripts/infrastructure/database.py prepare
+
+database-initialize:
+	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the exact reviewed database initialization digest'; exit 1)
+	$(PYTHON) scripts/infrastructure/database.py initialize --approve-plan "$(PLAN_SHA)"
+
+database-verify:
+	$(PYTHON) scripts/infrastructure/database.py verify
+
+database-backup:
+	@test -n "$(OPERATION)" || (echo 'Set a stable 12-character lowercase hexadecimal OPERATION'; exit 1)
+	$(PYTHON) scripts/infrastructure/database_recovery.py backup --operation "$(OPERATION)"
+
+database-restore-prepare:
+	@test -n "$(OPERATION)" || (echo 'Set OPERATION to the completed backup operation'; exit 1)
+	$(PYTHON) scripts/infrastructure/database_recovery.py restore-prepare --operation "$(OPERATION)"
+
+database-restore:
+	@test -n "$(OPERATION)" -a -n "$(PLAN_SHA)" || (echo 'Set OPERATION and the reviewed restore PLAN_SHA'; exit 1)
+	$(PYTHON) scripts/infrastructure/database_recovery.py restore --operation "$(OPERATION)" --approve-plan "$(PLAN_SHA)"
+
+database-verify-restore:
+	@test -n "$(OPERATION)" || (echo 'Set OPERATION to the restored backup operation'; exit 1)
+	$(PYTHON) scripts/infrastructure/database_recovery.py verify --operation "$(OPERATION)"
+
+.PHONY: database-cleanup-restore database-backup-secret database-verify-secret database-restore-secret
+database-cleanup-restore:
+	@test -n "$(OPERATION)" || (echo 'Set OPERATION to the verified synthetic restore operation'; exit 1)
+	$(PYTHON) scripts/infrastructure/database_cleanup.py --operation "$(OPERATION)"
+
+database-backup-secret:
+	$(PYTHON) scripts/infrastructure/database_secrets.py backup
+
+database-verify-secret:
+	$(PYTHON) scripts/infrastructure/database_secrets.py verify
+
+database-restore-secret:
+	$(PYTHON) scripts/infrastructure/database_secrets.py restore
+
 .PHONY: identity-collect identity-plan identity-apply identity-verify-public identity-activate identity-verify-federation
 identity-collect:
 	$(PYTHON) scripts/infrastructure/workload_identity.py collect

@@ -5,11 +5,13 @@ standby and failover quorum, separate data/WAL volumes, strict host anti-affinit
 spreading. It refuses a floating image or fewer than three instances. Losing both standbys
 can block writes: the selected policy prioritizes durability over write availability.
 
-The chart is implemented and structurally checked; live failover, identity, backups and
-restore acceptance remain pending. It does not install either operator. The verified
-schema candidates are CloudNativePG 1.30.1 (chart 0.29.1) and Barman Cloud Plugin 0.15.1
-(chart 0.8.1), compatible with the existing Kubernetes 1.36 line. Their deployment artifacts
-and PostgreSQL image still require digest verification before installation.
+CloudNativePG 1.30.1 (chart 0.29.1), Barman Cloud Plugin 0.15.1 (chart 0.8.1), and
+PostgreSQL 18.6 standard Trixie are digest/checksum pinned and deployed on the live
+Kubernetes 1.36 lab cluster. Continuous WAL archiving, an external base backup and
+an isolated three-instance restore have passed. Both a base-backup marker and a
+later WAL marker were recovered. Management migration and actual application
+failover remain pending. This chart does not install either operator. See the
+[operational runbook](../../docs/runbooks/management-postgresql.md).
 
 ## Prerequisites
 
@@ -42,7 +44,9 @@ clients, replication, operator management and monitoring separately.
 
 `bootstrap.mode=initdb` initializes a new database. `bootstrap.mode=recovery` selects
 physical recovery through the plugin and requires the original archive path/server name.
-Recovery never falls back to an empty database. Use a new cluster identity or archive
+Recovery never falls back to an empty database. It explicitly retains the application
+database, owner and credential Secret; `bootstrap.recovery.target` can bind recovery
+to a backup ID and named restore point. Use a new cluster identity or archive
 prefix; the chart rejects writing back to the exact source identity. The source ObjectStore
 has no retention policy, so the recovery definition cannot expire its source backups.
 

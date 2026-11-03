@@ -37,7 +37,11 @@ run "retained_encrypted_scoped_storage" {
   }
   assert {
     condition     = jsondecode(aws_iam_role_policy.database.policy).Statement[2].Resource == "${aws_s3_bucket.database.arn}/postgresql/*" && jsondecode(aws_iam_role_policy.database.policy).Statement[1].Condition.StringLike["s3:prefix"][0] == "postgresql/*"
-    error_message = "Barman may only enumerate/mutate its archive prefix."
+    error_message = "Barman object access and multipart operations stay within its archive prefix."
+  }
+  assert {
+    condition     = toset(jsondecode(aws_iam_role_policy.database.policy).Statement[0].Action) == toset(["s3:GetBucketLocation", "s3:ListBucket"]) && jsondecode(aws_iam_role_policy.database.policy).Statement[0].Resource == aws_s3_bucket.database.arn
+    error_message = "Barman HeadBucket requires ListBucket on the dedicated archive bucket, never other buckets."
   }
   assert {
     condition     = jsondecode(aws_iam_role_policy.artifacts.policy).Statement[0].Condition.StringEquals["elasticfilesystem:AccessPointArn"] == aws_efs_access_point.artifacts.arn && toset(jsondecode(aws_iam_role_policy.artifacts.policy).Statement[0].Action) == toset(["elasticfilesystem:ClientMount", "elasticfilesystem:ClientWrite"])
