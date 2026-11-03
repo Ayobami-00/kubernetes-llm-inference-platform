@@ -4,6 +4,7 @@ on:
   push:
     paths:
       - 'infra/**'
+      - 'charts/**'
       - 'deploy/**'
       - 'scripts/infrastructure/**'
       - 'tests/infrastructure/**'
@@ -16,6 +17,7 @@ on:
   pull_request:
     paths:
       - 'infra/**'
+      - 'charts/**'
       - 'deploy/**'
       - 'scripts/infrastructure/**'
       - 'tests/infrastructure/**'
@@ -43,3 +45,5 @@ jobs:
       - run: make infra-tools
       - run: uv run --locked --group infrastructure python scripts/infrastructure/platform_artifacts.py install
       - run: make infra-check
+      - name: Validate HA database charts against pinned upstream schemas
+        run: uv run --locked --group infrastructure python scripts/infrastructure/platform_checks.py --fetch-schemas

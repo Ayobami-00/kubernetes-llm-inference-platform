@@ -10,6 +10,8 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MANAGEMENT_", extra="ignore")
     database_url: str = "postgresql+psycopg://management:management@localhost:55432/management"
+    database_require_tls: bool = False
+    database_ca_file: Path | None = None
     admin_password_file: Path = Path("dev/.secrets/admin_password")
     lambda_api_key_file: Path = Path("dev/.secrets/lambda_api_key")
     secure_cookies: bool = False

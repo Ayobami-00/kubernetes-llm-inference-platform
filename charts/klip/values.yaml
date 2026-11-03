@@ -15,6 +15,9 @@ auth:
 database:
   existingSecret: ""
   urlKey: database-url
+  caSecret: ""
+  caKey: ca.crt
+  requireTLS: false
 publicOrigin: ""
 localDevelopment: false
 artifacts:
@@ -38,6 +41,11 @@ tolerations:
   - key: node-role.kubernetes.io/control-plane
     operator: Exists
     effect: NoSchedule
+availability:
+  enabled: false
+  minAvailable: 1
+  spreadAcrossZones: true
+terminationGracePeriodSeconds: 60
 ingress:
   enabled: false
   className: ""

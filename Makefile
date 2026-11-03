@@ -13,6 +13,13 @@ infra-policies:
 infra-check:
 	$(PYTHON) scripts/infrastructure/checks.py
 
+.PHONY: platform-check platform-schema-fetch
+platform-check:
+	$(PYTHON) scripts/infrastructure/platform_checks.py
+
+platform-schema-fetch:
+	$(PYTHON) scripts/infrastructure/platform_checks.py --fetch-schemas
+
 infra-lock:
 	$(PYTHON) scripts/infrastructure/checks.py --lock-platforms
 

@@ -5,6 +5,12 @@ kind: Deployment
 metadata: {name: {{ $.Release.Name }}-{{ $role }}}
 spec:
   replicas: {{ index $.Values.replicas $role }}
+  {{- if $.Values.availability.enabled }}
+  strategy:
+    type: RollingUpdate
+    # Required host anti-affinity must not require an extra host during updates.
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  {{- end }}
   selector:
     matchLabels: {app.kubernetes.io/name: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
   template:
@@ -12,6 +18,8 @@ spec:
       labels: {app.kubernetes.io/name: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
     spec:
       serviceAccountName: {{ $.Release.Name }}-{{ $role }}
+      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}
+      {{- include "klip.availability" (dict "root" $ "role" $role) | nindent 6 }}
       securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001}
       nodeSelector: {{ toYaml $.Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml $.Values.tolerations | nindent 8 }}
@@ -58,6 +66,11 @@ kind: Deployment
 metadata: {name: {{ .Release.Name }}-web}
 spec:
   replicas: {{ .Values.replicas.web }}
+  {{- if .Values.availability.enabled }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  {{- end }}
   selector:
     matchLabels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
   template:
@@ -65,6 +78,8 @@ spec:
       labels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
     spec:
       automountServiceAccountToken: false
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- include "klip.availability" (dict "root" . "role" "web") | nindent 6 }}
       securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, fsGroup: 101}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}

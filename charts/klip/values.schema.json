@@ -1,0 +1,33 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "replicas": {
+      "type": "object",
+      "properties": {
+        "api": {"type": "integer", "minimum": 1},
+        "worker": {"type": "integer", "minimum": 1},
+        "web": {"type": "integer", "minimum": 1}
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "minAvailable": {"type": "integer", "minimum": 1},
+        "spreadAcrossZones": {"type": "boolean"}
+      },
+      "required": ["enabled", "minAvailable", "spreadAcrossZones"]
+    },
+    "terminationGracePeriodSeconds": {"type": "integer", "minimum": 30},
+    "database": {
+      "type": "object",
+      "properties": {
+        "requireTLS": {"type": "boolean"},
+        "caSecret": {"type": "string"},
+        "caKey": {"type": "string", "minLength": 1}
+      }
+    }
+  }
+}

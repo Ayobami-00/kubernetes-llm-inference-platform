@@ -1,0 +1,60 @@
+# End-to-end platform delivery
+
+The active milestone connects the existing workload, infrastructure and management
+implementations. Completion requires live evidence and a retained-state rebuild; local
+rendering or a successful stub run does not satisfy a live gate.
+
+## Acceptance ledger
+
+| Gate | Required evidence | Current status |
+| --- | --- | --- |
+| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | In progress; HA charts implemented, live infrastructure pending |
+| Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
+| GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
+| Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
+| WriterAssist | Real JFLEG canonical run, valid delivery, GLEU and reconciled SLO verdict | Pending |
+| Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | Pending |
+| Resilience | Stable run identity through management/database faults and sustained runs | Pending |
+| Rebuild | Actual retained-state teardown, restore, fresh UI-provisioned A10 and repeated run | Pending |
+| Expansion | Sequential A100 profiles, separate mixed capacity, all scenarios and failure campaign | Pending |
+
+Start with one A10. Shared/CodeAgent testing later uses one 8×A100 **80 GB** VM
+sequentially; simultaneous mixed scenarios require additional authorized capacity. A single
+GPU host has expected inference downtime during host failure. Experimental SLO violations
+remain valid outcomes when delivery and measurements are valid.
+
+## Foundation implementation
+
+`deploy/environments/lab/management.yaml` enables two replicas for web/API/workers,
+required host anti-affinity, zone spreading and disruption budgets. It removes the old
+control-plane placement key explicitly because Helm merges maps. Provide verified image
+digests, existing Secret names, HTTPS origin and RWX storage separately.
+Updates replace at most one replica without a surge, so strict host anti-affinity does not
+deadlock a rollout when every eligible host already has a replica. A healthy replica must
+remain available; single-fault and rollout behavior still require live verification.
+
+The API, workers and migration Job share verified database TLS configuration. Connection
+pool health checks remain enabled. The CA must be mounted and conflicting URL settings
+fail closed without printing the URL.
+
+`charts/klip-database` provides the CloudNativePG resource definitions. See its README for
+durability, restore and identity prerequisites. `deploy/platform-services.lock.json` pins
+upstream CRD checksums and records schema compatibility; it does not claim installation.
+
+The existing AWS account/region/environment are discovered from `infra/terraform/project.json`.
+Before paid expansion, record the approved resource/spending envelope, GPU region/lease,
+registry, DNS integration and rebuild target. Keep the existing private API and credential
+boundaries. The management backend must not receive the foundation write identity.
+
+## Evidence and remaining work
+
+Keep live verification bundles under ignored artifact/operational storage, containing
+source commit, frozen inputs, pins, preparation hashes, actual inventory, schedule,
+request records, exports, quality/SLO reports, telemetry links, interventions and costs.
+Keep secrets and raw datasets outside Git.
+
+The initial baseline on 3 November 2026 passed 373 root Python tests (18 optional skips),
+17 frontend tests, Ruff/formatting, generated schemas and the production web build. A
+read-only AWS query confirmed the three existing control-plane instances running across
+London's three configured AZs. These observations do not establish application or GPU
+readiness. Live gates remain pending.

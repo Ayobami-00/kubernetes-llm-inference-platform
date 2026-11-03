@@ -10,6 +10,8 @@ spec:
   backoffLimit: 2
   activeDeadlineSeconds: 300
   template:
+    metadata:
+      labels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: migrate}
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
@@ -29,4 +31,19 @@ spec:
                 secretKeyRef:
                   name: {{ required "database.existingSecret is required" .Values.database.existingSecret }}
                   key: {{ .Values.database.urlKey }}
+            - name: MANAGEMENT_DATABASE_REQUIRE_TLS
+              value: {{ .Values.database.requireTLS | quote }}
+            {{- if .Values.database.caSecret }}
+            - name: MANAGEMENT_DATABASE_CA_FILE
+              value: /run/secrets/database/ca.crt
+          volumeMounts:
+            - {name: database-ca, mountPath: /run/secrets/database, readOnly: true}
+            {{- end }}
           securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+      {{- if .Values.database.caSecret }}
+      volumes:
+        - name: database-ca
+          secret:
+            secretName: {{ .Values.database.caSecret }}
+            items: [{key: {{ .Values.database.caKey }}, path: ca.crt}]
+      {{- end }}

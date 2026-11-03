@@ -6,6 +6,12 @@
     secretKeyRef:
       name: {{ required "database.existingSecret is required" .Values.database.existingSecret }}
       key: {{ .Values.database.urlKey }}
+- name: MANAGEMENT_DATABASE_REQUIRE_TLS
+  value: {{ .Values.database.requireTLS | quote }}
+{{- if .Values.database.caSecret }}
+- name: MANAGEMENT_DATABASE_CA_FILE
+  value: /run/secrets/database/ca.crt
+{{- end }}
 - name: MANAGEMENT_ADMIN_PASSWORD_FILE
   value: /run/secrets/management/admin-password
 - name: MANAGEMENT_LAMBDA_API_KEY_FILE
@@ -41,6 +47,9 @@
 - {name: management-secrets, mountPath: /run/secrets/management, readOnly: true}
 - {name: artifacts, mountPath: /artifacts}
 - {name: tmp, mountPath: /tmp}
+{{- if .Values.database.caSecret }}
+- {name: database-ca, mountPath: /run/secrets/database, readOnly: true}
+{{- end }}
 {{- end -}}
 {{- define "klip.volumes" -}}
 - name: management-secrets
@@ -54,4 +63,37 @@
     claimName: {{ include "klip.artifacts" . }}
 - name: tmp
   emptyDir: {}
+{{- if .Values.database.caSecret }}
+- name: database-ca
+  secret:
+    secretName: {{ .Values.database.caSecret }}
+    items: [{key: {{ .Values.database.caKey }}, path: ca.crt}]
+{{- end }}
+{{- end -}}
+{{- define "klip.availability" -}}
+{{- $root := .root -}}
+{{- $role := .role -}}
+{{- if $root.Values.availability.enabled }}
+{{- if lt (int (index $root.Values.replicas $role)) 2 -}}
+{{- fail (printf "HA requires at least two %s replicas" $role) -}}
+{{- end }}
+affinity:
+  podAntiAffinity:
+    requiredDuringSchedulingIgnoredDuringExecution:
+      - topologyKey: kubernetes.io/hostname
+        labelSelector:
+          matchLabels:
+            app.kubernetes.io/name: {{ $root.Release.Name }}
+            app.kubernetes.io/component: {{ $role }}
+{{- if $root.Values.availability.spreadAcrossZones }}
+topologySpreadConstraints:
+  - maxSkew: 1
+    topologyKey: topology.kubernetes.io/zone
+    whenUnsatisfiable: DoNotSchedule
+    labelSelector:
+      matchLabels:
+        app.kubernetes.io/name: {{ $root.Release.Name }}
+        app.kubernetes.io/component: {{ $role }}
+{{- end }}
+{{- end }}
 {{- end -}}

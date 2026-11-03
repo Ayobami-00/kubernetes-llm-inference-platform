@@ -1,0 +1,28 @@
+{
+  "schema_version": "klip-platform-services.v1",
+  "compatibility": {
+    "kubernetes": "1.36.5",
+    "cloudnative_pg": "1.30.1",
+    "cloudnative_pg_chart": "0.29.1",
+    "barman_cloud_plugin": "0.15.1",
+    "barman_cloud_chart": "0.8.1",
+    "validation": "Upstream support matrix and CRD schemas checked; live acceptance pending"
+  },
+  "schemas": {
+    "postgresql.cnpg.io/v1/Cluster": {
+      "file": "cnpg-cluster-1.30.1.yaml",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_clusters.yaml",
+      "sha256": "d255176c368727b8ee84893bb2f37b5c5578a497e6ee7461a81fa6f3f80e552b"
+    },
+    "postgresql.cnpg.io/v1/ScheduledBackup": {
+      "file": "cnpg-scheduledbackup-1.30.1.yaml",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_scheduledbackups.yaml",
+      "sha256": "fcd133df3056601c1a306a4bf0cd2fac6413c99b88b459e0296321299f7e5062"
+    },
+    "barmancloud.cnpg.io/v1/ObjectStore": {
+      "file": "barman-objectstore-0.15.1.yaml",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/plugin-barman-cloud/v0.15.1/config/crd/bases/barmancloud.cnpg.io_objectstores.yaml",
+      "sha256": "2d8be9265b99571a560e80f2a54dbbcc19cbfb2254575ff2e7bba9dc4429e99e"
+    }
+  }
+}

@@ -143,6 +143,11 @@ the isolated kind proof and explicit release workflow are in the
 [deployment guide](docs/development/management-deployment.md). Real cloud mutations and benchmark
 execution remain blocked until their downstream readiness requirements are satisfied.
 
+The [end-to-end delivery ledger](docs/development/end-to-end-platform.md) tracks the next live
+milestone: persistent CPU workers, CloudNativePG HA, UI-driven Lambda provisioning, authenticated
+llm-d serving, observability and retained-state rebuild. Management HA placement and verified
+database TLS are implemented as an opt-in overlay; their live acceptance is still pending.
+
 ## AWS foundation
 
 Stream B's Terraform foundation provides three continuously running CPU hosts in London for the

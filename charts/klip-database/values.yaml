@@ -1,0 +1,35 @@
+# Install compatible CloudNativePG and Barman Cloud Plugin operators first.
+# Image digests and credential values must come from verified operational inputs.
+imageName: ""
+instances: 3
+storage:
+  storageClass: ""
+  size: 40Gi
+walStorage:
+  storageClass: ""
+  size: 20Gi
+nodeSelector:
+  klip.dev/node-role: platform
+resources:
+  requests: {cpu: 500m, memory: 1Gi}
+  limits: {cpu: "2", memory: 2Gi}
+database: management
+owner: management
+applicationSecret: ""
+bootstrap:
+  mode: initdb
+  recovery:
+    destinationPath: ""
+    serverName: ""
+backup:
+  destinationPath: ""
+  credentialsSecret: ""
+  retentionPolicy: 30d
+  schedule: "0 0 2 * * *"
+monitoring:
+  enablePodMonitor: false
+networkPolicy:
+  enabled: true
+  managementRelease: klip
+  operatorNamespace: cnpg-system
+  monitoringNamespace: observability

@@ -1,0 +1,20 @@
+# Production placement overlay. Supply image digests, existing Secrets, the HTTPS
+# origin and the RWX claim separately; this file contains no credential values.
+replicas: {api: 2, worker: 2, web: 2}
+nodeSelector:
+  # Helm merges maps: explicitly remove the chart's historical control-plane key.
+  node-role.kubernetes.io/control-plane: null
+  klip.dev/node-role: platform
+tolerations: []
+availability:
+  enabled: true
+  minAvailable: 1
+  spreadAcrossZones: true
+terminationGracePeriodSeconds: 60
+database:
+  requireTLS: true
+  caSecret: klip-db-ca
+runner:
+  resources:
+    requests: {cpu: "1", memory: 512Mi}
+    limits: {cpu: "2", memory: 2Gi}

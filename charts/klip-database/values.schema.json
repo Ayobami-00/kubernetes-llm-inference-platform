@@ -1,0 +1,72 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "imageName": {"type": "string"},
+    "instances": {"type": "integer", "const": 3},
+    "storage": {"$ref": "#/definitions/storage"},
+    "walStorage": {"$ref": "#/definitions/storage"},
+    "nodeSelector": {
+      "type": "object",
+      "properties": {"klip.dev/node-role": {"const": "platform"}},
+      "required": ["klip.dev/node-role"],
+      "additionalProperties": {"type": "string"}
+    },
+    "resources": {"type": "object"},
+    "database": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "owner": {"type": "string", "pattern": "^[a-z][a-z0-9_]*$"},
+    "applicationSecret": {"type": "string"},
+    "bootstrap": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "mode": {"enum": ["initdb", "recovery"]},
+        "recovery": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "destinationPath": {"type": "string"},
+            "serverName": {"type": "string"}
+          }
+        }
+      }
+    },
+    "backup": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "destinationPath": {"type": "string"},
+        "credentialsSecret": {"type": "string"},
+        "retentionPolicy": {"type": "string", "pattern": "^[1-9][0-9]*[dwmy]$"},
+        "schedule": {"type": "string", "minLength": 1}
+      }
+    },
+    "monitoring": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {"enablePodMonitor": {"type": "boolean"}}
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {"type": "boolean"},
+        "managementRelease": {"type": "string", "minLength": 1},
+        "operatorNamespace": {"type": "string", "minLength": 1},
+        "monitoringNamespace": {"type": "string", "minLength": 1}
+      }
+    }
+  },
+  "definitions": {
+    "storage": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "storageClass": {"type": "string"},
+        "size": {"type": "string", "pattern": "^[1-9][0-9]*Gi$"}
+      },
+      "required": ["storageClass", "size"]
+    }
+  }
+}
