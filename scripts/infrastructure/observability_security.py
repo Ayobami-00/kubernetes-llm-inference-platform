@@ -9,7 +9,7 @@ from pathlib import Path
 
 import yaml
 from common import ROOT
-from observability_release import LOCK, image, monitoring_values
+from observability_release import LOCK, image, monitoring_values, thanos_values
 from platform_services import render
 
 REVIEW = ROOT / "deploy/observability-risk-review.json"
@@ -22,6 +22,7 @@ def digest(data: bytes) -> str:
 def configuration_hashes() -> dict:
     return {
         "values_sha256": digest(yaml.safe_dump(monitoring_values(), sort_keys=True).encode()),
+        "thanos_values_sha256": digest(yaml.safe_dump(thanos_values(), sort_keys=True).encode()),
         "boundary_sha256": digest(render("klip-observability", {}).encode()),
         "chart_sha256": json.loads(LOCK.read_text())["charts"]["kube-prometheus-stack"]["sha256"],
     }

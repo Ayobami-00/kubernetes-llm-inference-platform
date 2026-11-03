@@ -170,3 +170,56 @@ spec:
       toPorts:
         - ports: [{port: '9100', protocol: TCP}]
   # Node exporters have no API/AWS token and need no network egress.
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: metrics-query
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: thanos, app.kubernetes.io/instance: klip-thanos, app.kubernetes.io/component: query}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: grafana}
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: prometheus}
+      toPorts:
+        - ports: [{port: '9090', protocol: TCP}]
+  egress:
+    - toEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: prometheus}
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: thanos, app.kubernetes.io/component: storegateway}
+      toPorts:
+        - ports: [{port: '10901', protocol: TCP}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: metrics-store
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: thanos, app.kubernetes.io/instance: klip-thanos, app.kubernetes.io/component: storegateway}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: thanos, app.kubernetes.io/component: query}
+      toPorts:
+        - ports: [{port: '10901', protocol: TCP}]
+    - fromEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: prometheus}
+      toPorts:
+        - ports: [{port: '10902', protocol: TCP}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata:
+  name: metrics-compactor
+  namespace: observability
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: thanos, app.kubernetes.io/instance: klip-thanos, app.kubernetes.io/component: compactor}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: prometheus}
+      toPorts:
+        - ports: [{port: '10902', protocol: TCP}]

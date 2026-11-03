@@ -182,6 +182,57 @@ def monitoring_values() -> dict:
     return values
 
 
+def thanos_values() -> dict:
+    values = yaml.safe_load((ROOT / "deploy/observability/thanos.yaml").read_text())
+    values["global"]["image"] = {
+        "registry": "quay.io",
+        "repository": "thanos/thanos",
+        "tag": image("quay.io/thanos/thanos:v0.42.5").split(":", 1)[1],
+    }
+    values["global"]["objstore"] = {
+        "createSecret": True,
+        "secretName": "klip-thanos-objstore",
+        "secretKey": "objstore.yml",
+        "config": yaml.safe_dump(
+            {
+                "type": "S3",
+                "config": {
+                    "bucket": f"klip-metrics-{CONFIG['account_id']}-{CONFIG['region']}",
+                    "endpoint": f"s3.{CONFIG['region']}.amazonaws.com",
+                    "region": CONFIG["region"],
+                    "aws_sdk_auth": True,
+                    "insecure": False,
+                },
+            }
+        ),
+    }
+    for component, role in (("storegateway", "thanos-store"), ("compactor", "thanos-compactor")):
+        values[component]["serviceAccount"]["annotations"] = {
+            "eks.amazonaws.com/role-arn": (
+                f"arn:aws:iam::{CONFIG['account_id']}:role/{CONFIG['project']}/klip-observability-{role}"
+            ),
+            "eks.amazonaws.com/sts-regional-endpoints": "true",
+            "eks.amazonaws.com/token-expiration": "3600",
+        }
+    for component in ("query", "storegateway"):
+        selector = {
+            "app.kubernetes.io/name": "thanos",
+            "app.kubernetes.io/instance": "klip-thanos",
+            "app.kubernetes.io/component": component,
+        }
+        values[component]["affinity"] = {
+            "podAntiAffinity": {
+                "requiredDuringSchedulingIgnoredDuringExecution": [
+                    {
+                        "topologyKey": "kubernetes.io/hostname",
+                        "labelSelector": {"matchLabels": selector},
+                    }
+                ]
+            }
+        }
+    return values
+
+
 def check_render(documents: list[dict]) -> None:
     """Reject hidden image defaults, non-expiring tokens and accidental host access."""
     pinned = {image(name) for name in json.loads(LOCK.read_text())["images"]}
@@ -214,11 +265,11 @@ def check_render(documents: list[dict]) -> None:
             raise ValueError("Object metrics must not read Secrets or ConfigMaps")
         if doc.get("type") == "kubernetes.io/service-account-token":
             raise ValueError("Non-expiring Kubernetes API token is forbidden")
-        if doc.get("kind") in {"Deployment", "DaemonSet"}:
+        if doc.get("kind") in {"Deployment", "DaemonSet", "StatefulSet"}:
             pod = doc["spec"]["template"]["spec"]
             if pod.get("hostNetwork") or pod.get("hostPID") or pod.get("hostIPC"):
                 raise ValueError("Monitoring workloads cannot bypass Pod networking/isolation")
-            if doc["kind"] == "Deployment" and any(
+            if doc["kind"] in {"Deployment", "StatefulSet"} and any(
                 pod.get("nodeSelector", {}).get(k) != v for k, v in PLACEMENT.items()
             ):
                 raise ValueError("Monitoring applications must use protected platform CPU workers")
@@ -254,17 +305,23 @@ def check_render(documents: list[dict]) -> None:
                 raise ValueError("Replicated monitoring must be spread on protected CPU hosts")
 
 
-def render() -> None:
+def render(release="monitoring") -> None:
+    if release not in {"monitoring", "thanos"}:
+        raise ValueError("Unreviewed telemetry release")
     fetch()
     CACHE.mkdir(parents=True, exist_ok=True)
-    values_path = CACHE / "monitoring-values.yaml"
-    values_path.write_text(yaml.safe_dump(monitoring_values(), sort_keys=False))
+    values_path = CACHE / (release + "-values.yaml")
+    values_path.write_text(
+        yaml.safe_dump(
+            monitoring_values() if release == "monitoring" else thanos_values(), sort_keys=False
+        )
+    )
     output = subprocess.run(
         [
             tool("helm"),
             "template",
-            "klip-monitoring",
-            str(CACHE / "kube-prometheus-stack"),
+            "klip-" + release,
+            str(CACHE / ("kube-prometheus-stack" if release == "monitoring" else "thanos")),
             "--namespace",
             "observability",
             "--kube-version",
@@ -291,18 +348,19 @@ def render() -> None:
         if document.get("apiVersion", "").startswith("monitoring.coreos.com/"):
             key = (document["kind"], document["apiVersion"].split("/")[1])
             Draft7Validator(schemas[key]).validate(document)
-    (CACHE / "monitoring-rendered.yaml").write_text(output)
-    print(f"Rendered and checked {len(documents)} monitoring objects; nothing deployed")
+    (CACHE / (release + "-rendered.yaml")).write_text(output)
+    print(f"Rendered and checked {len(documents)} {release} objects; nothing deployed")
 
 
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["fetch", "render"])
+    parser.add_argument("--release", choices=["monitoring", "thanos"], default="monitoring")
     args = parser.parse_args()
     if args.command == "fetch":
         fetch()
     else:
-        render()
+        render(args.release)
 
 
 if __name__ == "__main__":

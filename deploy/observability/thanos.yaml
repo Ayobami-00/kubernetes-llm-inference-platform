@@ -1,0 +1,89 @@
+fullnameOverride: klip-thanos
+global:
+  nodeSelector:
+    klip.dev.node-restriction.kubernetes.io/platform: 'true'
+  podSecurityContext:
+    runAsNonRoot: true
+    runAsUser: 10001
+    runAsGroup: 10001
+    fsGroup: 10001
+    fsGroupChangePolicy: OnRootMismatch
+    seccompProfile: {type: RuntimeDefault}
+  containerSecurityContext:
+    allowPrivilegeEscalation: false
+    readOnlyRootFilesystem: true
+    runAsNonRoot: true
+    capabilities: {drop: [ALL]}
+  serviceAccount:
+    create: false
+    perComponent: true
+    automountServiceAccountToken: false
+  extraEnv: [{name: AWS_EC2_METADATA_DISABLED, value: 'true'}]
+query:
+  enabled: true
+  replicaCount: 2
+  serviceAccount:
+    create: true
+    name: klip-thanos-query
+    automountServiceAccountToken: false
+  replicaLabels: [prometheus_replica]
+  endpoints:
+    autogen: {enabled: true}
+    static:
+      - dnssrv+_grpc._tcp.klip-monitoring-thanos-discovery.observability.svc.cluster.local
+  extraArgs:
+    - --log.level=info
+    - --log.format=json
+    - --query.timeout=30s
+    - --query.max-concurrent=10
+    - --query.max-concurrent-select=4
+  resources:
+    requests: {cpu: 100m, memory: 256Mi}
+    limits: {cpu: '1', memory: 1Gi}
+  pdb: {enabled: true, minAvailable: 1}
+  serviceMonitor: {enabled: true, labels: {release: klip-monitoring}}
+storegateway:
+  enabled: true
+  replicaCount: 2
+  serviceAccount:
+    create: true
+    name: klip-thanos-store
+    automountServiceAccountToken: false
+  persistence: {enabled: true, size: 5Gi, storageClass: klip-gp3}
+  extraArgs:
+    - --log.level=info
+    - --log.format=json
+    - --index-cache-size=128MB
+    - --chunk-pool-size=64MB
+    - --block-sync-concurrency=1
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {cpu: '1', memory: 1Gi}
+  pdb: {enabled: true, minAvailable: 1}
+  serviceMonitor: {enabled: true, labels: {release: klip-monitoring}}
+compactor:
+  enabled: true
+  replicaCount: 1
+  serviceAccount:
+    create: true
+    name: klip-thanos-compactor
+    automountServiceAccountToken: false
+  persistence: {enabled: true, size: 10Gi, storageClass: klip-gp3}
+  retention: {resolutionRaw: 14d, resolution5m: 14d, resolution1h: 14d}
+  extraArgs:
+    - --log.level=info
+    - --log.format=json
+    - --consistency-delay=30m
+    - --compact.concurrency=1
+    - --downsample.concurrency=1
+  resources:
+    requests: {cpu: 100m, memory: 512Mi}
+    limits: {cpu: '1', memory: 1Gi}
+  serviceMonitor: {enabled: true, labels: {release: klip-monitoring}}
+receive: {enabled: false}
+ruler: {enabled: false}
+queryFrontend: {enabled: false}
+rustfs: {enabled: false}
+kube-prometheus-stack: {enabled: false}
+bucket:
+  bucketweb: {enabled: false}

@@ -153,6 +153,21 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
+.PHONY: thanos-render thanos-prepare thanos-apply thanos-observe
+thanos-render:
+	$(PYTHON) scripts/infrastructure/observability_release.py render --release thanos
+
+thanos-prepare:
+	@test -n "$(SECURITY_DIRECTORY)" || (echo 'Set SECURITY_DIRECTORY to the reviewed scan directory'; exit 1)
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py prepare --security-directory "$(SECURITY_DIRECTORY)"
+
+thanos-apply:
+	@test -n "$(PLAN_SHA)" || (echo 'Set the exact prepared telemetry PLAN_SHA'; exit 1)
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py apply --approve-plan "$(PLAN_SHA)"
+
+thanos-observe:
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py observe
+
 .PHONY: monitoring-prepare monitoring-apply monitoring-observe monitoring-firewall monitoring-reconcile
 monitoring-firewall:
 	$(PYTHON) scripts/infrastructure/telemetry_firewall.py

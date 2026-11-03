@@ -210,6 +210,21 @@ acceptance record; original values/logs are archived and a corrected plan gets a
 new identity. The chart's `IgnoreOnInstallOnly` setting is explicit because an
 empty failure-policy value with cert-manager otherwise remains `Ignore` on upgrade.
 
+The separate Thanos release has two spread query replicas and two spread store
+gateways, plus one recoverable compactor. Query deduplicates on
+`prometheus_replica`; the compactor enforces 14 days at every resolution. Receive,
+Ruler, query frontend and embedded object storage are disabled. Store uses the
+read-only metrics role, compactor uses the scoped compaction role, and query has
+no AWS identity. The additional 20 GiB of retained gp3 is about $1.86/month at the
+same reviewed London price. Five containers request 500m CPU and 2 GiB total.
+
+Update the boundary chart to include its private query/store policies, then use
+`make thanos-render`, `make thanos-prepare SECURITY_DIRECTORY=...` and
+`make thanos-apply PLAN_SHA=...`. The plan freezes values, image review and actual
+host identities. Completion checks the 2/2/1 workload topology; verify both hot
+replicas, query deduplication and actual object upload separately. Prometheus uses
+the standard two-hour blocks, so an empty initial bucket is not an upload proof.
+
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and
 buffered collectors. Tempo 3 distributed mode requires Kafka; the initial small
