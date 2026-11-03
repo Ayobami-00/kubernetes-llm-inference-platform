@@ -261,3 +261,57 @@ Official references:
 - [Encrypted SNS service permissions](https://docs.aws.amazon.com/sns/latest/dg/sns-key-management.html)
 - [Loki monolithic mode](https://grafana.com/docs/loki/latest/setup/install/helm/install-monolithic/)
 - [Tempo deployment modes](https://grafana.com/docs/tempo/latest/reference-tempo-architecture/deployment-modes/)
+
+## Dashboard, log, trace and ingestion releases
+
+The versioned component values use two Grafana replicas, three monolithic Loki
+replicas with replication factor three, one recoverable Tempo instance, and two
+OpenTelemetry Collectors with independent persistent queues. Loki retains 30 days
+and Tempo seven days. This adds 50 GiB of retained gp3 (about $4.64/month at the
+reviewed London rate), plus object-storage, requests and transfer usage. Grafana
+metadata uses an isolated `grafana` database/role on the existing CNPG cluster;
+it has no separate SQLite volume. Its shared encryption key and credentials are
+retained outside the cluster and age-encrypted into a version-bound S3 recovery
+object. `telemetry_secrets.py verify` downloads/decrypts that exact object and
+compares its contents without displaying them. `restore` refuses to overwrite a
+different local identity. Preserve its custody receipt and independent age key.
+
+Use the exact candidate scan artifacts from workflow `41731963265` to prepare
+these releases. `deploy/telemetry-risk-review.json` records the still-unfixed
+findings: eight unique High tuples across Grafana's bundled plugins (39 raw
+findings), one in Tempo and one in the Collector. The restricted configuration
+is part of the review. Grafana has no public endpoint in this release; public
+exposure requires a new boundary review and HTTPS validation. Unused datasource
+plugins, anonymous access, signup, plugin downloads and public egress are disabled.
+These restrictions mitigate exposure, without claiming vulnerable code is fixed.
+
+```sh
+make telemetry-prepare COMPONENT=loki SECURITY_DIRECTORY=<exact-scan-directory>
+make telemetry-apply COMPONENT=loki PLAN_SHA=<saved-plan-sha256>
+make telemetry-observe COMPONENT=loki
+```
+
+Repeat for `tempo`, `otel` and `grafana`. Prepare/apply checks fresh identities,
+Pod security admission, retained claim ownership and live resource reservations.
+It reserves one additional 1-CPU/2-GiB runner and requires 10% request headroom
+against the reviewed single-worker-loss envelope. This is resource accounting,
+not a scheduler or unplanned-failure proof. It does not authorize unlimited runs.
+Each component retains its own plan/history; an interrupted transition is never
+replayed automatically.
+
+`make telemetry-validate` uses the immutable upstream Loki, Tempo and Collector
+binaries to check rendered configuration in credential-free Docker containers
+with networking disabled. CI runs the same check and retains its logs. This is
+configuration validation, not an ingestion or storage acceptance test.
+
+The Collector uses memory limiting, batches capped at 512 records, 1,000-request
+persistent queues per exporter and retries capped at five minutes. Each replica
+has 5 GiB queue storage. Queue exhaustion, permanent export errors, disk exhaustion
+and upstream application drops must be alerted and reported; buffering is not a
+claim of lossless telemetry. Only scoped application/runner/serving/agent Pods
+may ingest. Logs and traces remain private; Grafana has fixed internal data
+sources. Prompts, responses and credentials must not enter ordinary telemetry.
+
+A separate headless `klip-thanos-stores` Service discovers both store replicas
+individually without renaming their StatefulSet or replacing retained claims.
+It is owned by the boundary chart; the upstream Service remains unchanged.

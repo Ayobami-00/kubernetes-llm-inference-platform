@@ -69,7 +69,7 @@ jobs:
               'limitations': 'Scanner findings require runtime review; zero findings are not a security guarantee.'
           }
           critical = 0
-          images = [(name, item, False) for name, item in lock['images'].items()]
+          images = [(name, item, False) for name, item in {**lock['images'], **lock.get('telemetry_images', {})}.items()]
           # Resolve official AMD64 manifests before scanning. Candidates are not
           # deployment authorization and remain outside the deployment lock.
           candidates = {
@@ -80,7 +80,7 @@ jobs:
               'quay.io/prometheus/blackbox-exporter:v0.29.1': 'sha256:66eae352a79e6f677aeddd8c25a9bdb017586dc5fbd230f22329213d891f94bd',
           }
           images.extend((name, {'digest': digest, 'platform': 'linux/amd64'}, True)
-                        for name, digest in candidates.items() if name not in lock['images'])
+                        for name, digest in candidates.items() if name not in {**lock['images'], **lock.get('telemetry_images', {})})
           for index, (reference, item, candidate) in enumerate(images):
               if item['platform'] != 'linux/amd64' or not item['digest'].startswith('sha256:'):
                   raise SystemExit('Missing immutable Linux AMD64 identity')

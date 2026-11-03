@@ -138,7 +138,8 @@ def main() -> None:
     print(f"Rendered and checked {len(documents)} static release resources")
     from observability_release import render
 
-    render()
+    for component in ("monitoring", "thanos", "grafana", "loki", "tempo", "otel"):
+        render(component)
 
 
 if __name__ == "__main__":

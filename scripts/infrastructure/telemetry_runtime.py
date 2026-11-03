@@ -5,6 +5,7 @@ from __future__ import annotations
 import argparse
 import fcntl
 import json
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -12,13 +13,67 @@ import yaml
 from common import private_dir, source_digest, state_home, tool, utc_now, write_private
 from monitoring_runtime import admission_fail_closed, sha, verify_boundary
 from observability import verify_roles
-from observability_release import CACHE, render, thanos_values
+from observability_release import BACKENDS, CACHE, backend_values, render, thanos_values
 from observability_security import assess
 from platform_resize import verify_capacity
 
+COMPONENT = "thanos"
+TOPOLOGIES = {
+    "thanos": [
+        ("deployment", "klip-thanos-query", 2),
+        ("statefulset", "klip-thanos-storegateway", 2),
+        ("statefulset", "klip-thanos-compactor", 1),
+    ],
+    "grafana": [("deployment", "klip-grafana", 2)],
+    "loki": [("statefulset", "klip-loki", 3)],
+    "tempo": [("statefulset", "klip-tempo", 1)],
+    "otel": [("statefulset", "klip-otel", 2)],
+}
+
+
+def component_values():
+    return thanos_values() if COMPONENT == "thanos" else backend_values(COMPONENT)
+
+
+def review(directory):
+    if COMPONENT == "thanos":
+        return assess(directory)
+    from telemetry_security import assess_component
+
+    return assess_component(directory, COMPONENT)
+
 
 def folder():
-    return private_dir(state_home() / "cluster/observability/thanos")
+    return private_dir(state_home() / "cluster/observability" / COMPONENT)
+
+
+def archive_current():
+    active = folder() / "active.json"
+    if not active.exists():
+        return
+    old = json.loads(active.read_text())
+    destination = folder() / "history" / old["approval_sha256"]
+    manifest = destination / "manifest.json"
+    if manifest.exists():
+        for name, checksum in json.loads(manifest.read_text()).items():
+            if sha((destination / name).read_text()) != checksum:
+                raise ValueError("Archived telemetry evidence changed")
+        return
+    for name in ("active.json", "values.yaml", "helm.log", "observation.json"):
+        source = folder() / name
+        target = destination / name
+        if source.exists():
+            if target.exists():
+                if target.read_bytes() != source.read_bytes():
+                    raise ValueError("Original telemetry history changed before archival")
+            else:
+                private_dir(destination)
+                shutil.copyfile(source, target)
+                target.chmod(0o600)
+
+    write_private(
+        manifest, {p.name: sha(p.read_text()) for p in destination.iterdir() if p.is_file()}
+    )
 
 
 def reconcile(approval):
@@ -39,7 +94,7 @@ def reconcile(approval):
             "get",
             "secret",
             "-l",
-            "owner=helm,name=klip-thanos",
+            "owner=helm,name=klip-" + COMPONENT,
             "-o",
             "json",
         )
@@ -51,7 +106,7 @@ def reconcile(approval):
             "get",
             "deployments,statefulsets,pods",
             "-l",
-            "app.kubernetes.io/instance=klip-thanos",
+            "app.kubernetes.io/instance=klip-" + COMPONENT,
             "-o",
             "json",
         )
@@ -80,16 +135,24 @@ def retained_claims():
             "get",
             "pvc",
             "-l",
-            "app.kubernetes.io/instance=klip-thanos",
+            "app.kubernetes.io/instance=klip-" + COMPONENT,
             "-o",
             "json",
         )
     )["items"]
-    expected = {
-        "data-klip-thanos-compactor-0": "10Gi",
-        "data-klip-thanos-storegateway-0": "5Gi",
-        "data-klip-thanos-storegateway-1": "5Gi",
-    }
+    documents = [
+        d for d in yaml.safe_load_all((CACHE / (COMPONENT + "-rendered.yaml")).read_text()) if d
+    ]
+    expected = {}
+    names = set()
+    for doc in documents:
+        if doc.get("kind") != "StatefulSet":
+            continue
+        names.add(doc["spec"]["selector"]["matchLabels"]["app.kubernetes.io/name"])
+        for claim in doc["spec"].get("volumeClaimTemplates", []):
+            for index in range(doc["spec"].get("replicas", 1)):
+                name = f"{claim['metadata']['name']}-{doc['metadata']['name']}-{index}"
+                expected[name] = claim["spec"]["resources"]["requests"]["storage"]
     if any(claim["metadata"]["name"] not in expected for claim in claims):
         raise ValueError("Unexpected retained Thanos claim")
     result = {}
@@ -100,8 +163,8 @@ def retained_claims():
         spec = claim["spec"]
         labels = claim["metadata"].get("labels", {})
         if (
-            labels.get("app.kubernetes.io/instance") != "klip-thanos"
-            or labels.get("app.kubernetes.io/name") != "thanos"
+            labels.get("app.kubernetes.io/instance") != "klip-" + COMPONENT
+            or labels.get("app.kubernetes.io/name") not in names
             or spec.get("storageClassName") != "klip-gp3"
             or spec.get("accessModes") != ["ReadWriteOnce"]
             or spec["resources"]["requests"]["storage"] != expected[name]
@@ -120,30 +183,40 @@ def prepare(directory):
     verify_boundary()
     capacity = verify_capacity()
     identities = verify_roles()
-    render("thanos")
-    security = assess(directory)
+    render(COMPONENT)
+    security = review(directory)
     claims = retained_claims()
+    from telemetry_budget import verify as verify_budget
+
+    budget = verify_budget(
+        [d for d in yaml.safe_load_all((CACHE / (COMPONENT + "-rendered.yaml")).read_text()) if d],
+        COMPONENT,
+    )
     plan = {
         "schema_version": "klip-telemetry-component-plan.v1",
-        "component": "thanos",
-        "release": "klip-thanos",
+        "component": COMPONENT,
+        "release": "klip-" + COMPONENT,
         "namespace": "observability",
         "prepared_at": utc_now(),
         "source_sha256": source_digest(),
         "security_directory": str(directory.resolve()),
         "security": security,
+        "request_budget": budget,
         "retained_claims": claims,
-        "values": thanos_values(),
+        "values": component_values(),
         "roles_verified_at": identities["verified_at"],
         "node_uids": {name: item["uid"] for name, item in capacity["nodes"].items()},
-        "storage_budget": {"gp3_gib": 20, "estimated_monthly_usd": 1.86},
-        "workloads": {
-            "query": {"replicas": 2},
-            "storegateway": {"replicas": 2},
-            "compactor": {"replicas": 1, "availability": "recoverable-singleton"},
+        "storage_budget": {
+            "gp3_gib": {"thanos": 20, "grafana": 0, "loki": 30, "tempo": 10, "otel": 10}[COMPONENT]
         },
+        "workloads": TOPOLOGIES[COMPONENT],
     }
+    if COMPONENT == "grafana":
+        from grafana_storage import credentials
+
+        plan["runtime_credentials_sha256"] = sha(credentials())
     plan["approval_sha256"] = sha(plan)
+    archive_current()
     write_private(folder() / "plan.json", plan)
     write_private(folder() / (plan["approval_sha256"] + ".json"), plan)
     return plan
@@ -153,12 +226,8 @@ def observe():
     from monitoring_runtime import get
 
     report = {"observed_at": utc_now(), "ready": True, "workloads": {}}
-    for kind, component, replicas in (
-        ("deployment", "query", 2),
-        ("statefulset", "storegateway", 2),
-        ("statefulset", "compactor", 1),
-    ):
-        item = get(kind, "klip-thanos-" + component, "observability")
+    for kind, component, replicas in TOPOLOGIES[COMPONENT]:
+        item = get(kind, component, "observability")
         status = item.get("status", {}) if item else {}
         ok = bool(
             item
@@ -190,9 +259,11 @@ def apply(approval):
             if active["status"] == "installed":
                 return active
             raise ValueError("Observe the original interrupted Helm operation; no automatic replay")
+        if active["status"] not in {"installed", "failed"}:
+            raise ValueError("A different interrupted telemetry operation remains unresolved")
     if (
         plan["source_sha256"] != source_digest()
-        or plan["values"] != thanos_values()
+        or plan["values"] != component_values()
         or not timedelta(0)
         <= datetime.now(UTC) - datetime.fromisoformat(plan["prepared_at"])
         <= timedelta(hours=1)
@@ -203,18 +274,31 @@ def apply(approval):
     if plan["node_uids"] != {name: item["uid"] for name, item in capacity["nodes"].items()}:
         raise ValueError("Platform identity changed after telemetry planning")
     verify_roles()
-    assess(Path(plan["security_directory"]))
-    render("thanos")
+    review(Path(plan["security_directory"]))
+    render(COMPONENT)
     if plan.get("retained_claims", {}) != retained_claims():
         raise ValueError("Retained Thanos volume identity changed after planning")
     active = {"approval_sha256": approval, "status": "validating", "started_at": utc_now()}
     write_private(active_path, active)
     try:
+        if COMPONENT == "grafana":
+            from grafana_storage import credentials, initialize
+
+            if plan["runtime_credentials_sha256"] != sha(credentials()):
+                raise ValueError("Grafana credential custody changed after planning")
+            active["database"] = initialize()
+            from telemetry_secrets import operate
+
+            active["secret_custody"] = operate("backup")
+
         from observability_release import validate_pod_admission
 
         documents = [
-            d for d in yaml.safe_load_all((CACHE / "thanos-rendered.yaml").read_text()) if d
+            d for d in yaml.safe_load_all((CACHE / (COMPONENT + "-rendered.yaml")).read_text()) if d
         ]
+        from telemetry_budget import verify as verify_budget
+
+        active["request_budget"] = verify_budget(documents, COMPONENT)
         active["pod_specs_admitted"] = validate_pod_admission(documents)
         write_private(active_path, active)
         Host(load_hosts()["cp-01"]).run(
@@ -228,7 +312,7 @@ def apply(approval):
                 "-f",
                 "-",
             ],
-            data=(CACHE / "thanos-rendered.yaml").read_text(),
+            data=(CACHE / (COMPONENT + "-rendered.yaml")).read_text(),
         )
         values = folder() / "values.yaml"
         write_private(values, yaml.safe_dump(plan["values"]))
@@ -241,8 +325,8 @@ def apply(approval):
                     tool("helm"),
                     "upgrade",
                     "--install",
-                    "klip-thanos",
-                    str(CACHE / "thanos"),
+                    "klip-" + COMPONENT,
+                    str(CACHE / ("opentelemetry-collector" if COMPONENT == "otel" else COMPONENT)),
                     "--namespace",
                     "observability",
                     "--kubeconfig",
@@ -281,11 +365,15 @@ def apply(approval):
 
 
 def main():
+    global COMPONENT
+
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["prepare", "apply", "observe", "reconcile"])
+    parser.add_argument("--component", choices=["thanos", *BACKENDS], default="thanos")
     parser.add_argument("--security-directory", type=Path)
     parser.add_argument("--approve-plan")
     args = parser.parse_args()
+    COMPONENT = args.component
     with (private_dir(state_home() / "cluster") / "operator.lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         if args.command == "prepare":

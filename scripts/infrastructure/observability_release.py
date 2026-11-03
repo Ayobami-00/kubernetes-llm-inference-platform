@@ -94,7 +94,8 @@ def fetch() -> None:
 
 
 def image(reference: str) -> str:
-    value = json.loads(LOCK.read_text())["images"][reference]
+    lock = json.loads(LOCK.read_text())
+    value = {**lock["images"], **lock.get("telemetry_images", {})}[reference]
     if value["platform"] != "linux/amd64" or not re.fullmatch(
         r"sha256:[a-f0-9]{64}", value["digest"]
     ):
@@ -233,6 +234,52 @@ def thanos_values() -> dict:
     return values
 
 
+BACKENDS = {
+    "grafana": "docker.io/grafana/grafana:13.3.0-distroless",
+    "loki": "docker.io/grafana/loki:3.7.9",
+    "tempo": "docker.io/grafana/tempo:3.1.1",
+    "otel": "docker.io/otel/opentelemetry-collector-contrib:0.163.2",
+}
+
+
+def backend_values(component):
+    if component not in BACKENDS:
+        raise ValueError("Unreviewed telemetry component")
+    values = yaml.safe_load((ROOT / "deploy/observability" / (component + ".yaml")).read_text())
+    pinned = image(BACKENDS[component])
+    reference, digest = pinned.split("@")
+    repository, tag = reference.rsplit(":", 1)
+    registry, repository = repository.split("/", 1)
+    if component == "grafana":
+        values["image"] = {
+            "registry": registry,
+            "repository": repository,
+            "tag": tag,
+            "sha": digest.removeprefix("sha256:"),
+        }
+    elif component == "loki":
+        values["loki"]["image"] = {
+            "registry": registry,
+            "repository": repository,
+            "tag": tag,
+            "digest": digest,
+        }
+    elif component == "tempo":
+        values["tempo"].update(registry=registry, repository=repository, tag=tag + "@" + digest)
+    else:
+        values["image"] = {"repository": registry + "/" + repository, "tag": tag, "digest": digest}
+    if component in {"loki", "tempo"}:
+        values["serviceAccount"]["annotations"] = {
+            "eks.amazonaws.com/role-arn": (
+                f"arn:aws:iam::{CONFIG['account_id']}:role/{CONFIG['project']}/"
+                f"klip-observability-{component}"
+            ),
+            "eks.amazonaws.com/sts-regional-endpoints": "true",
+            "eks.amazonaws.com/token-expiration": "3600",
+        }
+    return values
+
+
 def check_pod_security(pod: dict) -> None:
     """Controllers are not Pods: reject template omissions before Helm waits."""
     context = pod.get("securityContext", {})
@@ -307,7 +354,9 @@ def validate_pod_admission(documents: list[dict]) -> list[str]:
 
 def check_render(documents: list[dict]) -> None:
     """Reject hidden image defaults, non-expiring tokens and accidental host access."""
-    pinned = {image(name) for name in json.loads(LOCK.read_text())["images"]}
+    lock = json.loads(LOCK.read_text())
+    pinned = {image(name) for name in {**lock["images"], **lock.get("telemetry_images", {})}}
+    pinned |= {ref.split("@")[0].rsplit(":", 1)[0] + "@" + ref.split("@")[1] for ref in pinned}
 
     def visit(value):
         if isinstance(value, dict):
@@ -379,14 +428,19 @@ def check_render(documents: list[dict]) -> None:
 
 
 def render(release="monitoring") -> None:
-    if release not in {"monitoring", "thanos"}:
+    if release not in {"monitoring", "thanos", *BACKENDS}:
         raise ValueError("Unreviewed telemetry release")
     fetch()
     CACHE.mkdir(parents=True, exist_ok=True)
     values_path = CACHE / (release + "-values.yaml")
     values_path.write_text(
         yaml.safe_dump(
-            monitoring_values() if release == "monitoring" else thanos_values(), sort_keys=False
+            monitoring_values()
+            if release == "monitoring"
+            else thanos_values()
+            if release == "thanos"
+            else backend_values(release),
+            sort_keys=False,
         )
     )
     output = subprocess.run(
@@ -394,7 +448,12 @@ def render(release="monitoring") -> None:
             tool("helm"),
             "template",
             "klip-" + release,
-            str(CACHE / ("kube-prometheus-stack" if release == "monitoring" else "thanos")),
+            str(
+                CACHE
+                / {"monitoring": "kube-prometheus-stack", "otel": "opentelemetry-collector"}.get(
+                    release, release
+                )
+            ),
             "--namespace",
             "observability",
             "--kube-version",
@@ -408,6 +467,23 @@ def render(release="monitoring") -> None:
     ).stdout
     documents = [doc for doc in yaml.safe_load_all(output) if doc]
     check_render(documents)
+    if release in BACKENDS:
+        expected = image(BACKENDS[release])
+        aliases = {
+            expected,
+            expected.split("@")[0].rsplit(":", 1)[0] + "@" + expected.split("@")[1],
+        }
+        actual = {
+            c["image"]
+            for d in documents
+            if d["kind"] in {"Deployment", "StatefulSet"}
+            for c in (
+                d["spec"]["template"]["spec"].get("initContainers", [])
+                + d["spec"]["template"]["spec"].get("containers", [])
+            )
+        }
+        if not actual or not actual <= aliases:
+            raise ValueError("Unreviewed auxiliary runtime in telemetry component")
     schemas = {}
     for path in (CACHE / "kube-prometheus-stack/charts/crds/crds").glob("*.yaml"):
         crd = yaml.load(path.read_text(), Loader=CRDLoader)
@@ -428,7 +504,9 @@ def render(release="monitoring") -> None:
 def main():
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("command", choices=["fetch", "render"])
-    parser.add_argument("--release", choices=["monitoring", "thanos"], default="monitoring")
+    parser.add_argument(
+        "--release", choices=["monitoring", "thanos", *BACKENDS], default="monitoring"
+    )
     args = parser.parse_args()
     if args.command == "fetch":
         fetch()

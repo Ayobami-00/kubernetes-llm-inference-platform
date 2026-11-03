@@ -172,6 +172,22 @@ thanos-reconcile:
 	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the original interrupted install'; exit 2)
 	$(PYTHON) scripts/infrastructure/telemetry_runtime.py reconcile --approve-plan "$(PLAN_SHA)"
 
+.PHONY: telemetry-prepare telemetry-apply telemetry-observe telemetry-validate
+telemetry-prepare:
+	@test -n "$(COMPONENT)" -a -n "$(SECURITY_DIRECTORY)"
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py prepare --component "$(COMPONENT)" --security-directory "$(SECURITY_DIRECTORY)"
+
+telemetry-apply:
+	@test -n "$(COMPONENT)" -a -n "$(PLAN_SHA)"
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py apply --component "$(COMPONENT)" --approve-plan "$(PLAN_SHA)"
+
+telemetry-observe:
+	@test -n "$(COMPONENT)"
+	$(PYTHON) scripts/infrastructure/telemetry_runtime.py observe --component "$(COMPONENT)"
+
+telemetry-validate:
+	$(PYTHON) scripts/infrastructure/telemetry_validate.py
+
 .PHONY: monitoring-prepare monitoring-apply monitoring-observe monitoring-firewall monitoring-reconcile
 monitoring-firewall:
 	$(PYTHON) scripts/infrastructure/telemetry_firewall.py

@@ -84,8 +84,30 @@
     }
   },
   "limitations": [
-    "The Thanos runtime overrides chart 0.48.0's appVersion with patch 0.42.5; the chart archive remains unchanged.",
-    "Only monitoring runtime images are pinned so far; other chart pins are reviewed archives, not deployable releases.",
-    "Upstream manifest identity has been verified; runtime vulnerability/compatibility acceptance remains required before live installation."
-  ]
+    "The Thanos runtime overrides chart 0.48.0 appVersion with patch 0.42.5; chart archives are unchanged.",
+    "Immutable image identity alone is not rollout authorization; each component requires its runtime review and live preconditions.",
+    "Rendered requirements do not establish live performance, retention or recovery."
+  ],
+  "telemetry_images": {
+    "docker.io/grafana/grafana:13.3.0-distroless": {
+      "digest": "sha256:ffa50e781972f7862410639eed96e0a9ad96c94ebeccd43e634141f3d9605a99",
+      "platform": "linux/amd64"
+    },
+    "docker.io/grafana/loki:3.7.9": {
+      "digest": "sha256:569e5cab050b7705eb82080335ff9a8bd329650b358bb0d42131e3ced8d9492e",
+      "platform": "linux/amd64"
+    },
+    "docker.io/grafana/tempo:3.1.1": {
+      "digest": "sha256:24ded48437b982348fdb52d6353d6e0a6ea519e57b0517d6065d419112d4032c",
+      "platform": "linux/amd64"
+    },
+    "docker.io/otel/opentelemetry-collector-contrib:0.163.2": {
+      "digest": "sha256:989669581ee1f89184f3fd9dd5adfc6615ed6c9692c026aaea89e07a20dfb177",
+      "platform": "linux/amd64"
+    },
+    "quay.io/prometheus/blackbox-exporter:v0.29.1": {
+      "digest": "sha256:66eae352a79e6f677aeddd8c25a9bdb017586dc5fbd230f22329213d891f94bd",
+      "platform": "linux/amd64"
+    }
+  }
 }

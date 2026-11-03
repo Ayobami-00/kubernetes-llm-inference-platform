@@ -93,7 +93,14 @@ def test_telemetry_boundary_separates_host_mounts_and_has_no_public_service():
         "k8s:io.kubernetes.pod.namespace": "observability",
         "app.kubernetes.io/name": "prometheus",
     }
-    assert not any(d["kind"] in {"Service", "Ingress", "Gateway", "Deployment"} for d in documents)
+    assert not any(d["kind"] in {"Ingress", "Gateway", "Deployment"} for d in documents)
+    services = [d for d in documents if d["kind"] == "Service"]
+    assert len(services) == 1
+    assert services[0]["spec"]["clusterIP"] == "None"
+    assert services[0]["spec"]["type"] == "ClusterIP"
+    assert services[0]["spec"]["ports"] == [
+        {"name": "grpc", "port": 10901, "targetPort": "grpc", "protocol": "TCP"}
+    ]
 
 
 def test_static_efs_driver_cannot_mutate_nodes_or_create_access_points():
