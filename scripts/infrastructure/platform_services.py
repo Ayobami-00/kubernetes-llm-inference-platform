@@ -45,9 +45,18 @@ def fetch() -> None:
             if "oci" in item:
                 if not item["oci"].startswith("oci://quay.io/jetstack/charts/cert-manager@sha256:"):
                     raise ValueError("Unexpected chart registry")
-                subprocess.run(
-                    [tool("helm"), "pull", item["oci"], "--destination", str(CACHE)], check=True
-                )
+                # Helm's OCI/digest filename differs across releases. Verify the
+                # isolated download before placing it at our stable locked path.
+                with tempfile.TemporaryDirectory(dir=CACHE, prefix=".oci-") as temporary:
+                    subprocess.run(
+                        [tool("helm"), "pull", item["oci"], "--destination", temporary], check=True
+                    )
+                    archives = list(Path(temporary).glob("*.tgz"))
+                    if len(archives) != 1 or archives[0].is_symlink():
+                        raise ValueError("Expected one regular OCI chart archive")
+                    if hashlib.sha256(archives[0].read_bytes()).hexdigest() != item["sha256"]:
+                        raise ValueError("OCI chart checksum differs from the reviewed release")
+                    os.replace(archives[0], path)
             else:
                 sources = {
                     "aws-efs-csi-driver": "https://github.com/kubernetes-sigs/aws-efs-csi-driver/releases/download/helm-chart-",

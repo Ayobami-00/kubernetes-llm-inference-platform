@@ -9,8 +9,8 @@ CloudNativePG 1.30.1 (chart 0.29.1), Barman Cloud Plugin 0.15.1 (chart 0.8.1), a
 PostgreSQL 18.6 standard Trixie are digest/checksum pinned and deployed on the live
 Kubernetes 1.36 lab cluster. Continuous WAL archiving, an external base backup and
 an isolated three-instance restore have passed. Both a base-backup marker and a
-later WAL marker were recovered. Management migration and actual application
-failover remain pending. This chart does not install either operator. See the
+later WAL marker were recovered. Management history is migrated; application deployment
+and actual failover remain pending. This chart does not install either operator. See the
 [operational runbook](../../docs/runbooks/management-postgresql.md).
 
 ## Prerequisites

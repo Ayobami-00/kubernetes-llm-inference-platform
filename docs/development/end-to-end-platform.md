@@ -8,7 +8,7 @@ rendering or a successful stub run does not satisfy a live gate.
 
 | Gate | Required evidence | Current status |
 | --- | --- | --- |
-| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers, EFS/EBS and replicated PostgreSQL with external backup/restore live; management migration/failover pending |
+| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | CPU workers, EFS/EBS, replicated PostgreSQL and migrated management history live; management deployment/failover pending |
 | Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
 | GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |

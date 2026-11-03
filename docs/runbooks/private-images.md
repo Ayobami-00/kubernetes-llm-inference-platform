@@ -75,6 +75,19 @@ provider, match only the project registry paths, require the role annotation and
 use token-scoped credential caching. Keep ordinary CI independent of live cluster
 resources and this opt-in source build.
 
+The first private-branch CI identity audit verified GitHub's signature, issuer,
+audience, expiry, repository ID and ref without retaining the signed token. Its
+subject includes immutable owner/repository IDs. Configure CI publisher trust from
+that verified subject; do not assume the older name-only subject format. The
+current publisher role still uses the Kubernetes build account until that scoped
+CI handoff is applied. The audit alone does not grant CI publishing permissions.
+
+Clean-checkout CI also exercises the OCI chart fetch. Helm may choose a filename
+different from the lock's cache name when pulling by digest. The fetcher downloads
+into an isolated directory, verifies the original checksum and then places the
+archive at the locked path. A fresh real upstream download and positive/tampered
+archive regression tests verify this behavior without weakening the checksum lock.
+
 Sources: [Kubernetes 1.36 credential providers](https://v1-36.docs.kubernetes.io/docs/tasks/administer-cluster/kubelet-credential-provider/),
 [audience restriction](https://v1-36.docs.kubernetes.io/docs/reference/access-authn-authz/node/#service-account-token-audience-restriction),
 [pinned helper source](https://github.com/kubernetes/cloud-provider-aws/tree/v1.36.1/cmd/ecr-credential-provider),
