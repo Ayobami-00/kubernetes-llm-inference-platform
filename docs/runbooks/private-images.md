@@ -11,7 +11,7 @@ an execution binding.
 The current registry was applied from a reviewed create-only plan. Live read-back
 checks its project tags, encryption, immutability, lifecycle and absence of extra
 repository-sharing policies. Pull and publisher IAM roles are separate and have
-exact workload subjects and repository permissions. Host roles, control-plane
+exact workload/CI subjects and repository permissions. Host roles, control-plane
 permissions and management's infrastructure permissions were not broadened.
 This does not yet establish working private pulls, published images, scan results
 or deployed management availability.
@@ -75,12 +75,41 @@ provider, match only the project registry paths, require the role annotation and
 use token-scoped credential caching. Keep ordinary CI independent of live cluster
 resources and this opt-in source build.
 
+## CI publication
+
 The first private-branch CI identity audit verified GitHub's signature, issuer,
 audience, expiry, repository ID and ref without retaining the signed token. Its
 subject includes immutable owner/repository IDs. Configure CI publisher trust from
 that verified subject; do not assume the older name-only subject format. The
-current publisher role still uses the Kubernetes build account until that scoped
-CI handoff is applied. The audit alone does not grant CI publishing permissions.
+publisher role now trusts only the verified immutable-ID subject on
+`codex/end-to-end-platform`, recorded in `infra/terraform/registry.json`. Its
+former unused Kubernetes publisher subject was removed. Main and pull-request
+subjects have no publishing access. Adding a release branch requires an explicit
+Terraform trust review; merely changing a workflow cannot broaden IAM trust.
+
+The reviewed follow-up plan created the retained GitHub provider and updated only
+the publisher trust and repository-scoped metadata/scan reads. It changed no
+compute, repository, host role or pull permissions. AWS manages GitHub's signing
+endpoint certificate trust; no fabricated certificate thumbprint is configured.
+If a clean account already has this provider, explicitly adopt the verified
+resource into state before planning; never create a second owner or replace it.
+
+`platform-images.yaml` uses commit-pinned Actions and short-lived OIDC credentials
+to build Linux AMD64 backend, web, runner and stub images on hosted CI. Stub and
+runner share one repository with distinct component-prefixed immutable tags.
+Re-running the same source commit reuses its existing digest. Access denial is
+not interpreted as an absent image. No application source or image is made public.
+Production backend/web base images are also digest-pinned.
+
+Each component retains a `klip-private-image.v1` receipt containing source commit,
+Dockerfile/lockfile checksums, workflow identity, digest reference and complete ECR
+BASIC findings. The single-platform image manifest enables that scanner. CI keeps
+build records separately; it does not claim an attached signed provenance or
+SBOM. A complete scan is evidence, not security approval: review findings and the
+combined checks before choosing deployment pins. Download receipts into retained
+operator evidence as well as the 90-day CI artifact store. An unfinished or
+unsupported scan fails the publishing check. Images are never automatically
+deployed by the publishing workflow.
 
 Clean-checkout CI also exercises the OCI chart fetch. Helm may choose a filename
 different from the lock's cache name when pulling by digest. The fetcher downloads

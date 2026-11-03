@@ -65,12 +65,14 @@ function Canvas({
   onSelect,
   visibleKinds,
   search,
+  persistPreferences = true,
 }: {
   topology: Topology;
   selected: string | null;
   onSelect: (node: GraphNode) => void;
   visibleKinds: Set<string>;
   search: string;
+  persistPreferences?: boolean;
 }) {
   const { resolved } = useTheme();
   const [nodes, setNodes, onNodesChange] = useNodesState<VisualNode>([]);
@@ -92,6 +94,10 @@ function Canvas({
   }, [measured, setViewport, fitView]);
   const [preferencesReady, setPreferencesReady] = useState(false);
   useEffect(() => {
+    if (!persistPreferences) {
+      setPreferencesReady(true);
+      return;
+    }
     unwrap(endpoints.getPreferences())
       .then((p) => {
         positions.current = (p.positions || {}) as typeof positions.current;
@@ -100,7 +106,7 @@ function Canvas({
       })
       .catch(() => {})
       .finally(() => setPreferencesReady(true));
-  }, []);
+  }, [persistPreferences]);
   const visible = (node: GraphNode) =>
     visibleKinds.has(node.kind) ||
     (node.kind === 'instance' &&
@@ -228,12 +234,13 @@ function Canvas({
     );
   }, [topology, selected, visibleKinds, matching, neighborhood, setNodes, setEdges]);
   const persist = useCallback(() => {
+    if (!persistPreferences) return;
     unwrap(
       endpoints.savePreferences({
         body: { positions: positions.current, viewport: viewport.current, expanded: [...expanded] },
       }),
     ).catch(() => {});
-  }, [expanded]);
+  }, [expanded, persistPreferences]);
   return (
     <ReactFlow
       data-layout-ready={layoutReady ? 'true' : 'false'}

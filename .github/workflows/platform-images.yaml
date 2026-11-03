@@ -3,7 +3,13 @@ name: Platform experiment images
 on:
   push:
     branches: [codex/end-to-end-platform]
-    paths: ['.github/workflows/platform-images.yaml']
+    paths:
+      - '.github/workflows/platform-images.yaml'
+      - 'scripts/infrastructure/publish_images.py'
+      - 'apps/management/backend/Dockerfile'
+      - 'apps/management/web/Dockerfile'
+      - 'workload-runner/Dockerfile'
+      - 'dev/inference-stub/Dockerfile'
   workflow_dispatch:
 
 permissions:
@@ -69,4 +75,68 @@ jobs:
             process.exit(1);
           }
           NODE
-
+  publish:
+    needs: identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - component: backend
+            file: apps/management/backend/Dockerfile
+            target: production
+          - component: web
+            file: apps/management/web/Dockerfile
+            target: production
+          - component: runner
+            file: workload-runner/Dockerfile
+            target: ''
+          - component: stub
+            file: dev/inference-stub/Dockerfile
+            target: ''
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-images-push
+          allowed-account-ids: '127811062476'
+          role-duration-seconds: 3600
+          role-session-name: images-${{ github.run_id }}-${{ matrix.component }}
+          unset-current-credentials: true
+      - name: Reconcile the immutable source tag
+        id: existing
+        run: python3 scripts/infrastructure/publish_images.py resolve '${{ matrix.component }}'
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        if: steps.existing.outputs.exists != 'true'
+      - name: Authenticate to the private registry
+        if: steps.existing.outputs.exists != 'true'
+        run: |
+          aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 127811062476.dkr.ecr.eu-west-2.amazonaws.com
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.existing.outputs.image }}
+          # A single platform manifest is scanned by ECR BASIC. Build records and
+          # source/digest receipts remain separate from runnable image manifests.
+          provenance: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Retain digest, source and complete registry scan evidence
+        run: python3 scripts/infrastructure/publish_images.py record '${{ matrix.component }}'
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: private-image-${{ matrix.component }}-${{ github.sha }}
+          path: artifacts/releases/${{ matrix.component }}.json
+          if-no-files-found: error
+          retention-days: 90

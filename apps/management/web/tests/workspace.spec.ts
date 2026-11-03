@@ -111,6 +111,7 @@ test('graph, revision editing, durable allocation, serving, simulated run and re
   await page.getByRole('button', { name: 'Explore frozen snapshot' }).click();
   await expect(page.getByRole('heading', { name: 'Frozen run snapshot' })).toBeVisible();
   await page.getByRole('button', { name: 'Return to current topology' }).click();
+  await expect(page.getByTestId('node-writer-assist').first()).toBeVisible();
   await page.getByTestId('node-writer-assist').first().click();
   if (await page.getByRole('button', { name: 'Dismiss notification' }).isVisible())
     await page.getByRole('button', { name: 'Dismiss notification' }).click();

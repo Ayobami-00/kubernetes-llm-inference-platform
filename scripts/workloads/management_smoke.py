@@ -109,6 +109,25 @@ def main(root, campaign="initial"):
             *args,
         )
 
+    def read_plan(scenario, name="snapshot.json"):
+        # Production artifacts are private to UID 10001. Hosted CI's user is
+        # different: read as the actual image user, never chmod the artifact tree.
+        relative = Path("plans") / scenario / name
+        content = proof.run(
+            "docker",
+            "run",
+            "--rm",
+            "--entrypoint",
+            "python",
+            "-v",
+            f"{artifact_root}:/artifacts:ro",
+            "klip-integration-workloads:local",
+            "-c",
+            "from pathlib import Path; import sys; print(Path(sys.argv[1]).read_text())",
+            str(Path("/artifacts") / relative),
+        )
+        return json.loads(content)
+
     runner("prepare", "--source", "synthetic", "--limit", "100", "--output", "/artifacts/prepared")
     api = proof.API(root)
     results = []
@@ -125,7 +144,12 @@ def main(root, campaign="initial"):
             "--output",
             "/artifacts/plans/" + scenario,
         )
-        snapshot = json.loads((artifact_root / "plans" / scenario / "snapshot.json").read_text())
+        snapshot = read_plan(scenario)
+        if scenario == "writer-assist-baseline":
+            for name in ("snapshot.json", "management-bundle.json"):
+                exported = root / ("writer-assist-" + name)
+                exported.write_text(json.dumps(read_plan(scenario, name)))
+                exported.chmod(0o600)
         identity = "actual-a-" + scenario
         api.import_document("prepared-runs", dict(id=identity, fixture=True, snapshot=snapshot))
         body = dict(
@@ -145,10 +169,24 @@ def main(root, campaign="initial"):
             time.sleep(0.2)
         uid = job(run_id)["metadata"]["uid"]
         if scenario == "writer-assist-baseline":
-            deadline = time.monotonic() + 90
-            while not list((artifact_root / "runs" / run_id).glob("*/engine-clock.json")):
-                assert time.monotonic() < deadline, "Runner did not start its common timeline"
-                time.sleep(0.1)
+            proof.run(
+                "docker",
+                "run",
+                "--rm",
+                "--entrypoint",
+                "python",
+                "-v",
+                f"{artifact_root}:/artifacts:ro",
+                "klip-integration-workloads:local",
+                "-c",
+                "from pathlib import Path; import sys,time\n"
+                "deadline=time.monotonic()+90\n"
+                "folder=Path('/artifacts/runs')/sys.argv[1]\n"
+                "while not list(folder.glob('*/engine-clock.json')):\n"
+                " assert time.monotonic()<deadline, 'Runner did not start its common timeline'\n"
+                " time.sleep(0.2)\n",
+                run_id,
+            )
             proof.run("kubectl", "-n", "klip", "rollout", "restart", "deployment/klip-worker")
             proof.run(
                 "kubectl",
@@ -201,7 +239,7 @@ def main(root, campaign="initial"):
         "workload_runner.cli",
         "submit",
         "--bundle",
-        str(artifact_root / "plans/writer-assist-baseline/management-bundle.json"),
+        str(root / "writer-assist-management-bundle.json"),
         "--management-url",
         api.url,
         "--password-file",
@@ -233,7 +271,7 @@ def main(root, campaign="initial"):
         "--output",
         "/artifacts/plans/cancellation",
     )
-    snapshot = json.loads((artifact_root / "plans/cancellation/snapshot.json").read_text())
+    snapshot = read_plan("cancellation")
     api.import_document(
         "prepared-runs", dict(id="actual-a-cancel", fixture=True, snapshot=snapshot)
     )

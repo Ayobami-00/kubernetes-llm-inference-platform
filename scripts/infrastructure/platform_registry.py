@@ -1,4 +1,4 @@
-"""Read back retained project repositories and their exact workload-only identities."""
+"""Read back retained repositories and exact workload/CI publishing identities."""
 
 from __future__ import annotations
 
@@ -27,6 +27,21 @@ def verify() -> dict:
     if {x["repositoryName"] for x in actual} != set(names):
         raise ValueError("Repository read-back does not match the allocation")
     observed = {}
+    publisher = allocation["publisher"]
+    provider = aws.call(
+        "iam",
+        "get-open-id-connect-provider",
+        "--open-id-connect-provider-arn",
+        publisher["provider_arn"],
+    )
+    if (
+        provider["Url"] != "token.actions.githubusercontent.com"
+        or provider["ClientIDList"] != ["sts.amazonaws.com"]
+        or publisher["repository"] != "Ayobami-00/kubernetes-llm-inference-platform"
+        or publisher["owner_id"] != "41403457"
+        or publisher["repository_id"] != "1432746028"
+    ):
+        raise ValueError("CI publisher issuer/audience/immutable repository identity differs")
     for repo in actual:
         name = repo["repositoryName"]
         key = name.split("/", 1)[1]

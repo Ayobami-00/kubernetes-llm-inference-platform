@@ -233,3 +233,14 @@ plans and linting, Ansible/Helm checks, 538 Python tests (17 optional skips), al
 19 schemas and Ruff/formatting. Private-branch CI exposed and now has fixes for
 OCI cache naming, the Kind checksum download and recursive Terraform formatting.
 Combined CI is being repeated; local success is not a substitute for that result.
+
+The registry's CI handoff has now been applied and read back: one retained GitHub
+OIDC provider, exact immutable repository/branch trust and only scoped image
+publishing/metadata permissions. Hosted CI builds private digest-addressed images
+and retains scan receipts; it does not automatically deploy them. The local suite
+passes 542 tests (17 optional skips) and the frontend builds with 17 passing tests.
+Combined CI additionally exposed a historical/current graph canvas lifecycle issue
+and a hosted-Linux test-user mismatch reading private runner artifacts. The graph
+now uses separate canvas lifetimes and never saves historical layout preferences;
+the integration harness reads artifacts through the image's actual non-root user.
+Those real browser/Job checks must pass again before application deployment.

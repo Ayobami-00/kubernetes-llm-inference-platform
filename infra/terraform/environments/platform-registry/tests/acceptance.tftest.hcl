@@ -1,4 +1,9 @@
 mock_provider "aws" {}
+override_resource {
+  override_during = plan
+  target          = aws_iam_openid_connect_provider.github
+  values          = { arn = "arn:aws:iam::127811062476:oidc-provider/token.actions.githubusercontent.com" }
+}
 override_data {
   target = data.terraform_remote_state.identity
   values = {
@@ -24,8 +29,12 @@ run "private_immutable_project_images" {
     error_message = "Automatic retention must not remove tagged historical run images."
   }
   assert {
-    condition     = length(local.subjects.pull) == 6 && local.subjects.push == ["system:serviceaccount:platform-build:image-publisher"] && aws_iam_role.images["pull"].max_session_duration == 3600 && !contains(jsondecode(aws_iam_role_policy.images["pull"].policy).Statement[1].Action, "ecr:PutImage")
+    condition     = length(local.subjects.pull) == 6 && local.subjects.push == ["repo:Ayobami-00@41403457/kubernetes-llm-inference-platform@1432746028:ref:refs/heads/codex/end-to-end-platform"] && aws_iam_role.images["pull"].max_session_duration == 3600 && !contains(jsondecode(aws_iam_role_policy.images["pull"].policy).Statement[1].Action, "ecr:PutImage")
     error_message = "Image pull and publisher credentials need distinct exact workload subjects and permissions."
+  }
+  assert {
+    condition     = aws_iam_openid_connect_provider.github.url == "https://token.actions.githubusercontent.com" && aws_iam_openid_connect_provider.github.client_id_list == toset(["sts.amazonaws.com"]) && jsondecode(aws_iam_role.images["push"].assume_role_policy).Statement[0].Condition.StringEquals["token.actions.githubusercontent.com:sub"] == local.subjects.push
+    error_message = "CI write access must be limited to the reviewed immutable repository/branch subject."
   }
 }
 

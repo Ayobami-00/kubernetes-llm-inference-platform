@@ -670,11 +670,13 @@ function Workspace() {
                         }
                       >
                         <Graph
+                          key={snapshot || 'current'}
                           topology={topology.data}
                           selected={selected?.id || null}
                           onSelect={select}
                           visibleKinds={kinds}
                           search={search}
+                          persistPreferences={!snapshot}
                         />
                       </Suspense>
                     )

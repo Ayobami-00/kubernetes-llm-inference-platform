@@ -1,15 +1,31 @@
 locals {
   config          = jsondecode(file("${path.module}/../../project.json"))
+  github          = jsondecode(file("${path.module}/../../registry.json")).github
   identity        = data.terraform_remote_state.identity.outputs.identity_manifest
   images          = toset(["management-backend", "management-web", "workload-runner"])
   repository_arns = [for name in sort(tolist(local.images)) : "arn:aws:ecr:${local.config.region}:${local.config.account_id}:repository/${local.config.cluster_id}/${name}"]
   subjects = {
     pull = [for name in ["klip-api", "klip-worker", "klip-web", "klip-migrate", "klip-runner", "klip-image-pull-probe"] : "system:serviceaccount:klip:${name}"]
-    push = ["system:serviceaccount:platform-build:image-publisher"]
+    push = [for ref in local.github.refs : "repo:${split("/", local.github.repository)[0]}@${local.github.owner_id}/${split("/", local.github.repository)[1]}@${local.github.repository_id}:ref:${ref}"]
   }
   tags = {
     Project     = local.config.project, Cluster = local.config.cluster_id,
     Environment = local.config.environment, ManagedBy = "terraform-platform-registry"
+  }
+}
+
+# This account had no GitHub provider at adoption. Retain it through lab rebuilds;
+# an existing shared provider must be explicitly adopted, never replaced.
+resource "aws_iam_openid_connect_provider" "github" {
+  url            = local.github.issuer
+  client_id_list = ["sts.amazonaws.com"]
+  tags           = local.tags
+  lifecycle {
+    prevent_destroy = true
+    precondition {
+      condition     = local.github.issuer == "https://token.actions.githubusercontent.com" && local.github.repository == "Ayobami-00/kubernetes-llm-inference-platform" && local.github.owner_id == "41403457" && local.github.repository_id == "1432746028" && length(local.github.refs) > 0 && alltrue([for ref in local.github.refs : contains(["refs/heads/codex/end-to-end-platform", "refs/heads/main"], ref)])
+      error_message = "Publishing trust must use the verified immutable repository identity and explicitly reviewed branches."
+    }
   }
 }
 
@@ -58,7 +74,8 @@ resource "aws_ecr_lifecycle_policy" "untagged" {
   }] })
 }
 
-# The kubelet exchanges a Pod-bound token; hosts receive no ECR policy or static key.
+# Pull uses Pod-bound tokens; publishing uses the verified repository's CI tokens.
+# Neither the hosts nor application Pods receive ECR write permissions.
 resource "aws_iam_role" "images" {
   for_each             = local.subjects
   name                 = "klip-images-${each.key}"
@@ -66,10 +83,10 @@ resource "aws_iam_role" "images" {
   max_session_duration = 3600
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{
     Effect    = "Allow", Action = "sts:AssumeRoleWithWebIdentity",
-    Principal = { Federated = local.identity.provider_arn },
+    Principal = { Federated = each.key == "pull" ? local.identity.provider_arn : aws_iam_openid_connect_provider.github.arn },
     Condition = { StringEquals = {
-      "oidc.${local.config.domain}:sub" = each.value,
-      "oidc.${local.config.domain}:aud" = "sts.amazonaws.com"
+      "${each.key == "pull" ? "oidc.${local.config.domain}" : "token.actions.githubusercontent.com"}:sub" = each.value,
+      "${each.key == "pull" ? "oidc.${local.config.domain}" : "token.actions.githubusercontent.com"}:aud" = "sts.amazonaws.com"
     } }
   }] })
   tags       = local.tags
@@ -88,7 +105,7 @@ resource "aws_iam_role_policy" "images" {
     {
       Effect = "Allow",
       Action = concat(["ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
-      each.key == "push" ? ["ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:PutImage"] : []),
+      each.key == "push" ? ["ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:DescribeImages", "ecr:DescribeImageScanFindings"] : []),
       Resource = local.repository_arns
     }
   ] })
@@ -99,6 +116,11 @@ output "registry_manifest" {
     schema_version = "klip-platform-registry.v1", project = local.config.project,
     cluster_id     = local.config.cluster_id, account_id = local.config.account_id,
     region         = local.config.region,
+    publisher = {
+      issuer        = local.github.issuer, provider_arn = aws_iam_openid_connect_provider.github.arn,
+      repository    = local.github.repository, owner_id = local.github.owner_id,
+      repository_id = local.github.repository_id, refs = local.github.refs
+    },
     repositories = { for name, repository in aws_ecr_repository.images : name => {
       name = repository.name, arn = repository.arn, url = repository.repository_url
     } },

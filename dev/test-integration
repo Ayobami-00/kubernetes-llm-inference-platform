@@ -71,7 +71,7 @@ kubectl -n "$qa_namespace" rollout status statefulset/klip-db --timeout=180s
 python3 scripts/management/integration_smoke.py verify "$qa_directory"
 if [[ "${KLIP_WORKLOAD_INTEGRATION:-0}" == 1 ]]; then
   uv run --locked --all-packages python scripts/workloads/management_smoke.py "$qa_directory"
-  MANAGEMENT_WORKLOAD_PLAN_FILE="$qa_directory/data/artifacts/plans/writer-assist-baseline/snapshot.json" \
+  MANAGEMENT_WORKLOAD_PLAN_FILE="$qa_directory/writer-assist-snapshot.json" \
     npm --prefix apps/management/web run test:e2e -- workloads.spec.ts
 fi
 echo "Integration proof passed: imports, fixture Jobs, recovery, browser workflows, upgrade, restore and PVC persistence."
