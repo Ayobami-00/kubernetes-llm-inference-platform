@@ -151,7 +151,15 @@ def verify() -> dict:
     ]
     if len(matched) != 1 or len(subscriptions) != 1:
         raise ValueError("Alert destination missing, duplicated or contains an unreviewed receiver")
-    confirmed = matched[0]["SubscriptionArn"] != "PendingConfirmation"
+    subscription_arn = matched[0]["SubscriptionArn"]
+    confirmed = False
+    if subscription_arn != "PendingConfirmation":
+        if not subscription_arn.startswith(alerts["topic_arn"] + ":"):
+            raise ValueError("Unexpected email subscription identity")
+        subscription = global_aws.call(
+            "sns", "get-subscription-attributes", "--subscription-arn", subscription_arn
+        )["Attributes"]
+        confirmed = subscription.get("PendingConfirmation") == "false"
     alarm = global_aws.call("cloudwatch", "describe-alarms", "--alarm-names", alerts["alarm_name"])[
         "MetricAlarms"
     ]
@@ -166,6 +174,12 @@ def verify() -> dict:
         or alarm[0].get("OKActions") != [alerts["topic_arn"]]
         or alarm[0].get("ActionsEnabled") is not True
         or alarm[0].get("TreatMissingData") != "breaching"
+        or alarm[0].get("Statistic") != "Minimum"
+        or alarm[0].get("Period") != 60
+        or alarm[0].get("EvaluationPeriods") != 2
+        or alarm[0].get("DatapointsToAlarm") != 2
+        or alarm[0].get("Threshold") != 1
+        or alarm[0].get("ComparisonOperator") != "LessThanThreshold"
     ):
         raise ValueError("External alarm differs from the reviewed Route 53 path")
     health = global_aws.call(
@@ -178,6 +192,9 @@ def verify() -> dict:
         or health.get("EnableSNI") is not True
         or health.get("Disabled", False)
         or health.get("Inverted", False)
+        or health.get("RequestInterval") != 30
+        or health.get("FailureThreshold") != 3
+        or set(health.get("Regions", [])) != {"eu-west-1", "us-east-1", "ap-southeast-1"}
     ):
         raise ValueError("External health check no longer targets management readiness")
     result = {

@@ -36,7 +36,10 @@ resource "aws_sns_topic_policy" "alerts" {
   policy = jsonencode({ Version = "2012-10-17", Statement = [
     {
       Sid       = "AccountTopicAdministration", Effect = "Allow",
-      Principal = { AWS = "arn:aws:iam::${local.config.account_id}:root" }, Action = "sns:*", Resource = aws_sns_topic.alerts.arn
+      Principal = { AWS = "arn:aws:iam::${local.config.account_id}:root" },
+      # SNS resource policies reject the service wildcard that IAM policies accept.
+      Action   = ["sns:GetTopicAttributes", "sns:SetTopicAttributes", "sns:AddPermission", "sns:RemovePermission", "sns:DeleteTopic", "sns:Subscribe", "sns:ListSubscriptionsByTopic", "sns:Publish"],
+      Resource = aws_sns_topic.alerts.arn
     },
     {
       Sid       = "OnlyThisExternalAlarm", Effect = "Allow", Principal = { Service = "cloudwatch.amazonaws.com" },
@@ -44,7 +47,9 @@ resource "aws_sns_topic_policy" "alerts" {
       Condition = { StringEquals = { "aws:SourceAccount" = local.config.account_id }, ArnEquals = { "aws:SourceArn" = local.alarm_arn } }
     },
     {
-      Sid       = "DenyInsecureTransport", Effect = "Deny", Principal = "*", Action = "sns:*", Resource = aws_sns_topic.alerts.arn,
+      Sid       = "DenyInsecureTransport", Effect = "Deny", Principal = "*",
+      Action    = ["sns:GetTopicAttributes", "sns:SetTopicAttributes", "sns:AddPermission", "sns:RemovePermission", "sns:DeleteTopic", "sns:Subscribe", "sns:ListSubscriptionsByTopic", "sns:Publish"],
+      Resource  = aws_sns_topic.alerts.arn,
       Condition = { Bool = { "aws:SecureTransport" = "false", "aws:PrincipalIsAWSService" = "false" } }
     }
   ] })

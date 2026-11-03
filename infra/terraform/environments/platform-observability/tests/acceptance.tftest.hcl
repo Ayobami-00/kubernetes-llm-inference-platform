@@ -2,6 +2,11 @@ mock_provider "aws" {}
 mock_provider "aws" { alias = "global_monitoring" }
 override_resource {
   override_during = plan
+  target          = aws_sns_topic.alerts
+  values          = { arn = "arn:aws:sns:us-east-1:127811062476:klip-platform-alerts" }
+}
+override_resource {
+  override_during = plan
   target          = aws_s3_bucket.telemetry["metrics"]
   values          = { arn = "arn:aws:s3:::klip-metrics-127811062476-eu-west-2" }
 }
@@ -55,6 +60,10 @@ run "retained_scoped_telemetry" {
   assert {
     condition     = jsondecode(aws_kms_key.alerts.policy).Statement[1].Condition.ArnEquals["aws:SourceArn"] == local.alarm_arn && jsondecode(aws_kms_key.alerts.policy).Statement[1].Condition.StringEquals["aws:SourceAccount"] == "127811062476"
     error_message = "CloudWatch KMS use must bind this account and exact external alarm."
+  }
+  assert {
+    condition     = alltrue([for statement in [jsondecode(aws_sns_topic_policy.alerts.policy).Statement[0], jsondecode(aws_sns_topic_policy.alerts.policy).Statement[2]] : length(statement.Action) == 8 && !contains(statement.Action, "sns:*") && contains(statement.Action, "sns:Publish") && contains(statement.Action, "sns:Subscribe")]) && jsondecode(aws_sns_topic_policy.alerts.policy).Statement[2].Condition.Bool["aws:SecureTransport"] == "false"
+    error_message = "SNS resource policies require the eight supported explicit actions; retain HTTPS enforcement."
   }
 }
 
