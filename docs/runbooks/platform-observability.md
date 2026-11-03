@@ -174,6 +174,27 @@ interrupted install is retained for inspection and never automatically replayed
 under its original identity. Replica readiness is an installation observation;
 scrape/ingestion/query, denied-access and retention/failure acceptance are separate.
 
+Cross-host kubelet scrapes use the existing WireGuard path. Cilium masquerades
+those requests to the source platform worker's WireGuard address. The initial
+host firewall permitted control-plane kubelet clients but blocked those CPU peer
+addresses. `make monitoring-firewall` permits only the three reserved platform
+CPU `/32` sources, on `wg0`, to TCP 10250. It preserves API, etcd, SSH, metadata
+isolation and all other rules. Kubernetes token/RBAC authentication remains
+required, and the ServiceMonitor verifies the serving certificate against the
+private Kubernetes CA. No `nodes/proxy` privilege is added.
+
+The Ansible update checks host identity and prior file hashes, syntax-checks the
+rules, applies one host at a time, then verifies the original Node UID, three
+healthy etcd members and all database replicas. A drifted firewall fails before
+copying. The same sources are included in generated bootstrap rules for fresh
+and subsequent GPU hosts.
+
+On a fresh installation, the upstream chart initially ignores admission failures
+while its serving Pod/certificate comes up. After readiness the operator performs
+an unchanged Helm upgrade and requires both monitoring admission configurations
+to use `Fail` with an injected CA. Original release plans, values, logs and terminal
+observations are archived with hashes before the next release is prepared.
+
 Deploy replicated scraping with Thanos deduplication, Alertmanager, PostgreSQL-backed
 replicated Grafana, HA monolithic Loki, a recoverable single Tempo backend and
 buffered collectors. Tempo 3 distributed mode requires Kafka; the initial small

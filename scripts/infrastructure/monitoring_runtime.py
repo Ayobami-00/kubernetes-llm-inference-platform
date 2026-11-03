@@ -6,6 +6,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import shutil
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 
@@ -132,6 +133,77 @@ def check_crd(existing, desired):
         raise ValueError("Existing monitoring CRD ownership/schema differs; no forced adoption")
 
 
+def archive_current():
+    active = folder() / "active.json"
+    if not active.exists():
+        return
+    current = json.loads(active.read_text())
+    destination = folder() / "history" / current["approval_sha256"]
+    manifest = destination / "manifest.json"
+    if manifest.exists():
+        for name, checksum in json.loads(manifest.read_text())["files"].items():
+            if hashlib.sha256((destination / name).read_bytes()).hexdigest() != checksum:
+                raise ValueError("Archived monitoring receipt changed")
+        return
+    original = folder() / (current["approval_sha256"] + ".json")
+    plan = json.loads(original.read_text())
+    values = folder() / "values.yaml"
+    if values.exists() and sha(yaml.safe_load(values.read_text())) != plan["values_sha256"]:
+        raise ValueError("Previous release values changed before archival")
+    private_dir(destination)
+    for name in (
+        "active.json",
+        "values.yaml",
+        "helm.log",
+        "helm-admission.log",
+        "observation.json",
+    ):
+        source = folder() / name
+        if source.exists():
+            if (destination / name).exists() and (
+                destination / name
+            ).read_bytes() != source.read_bytes():
+                raise ValueError("Partial monitoring archive conflicts with the original receipt")
+            shutil.copyfile(source, destination / name)
+            (destination / name).chmod(0o600)
+    write_private(destination / "plan.json", plan)
+    write_private(
+        manifest,
+        {
+            "approval_sha256": current["approval_sha256"],
+            "archived_at": utc_now(),
+            "files": {
+                p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in destination.iterdir()
+                if p.is_file()
+            },
+        },
+    )
+
+
+def admission_fail_closed():
+    for kind in ("MutatingWebhookConfiguration", "ValidatingWebhookConfiguration"):
+        document = get(kind, "klip-monitoring-admission")
+        if (
+            not document
+            or document["metadata"].get("annotations", {}).get("meta.helm.sh/release-name")
+            != RELEASE
+            or not document.get("webhooks")
+        ):
+            return False
+        for hook in document["webhooks"]:
+            service = hook["clientConfig"].get("service", {})
+            if (
+                hook.get("failurePolicy") != "Fail"
+                or not hook["clientConfig"].get("caBundle")
+                or service.get("namespace") != NAMESPACE
+                or service.get("name") != "klip-monitoring-operator"
+                or service.get("port", 443) != 443
+            ):
+                return False
+    return True
+
+
 def prepare(security_directory):
     from observability import verify_roles
     from platform_resize import verify_capacity
@@ -142,6 +214,7 @@ def prepare(security_directory):
         "failed",
     }:
         raise ValueError("Reconcile the original interrupted monitoring operation first")
+    archive_current()
     Aws(PROFILES["foundation"]).preflight("foundation")
     capacity = verify_capacity()
     boundary = verify_boundary()
@@ -320,7 +393,22 @@ def apply(approval):
             timeout=300,
             interval=5,
         )
-        active.update(status="installed", completed_at=utc_now(), observation=observed)
+        if not admission_fail_closed():
+            # Upstream uses IgnoreOnInstallOnly while its serving certificate and
+            # first Pod become ready. An unchanged Helm upgrade makes it Fail.
+            active.update(status="hardening-admission", hardening_started_at=utc_now())
+            write_private(active_path, active)
+            with tunnel():
+                hardened = checked(command, timeout=750)
+            write_private(folder() / "helm-admission.log", hardened)
+            if not admission_fail_closed():
+                raise ValueError("Monitoring admission must verify TLS and fail closed")
+        active.update(
+            status="installed",
+            completed_at=utc_now(),
+            observation=observed,
+            admission_fail_closed=True,
+        )
         write_private(active_path, active)
         return active
     except Exception as error:

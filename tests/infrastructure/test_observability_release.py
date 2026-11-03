@@ -45,6 +45,7 @@ def test_monitoring_uses_rotating_credentials_and_separate_scoped_roles():
         "additional": ["observability-node-agents"],
     }
     assert prom["arbitraryFSAccessThroughSMs"] == {"deny": True}
+    assert not values["kubelet"]["serviceMonitor"]["tlsConfig"]["insecureSkipVerify"]
     assert all(
         c["env"] == [{"name": "AWS_EC2_METADATA_DISABLED", "value": "true"}]
         for c in prom["containers"]

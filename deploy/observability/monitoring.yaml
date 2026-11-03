@@ -14,6 +14,10 @@ kubeScheduler:
   enabled: false
 kubeProxy:
   enabled: false
+kubelet:
+  serviceMonitor:
+    tlsConfig:
+      insecureSkipVerify: false
 defaultRules:
   rules:
     etcd: false

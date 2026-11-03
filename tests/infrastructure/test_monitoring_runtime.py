@@ -7,6 +7,7 @@ from unittest.mock import Mock
 import monitoring_runtime as runtime
 import platform_resize
 import pytest
+import yaml
 
 
 def test_crd_defaults_are_accepted_but_schema_drift_and_adoption_are_not():
@@ -55,3 +56,50 @@ def test_new_plan_cannot_overwrite_an_ambiguous_install(monkeypatch, tmp_path):
     (tmp_path / "active.json").write_text(json.dumps({"status": "installing"}))
     with pytest.raises(ValueError, match="original interrupted"):
         runtime.prepare(tmp_path)
+
+
+def test_archive_preserves_terminal_values_and_detects_changes(monkeypatch, tmp_path):
+    monkeypatch.setattr(runtime, "folder", lambda: tmp_path)
+    approval = "synthetic-approval"
+    values = {"synthetic": "original"}
+    plan = {"approval_sha256": approval, "values_sha256": runtime.sha(values)}
+    (tmp_path / (approval + ".json")).write_text(json.dumps(plan))
+    (tmp_path / "active.json").write_text(
+        json.dumps({"approval_sha256": approval, "status": "installed"})
+    )
+    (tmp_path / "values.yaml").write_text(yaml.safe_dump(values))
+    runtime.archive_current()
+    path = tmp_path / "history" / approval / "values.yaml"
+    assert yaml.safe_load(path.read_text()) == values
+    (tmp_path / "values.yaml").write_text("synthetic: new-release\n")
+    runtime.archive_current()
+    assert yaml.safe_load(path.read_text()) == values
+    path.write_text("synthetic: changed-history\n")
+    with pytest.raises(ValueError, match="Archived monitoring receipt changed"):
+        runtime.archive_current()
+
+
+def test_operator_admission_needs_fail_policy_ca_and_exact_service(monkeypatch):
+    document = {
+        "metadata": {"annotations": {"meta.helm.sh/release-name": runtime.RELEASE}},
+        "webhooks": [
+            {
+                "failurePolicy": "Fail",
+                "clientConfig": {
+                    "caBundle": "synthetic-public-ca",
+                    "service": {
+                        "name": "klip-monitoring-operator",
+                        "namespace": runtime.NAMESPACE,
+                        "port": 443,
+                    },
+                },
+            }
+        ],
+    }
+    monkeypatch.setattr(runtime, "get", lambda *_: document)
+    assert runtime.admission_fail_closed()
+    document["webhooks"][0]["failurePolicy"] = "Ignore"
+    assert not runtime.admission_fail_closed()
+    document["webhooks"][0]["failurePolicy"] = "Fail"
+    document["webhooks"][0]["clientConfig"]["caBundle"] = ""
+    assert not runtime.admission_fail_closed()

@@ -2,11 +2,25 @@
 
 from __future__ import annotations
 
+import json
+from ipaddress import ip_address, ip_network
 from pathlib import Path
 
 import yaml
 from common import CONFIG, ROOT, state_home, write_private
 from platform_artifacts import VERSIONS
+
+
+def platform_metrics_sources() -> list[str]:
+    platform = json.loads((ROOT / "infra/terraform/platform.json").read_text())
+    if set(platform["nodes"]) != {"platform-01", "platform-02", "platform-03"}:
+        raise ValueError("Metrics access requires the three reserved platform CPU slots")
+    addresses = [ip_address(node["wireguard_ip"]) for node in platform["nodes"].values()]
+    if len(set(addresses)) != 3 or any(
+        address not in ip_network(CONFIG["wireguard_cidr"]) for address in addresses
+    ):
+        raise ValueError("Invalid platform metrics source addresses")
+    return sorted(str(address) + "/32" for address in addresses)
 
 
 def node_configuration(
@@ -36,6 +50,7 @@ def node_configuration(
         },
         "api_frontend_ips": allocation["api"]["frontend_ips"],
         "native_ips": [node["private_ip"] for node in allocation["nodes"].values()],
+        "platform_metrics_sources": platform_metrics_sources(),
         "kubernetes_version": VERSIONS["kubernetes"],
         "containerd_version": VERSIONS["containerd"],
         "runc_version": VERSIONS["runc"],
@@ -66,6 +81,11 @@ def firewall(config: dict) -> str:
             f"-A KLIP-HOST -i wg0 -s {ip}/32 -p tcp "
             "-m multiport --dports 2379,2380,10250,4244 -j ACCEPT"
         )
+    for source in config.get("platform_metrics_sources", []):
+        network = ip_network(source, strict=True)
+        if network.prefixlen != 32 or str(network) not in platform_metrics_sources():
+            raise ValueError("Kubelet metrics may originate only from reserved CPU workers")
+        rules.append(f"-A KLIP-HOST -i wg0 -s {network} -p tcp --dport 10250 -j ACCEPT")
     rules += [
         f"-A KLIP-HOST -i wg0 -s {config['wireguard_cidr']} -p tcp --dport 6443 -j ACCEPT",
         f"-A KLIP-HOST -i wg0 -s {config['wireguard_cidr']} -p udp --dport 8472 -j ACCEPT",

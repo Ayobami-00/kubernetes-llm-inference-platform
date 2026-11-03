@@ -1,0 +1,41 @@
+---
+- name: Apply an identity-bound reviewed host firewall update
+  hosts: all
+  serial: 1
+  become: true
+  gather_facts: false
+  tasks:
+    - name: Read the installed public host identity
+      ansible.builtin.slurp:
+        src: /etc/klip/node.json
+      register: klip_installed_identity
+      no_log: true
+    - name: Check the exact configured instance before changing its firewall
+      ansible.builtin.assert:
+        that:
+          - (klip_installed_identity.content | b64decode | from_json).instance_id == klip_node.instance_id
+          - (klip_installed_identity.content | b64decode | from_json).name == inventory_hostname
+        fail_msg: Host identity differs from the reviewed firewall target
+      no_log: true
+    - name: Inspect the existing firewall checksum
+      ansible.builtin.stat:
+        path: /etc/klip/firewall.rules
+        checksum_algorithm: sha256
+      register: klip_existing_firewall
+    - name: Reject an unreviewed concurrent firewall change
+      ansible.builtin.assert:
+        that:
+          - klip_existing_firewall.stat.checksum in [klip_firewall_before_sha256, klip_firewall_after_sha256]
+        fail_msg: Host firewall changed after review
+    - name: Install and syntax-check only the reviewed rules
+      ansible.builtin.copy:
+        src: '{{ klip_firewall_file }}'
+        dest: /etc/klip/firewall.rules
+        mode: '0600'
+        backup: true
+        validate: /usr/sbin/iptables-restore --test --noflush %s
+    - name: Activate the existing dedicated firewall service
+      ansible.builtin.systemd_service:
+        name: klip-firewall
+        state: restarted
+        enabled: true

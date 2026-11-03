@@ -153,7 +153,10 @@ observability-charts:
 observability-render:
 	$(PYTHON) scripts/infrastructure/observability_release.py render
 
-.PHONY: monitoring-prepare monitoring-apply monitoring-observe
+.PHONY: monitoring-prepare monitoring-apply monitoring-observe monitoring-firewall
+monitoring-firewall:
+	$(PYTHON) scripts/infrastructure/telemetry_firewall.py
+
 monitoring-prepare:
 	@test -n "$(SECURITY_DIRECTORY)" || (echo 'Set SECURITY_DIRECTORY to the reviewed CI image-scan directory'; exit 1)
 	$(PYTHON) scripts/infrastructure/monitoring_runtime.py prepare --security-directory "$(SECURITY_DIRECTORY)"
