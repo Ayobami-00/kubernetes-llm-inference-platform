@@ -70,7 +70,12 @@ def input_values(root: str, origins_file: Path | None, deletion_protection: bool
             raise ValueError("Invalid gateway health-check path")
         values["health_path"] = path
         return values
-    return {"adopt_existing_access": True}
+    if root == "bootstrap":
+        return {"adopt_existing_access": True}
+    if root == "probe":
+        public, _ = ensure_ssh_key()
+        return {"ssh_public_key": public}
+    return {}
 
 
 def create_plan(
@@ -204,8 +209,11 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
         raise ValueError("Use the explicit destroy command for teardown plans")
     Aws(PROFILES[root]).preflight(root)
     if teardown:
-        verify_teardown_evidence(receipt["teardown"])
-        if receipt["teardown"]["empty_etcd"]:
+        if root == "probe":
+            verify_probe_teardown(receipt["teardown"])
+        else:
+            verify_teardown_evidence(receipt["teardown"])
+        if root != "probe" and receipt["teardown"]["empty_etcd"]:
             from smoke import assert_prebootstrap, ssm_command
 
             aws = Aws(PROFILES["foundation"])
@@ -224,6 +232,22 @@ def apply_plan(root: str, approval: str, *, teardown: bool = False) -> None:
         migrate_bootstrap()
     receipt["applied_at"] = utc_now()
     write_private(receipt_file, receipt)
+
+
+def verify_probe_teardown(evidence: dict) -> None:
+    if not evidence or evidence.get("cluster_id") != CONFIG["cluster_id"]:
+        raise ValueError("Explicit probe cleanup evidence is required")
+    current = json.loads(tf("probe", "output", "-json", "probe"))
+    if current["instance_id"] != evidence.get("probe_instance_id"):
+        raise ValueError("Probe teardown targets a different instance")
+    if not evidence.get("node_absent") or not evidence.get("peers_revoked"):
+        raise ValueError("Remove probe Kubernetes membership and peers before teardown")
+    from cluster import FOLDER, kubectl
+
+    if "network-probe" in json.loads((FOLDER / "peers.json").read_text())["peers"]:
+        raise ValueError("Probe still appears in the current mesh registry")
+    if kubectl("get", "node", "network-probe", "--ignore-not-found", "-o", "json").strip():
+        raise ValueError("Probe still appears in Kubernetes")
 
 
 def allocation() -> dict:

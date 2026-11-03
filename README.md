@@ -19,7 +19,7 @@ flowchart TB
     R --> B["Shared model B<br/>2 replicas · 1 GPU each"]
     R --> S["Dedicated latency pool<br/>1 GPU · llm-d + vLLM"]
 
-    P["Persistent CPU environment<br/>Kubernetes control plane, platform controller,<br/>observability and experiment results"]
+    P["Persistent CPU environment<br/>Kubernetes control plane, management services,<br/>observability and experiment results"]
     P -. configuration and lifecycle .-> G
     P -. configuration and lifecycle .-> R
     P -.-> L
@@ -112,8 +112,10 @@ client will be added when the management API routes exist.
 Stream B's Terraform slice prepares three continuously running CPU hosts in London for a later
 self-managed Kubernetes bootstrap. It includes native S3 state locking, imported access-bootstrap
 IAM, a private API NLB, dedicated etcd disks and a separately authorized inference DNS root.
-Host WireGuard, kubeadm, containerd, Cilium, Helm releases and GPU software follow in Ansible and
-platform deployment work. Terraform does not provision Lambda GPU VMs.
+Ansible host preparation, direct WireGuard peers, guarded kubeadm bootstrap, Cilium/Hubble,
+metrics-server, encrypted etcd backups and generic worker operations are implemented as a
+separate rollout. Their live acceptance is pending authorization; the foundation acceptance
+report remains the source for checks already performed. Terraform does not provision Lambda GPU VMs.
 
 ```bash
 make infra-tools
@@ -134,3 +136,18 @@ identities and saved-plan digests. Private credentials, recovery state and repor
 - [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
 - [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)
 - [Live foundation acceptance and Ansible handoff](docs/runbooks/aws-foundation-acceptance.md)
+
+## CPU cluster bootstrap
+
+```bash
+make cluster-tools
+make cluster-check
+make cluster-preflight
+```
+
+Review the [cluster rollout](docs/runbooks/cluster-bootstrap.md) before applying host changes.
+The [network architecture](docs/architecture/kubernetes-bootstrap.md),
+[backup recovery workflow](docs/runbooks/cluster-recovery.md) and
+[worker operation interface for C](docs/runbooks/worker-host-operations.md) describe ownership,
+credential boundaries and later GPU integration. Local validation is distinct from live
+Kubernetes acceptance; no readiness is inferred from Terraform allocations.

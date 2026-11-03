@@ -54,8 +54,9 @@ the code does not fabricate a CA reference or mark fixtures as live infrastructu
 
 ## Later Stream C invocation contract
 
-C owns Lambda allocation/termination and durable job retries. B will provide
-idempotent host-preparation/join/removal entrypoints in the next Ansible slice.
+C owns Lambda allocation/termination and durable job retries. B now provides
+versioned host-preparation/join/removal commands; see [worker operations](worker-host-operations.md).
+Their live Kubernetes acceptance remains pending rollout authorization.
 The expected inputs are:
 
 | Input | Owner/source |
@@ -73,9 +74,9 @@ Establish direct peers, MTU, forwarding, API routes/return paths and peer failov
 before join. GPU-to-GPU traffic uses direct peers. A GPU VM joining Kubernetes and
 being GPU-runtime-ready are distinct from model-serving readiness.
 
-Removal will drain workloads, remove the Kubernetes node and stale WireGuard peers,
-then report completion so C can terminate the VM. Define forced/failure handling
-explicitly in that slice; do not describe these future commands as implemented.
+Removal validates provider/node UID, respects drain failures, stops participation, revokes
+peers and deletes the matching Node with a UID precondition. It reports whether cleanup
+is pending; C confirms termination before reusing the address. No forced removal is implicit.
 C needs no AWS foundation/DNS write identity. Inference gateway origin changes use
 the separate foundation-operated DNS workflow. No custom operator/CRD/controller
 is introduced.

@@ -13,9 +13,11 @@ locals {
     operations     = "kubernetes-llm-foundation-operations"
     node-boundary  = "kubernetes-llm-control-plane-boundary"
     dns            = "kubernetes-llm-inference-dns"
+    backups        = "kubernetes-llm-foundation-backups"
+    node-backup    = "kubernetes-llm-node-backup"
   }
   existing_policies    = toset(["network", "compute", "api", "identity-state", "node-boundary"])
-  foundation_policies  = toset(["network", "compute", "api", "identity-state", "operations"])
+  foundation_policies  = toset(["network", "compute", "api", "identity-state", "operations", "backups"])
   existing_attachments = toset(["network", "compute", "api", "identity-state"])
 }
 

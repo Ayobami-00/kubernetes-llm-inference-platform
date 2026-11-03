@@ -1,0 +1,86 @@
+---
+- name: Refuse synthetic inventories before changing hosts
+  ansible.builtin.assert:
+    that: not (klip_fixture | default(false) | bool)
+    fail_msg: Generate inventory from current live foundation observations first
+- name: Validate the supported base host profile
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '24.04'
+      - ansible_facts.architecture == 'x86_64'
+    fail_msg: This base profile requires Ubuntu 24.04 AMD64; review other provider images explicitly
+- name: Create private configuration directories
+  ansible.builtin.file:
+    path: "{{ item }}"
+    state: directory
+    owner: root
+    group: root
+    mode: '0700'
+  loop:
+    - /etc/klip
+    - /var/lib/klip
+    - /etc/wireguard
+    - /etc/systemd/journald.conf.d
+- name: Install host safety helper
+  ansible.builtin.copy:
+    src: "{{ klip_repository }}/scripts/infrastructure/node_agent.py"
+    dest: /usr/local/sbin/klip-node
+    owner: root
+    group: root
+    mode: '0700'
+- name: Write allocated host configuration
+  ansible.builtin.copy:
+    content: "{{ klip_node | to_nice_json }}"
+    dest: /etc/klip/node.json
+    owner: root
+    group: root
+    mode: '0600'
+- name: Validate identity, networks, clock and storage capacity
+  ansible.builtin.command: python3 /usr/local/sbin/klip-node preflight
+  changed_when: false
+- name: Install Ubuntu host prerequisites
+  ansible.builtin.apt:
+    name: [ca-certificates, curl, gnupg, wireguard-tools, iptables, conntrack, tcpdump, socat, e2fsprogs, nvme-cli]
+    state: present
+    update_cache: true
+    cache_valid_time: 3600
+- name: Set the stable Kubernetes hostname
+  ansible.builtin.hostname:
+    name: "{{ inventory_hostname }}"
+- name: Disable active swap
+  ansible.builtin.command: swapoff -a
+  when: ansible_facts.swaptotal_mb > 0
+  changed_when: true
+- name: Disable persistent swap entries
+  ansible.builtin.lineinfile:
+    path: /etc/fstab
+    regexp: '^([^#].*\sswap\s.*)$'
+    line: '# disabled by klip: \1'
+    backrefs: true
+- name: Load required kernel modules persistently
+  ansible.builtin.copy:
+    content: "overlay\nbr_netfilter\nwireguard\n"
+    dest: /etc/modules-load.d/klip.conf
+    mode: '0644'
+- name: Load required kernel modules now
+  ansible.builtin.command:
+    argv: [modprobe, '{{ item }}']
+  loop: [overlay, br_netfilter, wireguard]
+  changed_when: false
+- name: Configure forwarding and routed return paths
+  ansible.builtin.copy:
+    dest: /etc/sysctl.d/90-klip.conf
+    content: |
+      net.ipv4.ip_forward=1
+      net.bridge.bridge-nf-call-iptables=1
+      net.ipv4.conf.all.rp_filter=2
+      net.ipv4.conf.default.rp_filter=2
+    mode: '0644'
+  notify: Apply host networking parameters
+- name: Bound persistent system logs
+  ansible.builtin.copy:
+    dest: /etc/systemd/journald.conf.d/klip.conf
+    content: "[Journal]\nSystemMaxUse=512M\nRuntimeMaxUse=128M\n"
+    mode: '0644'
+  notify: Restart journald

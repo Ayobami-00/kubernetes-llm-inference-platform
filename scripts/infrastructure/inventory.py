@@ -236,7 +236,9 @@ def shared_inventory(
     )
 
 
-def verify_ca(ca_bundle: Path, api_endpoint: str) -> str:
+def verify_ca(
+    ca_bundle: Path, api_endpoint: str, connect_address: tuple[str, int] | None = None
+) -> str:
     if not ca_bundle.is_file() or "PRIVATE KEY" in ca_bundle.read_text():
         raise ValueError("Supply an existing public CA certificate, never a private key")
     output = run(["openssl", "x509", "-in", str(ca_bundle), "-noout", "-text", "-checkend", "0"])
@@ -245,7 +247,7 @@ def verify_ca(ca_bundle: Path, api_endpoint: str) -> str:
     endpoint = urlparse(api_endpoint)
     context = ssl.create_default_context(cafile=str(ca_bundle))
     with socket.create_connection(
-        (endpoint.hostname, endpoint.port or 443), timeout=10
+        connect_address or (endpoint.hostname, endpoint.port or 443), timeout=10
     ) as connection:
         with context.wrap_socket(connection, server_hostname=endpoint.hostname):
             pass

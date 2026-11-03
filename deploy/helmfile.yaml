@@ -1,0 +1,23 @@
+repositories: []
+releases:
+  - name: cilium
+    namespace: kube-system
+    chart: ../artifacts/platform/charts/cilium
+    version: 1.20.4
+    wait: true
+    timeout: 600
+    values:
+      - values/cilium.yaml
+  - name: metrics-server
+    namespace: kube-system
+    chart: ../artifacts/platform/charts/metrics-server
+    version: 3.14.0
+    wait: true
+    timeout: 300
+    values:
+      - values/metrics-server.yaml
+  - name: metadata-guard
+    namespace: kube-system
+    chart: releases/metadata-guard
+    version: 0.1.0
+    wait: true

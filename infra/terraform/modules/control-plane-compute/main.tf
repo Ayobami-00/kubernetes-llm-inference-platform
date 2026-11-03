@@ -15,6 +15,11 @@ resource "aws_iam_role_policy_attachment" "ssm" {
   policy_arn = "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
 }
 
+resource "aws_iam_role_policy_attachment" "backups" {
+  role       = aws_iam_role.node.name
+  policy_arn = replace(var.permissions_boundary_arn, "kubernetes-llm-control-plane-boundary", "kubernetes-llm-node-backup")
+}
+
 resource "aws_iam_instance_profile" "node" {
   name = "klip-control-plane"
   path = "/kubernetes-llm-inference-platform/"

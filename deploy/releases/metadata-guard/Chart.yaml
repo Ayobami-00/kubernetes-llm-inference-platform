@@ -1,0 +1,5 @@
+apiVersion: v2
+name: metadata-guard
+description: Deny workload access to host instance metadata through Cilium enforcement
+type: application
+version: 0.1.0

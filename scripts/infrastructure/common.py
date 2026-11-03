@@ -5,6 +5,7 @@ from __future__ import annotations
 import hashlib
 import json
 import os
+import platform
 import shutil
 import subprocess
 import tempfile
@@ -18,16 +19,22 @@ ROOTS = {
     "bootstrap": TERRAFORM / "state-bootstrap",
     "foundation": TERRAFORM / "environments/aws-foundation",
     "dns": TERRAFORM / "environments/inference-dns",
+    "backups": TERRAFORM / "environments/cluster-backups",
+    "probe": TERRAFORM / "environments/network-probe",
 }
 STATE_KEYS = {
     "bootstrap": "state-bootstrap/terraform.tfstate",
     "foundation": "aws-foundation/terraform.tfstate",
     "dns": "inference-dns/terraform.tfstate",
+    "backups": "cluster-backups/terraform.tfstate",
+    "probe": "network-probe/terraform.tfstate",
 }
 PROFILES = {
     "bootstrap": "kubernetes-llm-bootstrap",
     "foundation": "kubernetes-llm-foundation",
     "dns": "kubernetes-llm-dns",
+    "backups": "kubernetes-llm-foundation",
+    "probe": "kubernetes-llm-foundation",
 }
 
 
@@ -86,6 +93,9 @@ def environment(profile: str) -> dict[str, str]:
             "AWS_CLI_AUTO_PROMPT": "off",
             "TF_IN_AUTOMATION": "1",
             "TF_INPUT": "0",
+            "PATH": str(ROOT / "artifacts/tools/bin") + os.pathsep + result.get("PATH", ""),
+            "LC_ALL": "en_US.UTF-8" if platform.system() == "Darwin" else "C.UTF-8",
+            "ANSIBLE_HOME": str(ROOT / "artifacts/ansible"),
             "TF_PLUGIN_CACHE_DIR": str(ROOT / "artifacts/terraform-provider-cache"),
         }
     )
@@ -153,7 +163,7 @@ class Aws:
         else:
             name = (
                 "kubernetes-llm-foundation-deployer"
-                if root == "foundation"
+                if root in {"foundation", "backups", "probe"}
                 else "kubernetes-llm-inference-dns-deployer"
             )
             valid = identity["Arn"].startswith(
@@ -188,6 +198,8 @@ def source_digest() -> str:
         and (path.suffix in {".tf", ".json"} or path.name == ".terraform.lock.hcl")
     )
     paths += sorted((ROOT / "scripts/infrastructure").glob("*.py"))
+    for folder in (ROOT / "infra/ansible", ROOT / "deploy"):
+        paths += sorted(path for path in folder.rglob("*") if path.is_file())
     digest = hashlib.sha256()
     for path in paths:
         digest.update(str(path.relative_to(ROOT)).encode())

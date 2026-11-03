@@ -29,7 +29,8 @@
       ],
       "Resource": [
         "arn:aws:ssm:eu-west-2::document/AWS-RunShellScript",
-        "arn:aws:ssm:eu-west-2::document/AWS-StartSSHSession"
+        "arn:aws:ssm:eu-west-2::document/AWS-StartSSHSession",
+        "arn:aws:ssm:eu-west-2::document/AWS-StartPortForwardingSessionToRemoteHost"
       ],
       "Condition": {
         "StringEquals": {

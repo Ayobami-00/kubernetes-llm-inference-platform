@@ -1,5 +1,5 @@
 UV ?= uv
-PYTHON = $(UV) run --locked --package platform-contracts python
+PYTHON = $(UV) run --locked --group infrastructure python
 OPERATOR = $(PYTHON) scripts/infrastructure/manage.py
 
 .PHONY: infra-tools infra-policies infra-check infra-lock infra-profiles infra-bootstrap-plan infra-bootstrap-apply infra-plan infra-preview infra-apply infra-smoke infra-export infra-verify infra-dns-plan infra-dns-preview infra-dns-apply infra-destroy-plan infra-destroy
@@ -63,3 +63,26 @@ infra-destroy-plan:
 infra-destroy:
 	@test -n "$(PLAN_SHA)" || (echo 'Set PLAN_SHA to the reviewed teardown plan digest'; exit 1)
 	$(OPERATOR) destroy --approve-plan "$(PLAN_SHA)"
+
+.PHONY: cluster-tools cluster-check cluster-preflight cluster-prepare cluster-mesh cluster-bootstrap cluster-deploy cluster-verify cluster-backup cluster-acceptance
+cluster-tools:
+	$(UV) sync --locked --all-packages --group infrastructure
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/platform_artifacts.py install --all-targets
+cluster-check:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster_checks.py
+cluster-preflight:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py preflight
+cluster-prepare:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py prepare
+cluster-mesh:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py mesh $(CLUSTER_ARGS)
+cluster-bootstrap:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py bootstrap
+cluster-deploy:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py deploy
+cluster-verify:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py verify
+cluster-backup:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py backup
+cluster-acceptance:
+	$(UV) run --locked --group infrastructure python scripts/infrastructure/cluster.py acceptance

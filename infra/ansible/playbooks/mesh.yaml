@@ -1,0 +1,6 @@
+---
+- name: Reconcile the versioned direct peer mesh
+  hosts: all
+  become: true
+  roles:
+    - klip_wireguard

@@ -59,6 +59,7 @@ def main() -> None:
     modules = sorted((TERRAFORM / "modules").iterdir())
     with tempfile.TemporaryDirectory(prefix="klip-terraform-checks-") as temporary:
         check_terraform([*ROOTS.values(), *modules], temporary, args.lock_platforms)
+    check_command([sys.executable, "scripts/infrastructure/cluster_checks.py"])
     check_command([sys.executable, "-m", "pytest", "-q"])
     check_command([str(ROOT / ".venv/bin/ruff"), "check", "."])
     check_command([str(ROOT / ".venv/bin/ruff"), "format", "--check", "."])

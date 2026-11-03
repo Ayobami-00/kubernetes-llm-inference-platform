@@ -1,0 +1,14 @@
+---
+all:
+  vars:
+    klip_fixture: true
+    ansible_user: ubuntu
+  children:
+    control_plane:
+      hosts:
+        cp-01:
+          ansible_host: cp-01.inventory.invalid
+        cp-02:
+          ansible_host: cp-02.inventory.invalid
+        cp-03:
+          ansible_host: cp-03.inventory.invalid

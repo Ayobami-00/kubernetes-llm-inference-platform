@@ -43,7 +43,8 @@
         "iam:PutRolePermissionsBoundary"
       ],
       "Resource": [
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
       ],
       "Condition": {
         "StringEquals": {
@@ -68,7 +69,8 @@
         "iam:ListInstanceProfilesForRole"
       ],
       "Resource": [
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
       ]
     },
     {
@@ -79,11 +81,28 @@
         "iam:DetachRolePolicy"
       ],
       "Resource": [
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
       ],
       "Condition": {
         "ArnEquals": {
           "iam:PolicyARN": "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        }
+      }
+    },
+    {
+      "Sid": "AttachOnlyNodeBackup",
+      "Effect": "Allow",
+      "Action": [
+        "iam:AttachRolePolicy",
+        "iam:DetachRolePolicy"
+      ],
+      "Resource": [
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+      ],
+      "Condition": {
+        "ArnEquals": {
+          "iam:PolicyARN": "arn:aws:iam::127811062476:policy/kubernetes-llm-inference-platform/kubernetes-llm-node-backup"
         }
       }
     },
@@ -94,7 +113,8 @@
         "iam:PassRole"
       ],
       "Resource": [
-        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane"
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-control-plane",
+        "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-network-probe"
       ],
       "Condition": {
         "StringEquals": {
@@ -116,7 +136,8 @@
         "iam:ListInstanceProfileTags"
       ],
       "Resource": [
-        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-control-plane"
+        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-control-plane",
+        "arn:aws:iam::127811062476:instance-profile/kubernetes-llm-inference-platform/klip-network-probe"
       ]
     },
     {
@@ -128,7 +149,8 @@
       ],
       "Resource": [
         "arn:aws:iam::127811062476:policy/kubernetes-llm-inference-platform/kubernetes-llm-control-plane-boundary",
-        "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore"
+        "arn:aws:iam::aws:policy/AmazonSSMManagedInstanceCore",
+        "arn:aws:iam::127811062476:policy/kubernetes-llm-inference-platform/kubernetes-llm-node-backup"
       ]
     },
     {

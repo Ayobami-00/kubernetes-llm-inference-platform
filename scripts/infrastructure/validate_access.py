@@ -60,7 +60,7 @@ def main() -> None:
         passed = (result["EvalDecision"] == "allowed") == expected
         checks.append({"name": label, "passed": passed, "evaluation": result})
 
-    foundation = ["network", "compute", "api", "identity-state", "operations"]
+    foundation = ["network", "compute", "api", "identity-state", "operations", "backups"]
     regional = {"aws:RequestedRegion": ("string", [region])}
     for action in ("ec2:CreateSubnet", "ec2:CreateRouteTable", "ec2:CreateSecurityGroup"):
         for project, expected in ((PROJECT, True), ("unrelated", False)):
@@ -192,6 +192,31 @@ def main() -> None:
     simulate(
         "DNS state write", ["dns"], "s3:PutObject", state + "/inference-dns/terraform.tfstate", True
     )
+    bucket = f"arn:aws:s3:::klip-backups-{account}-{region}"
+    principal = "AROAEXAMPLE:i-00000000000000001"
+    own = bucket + "/clusters/klip/" + principal + "/snapshot.age"
+    foreign = bucket + "/clusters/klip/" + principal.replace("00001", "00002") + "/snapshot.age"
+    context = {"aws:userid": ("string", [principal]), **regional}
+    for name in ("node-backup", "node-boundary"):
+        simulate(f"{name} own upload", [name], "s3:PutObject", own, True, context)
+        simulate(f"{name} other node denied", [name], "s3:PutObject", foreign, False, context)
+        simulate(f"{name} read denied", [name], "s3:GetObject", own, False, context)
+        simulate(f"{name} delete denied", [name], "s3:DeleteObject", own, False, context)
+    simulate(
+        "backup state write",
+        foundation,
+        "s3:PutObject",
+        state + "/cluster-backups/terraform.tfstate",
+        True,
+    )
+    simulate(
+        "probe state write",
+        foundation,
+        "s3:PutObject",
+        state + "/network-probe/terraform.tfstate",
+        True,
+    )
+    simulate("retained backup bucket deletion denied", foundation, "s3:DeleteBucket", bucket, False)
     report = {"observed_at": utc_now(), "findings": findings, "simulations": checks}
     write_private(state_home() / "reports/iam-validation.json", report)
     if any(findings.values()) or not all(item["passed"] for item in checks):

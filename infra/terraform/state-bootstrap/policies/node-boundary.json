@@ -2,6 +2,16 @@
   "Version": "2012-10-17",
   "Statement": [
     {
+      "Sid": "UploadOwnRecoveryBundle",
+      "Effect": "Allow",
+      "Action": [
+        "s3:PutObject"
+      ],
+      "Resource": [
+        "arn:aws:s3:::klip-backups-127811062476-eu-west-2/clusters/klip/${aws:userid}/*"
+      ]
+    },
+    {
       "Sid": "RegionalSsmAgentCore",
       "Effect": "Allow",
       "Action": [

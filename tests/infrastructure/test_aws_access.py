@@ -85,7 +85,8 @@ def test_role_creation_and_passrole_cannot_escape_node_boundary(documents):
     statements = documents["identity-state"]["Statement"]
     create = next(item for item in statements if item["Sid"] == "CreateBoundedNodeRole")
     assert create["Resource"] == [
-        f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-control-plane"
+        f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-control-plane",
+        f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-network-probe",
     ]
     assert create["Condition"]["StringEquals"]["iam:PermissionsBoundary"].endswith(
         "/kubernetes-llm-control-plane-boundary"
@@ -93,6 +94,22 @@ def test_role_creation_and_passrole_cannot_escape_node_boundary(documents):
     pass_role = next(item for item in statements if item["Sid"] == "PassOnlyNodeRoleToEc2")
     assert pass_role["Resource"] == create["Resource"]
     assert pass_role["Condition"] == {"StringEquals": {"iam:PassedToService": "ec2.amazonaws.com"}}
+
+
+def test_backup_grant_has_instance_specific_write_only_prefix(documents):
+    grant = documents["node-backup"]["Statement"]
+    assert len(grant) == 1
+    assert grant[0]["Action"] == ["s3:PutObject"]
+    assert grant[0]["Resource"] == [
+        f"arn:aws:s3:::klip-backups-{ACCOUNT}-eu-west-2/clusters/klip/${{aws:userid}}/*"
+    ]
+    attach = next(
+        item
+        for item in documents["identity-state"]["Statement"]
+        if item["Sid"] == "AttachOnlyNodeBackup"
+    )
+    assert len(attach["Resource"]) == 1
+    assert attach["Resource"][0].endswith("/klip-control-plane")
 
 
 def test_state_deletion_is_limited_to_foundation_lock(documents):

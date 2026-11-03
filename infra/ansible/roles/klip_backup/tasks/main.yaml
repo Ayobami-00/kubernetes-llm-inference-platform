@@ -1,0 +1,55 @@
+---
+- name: Require verified recovery key custody
+  ansible.builtin.assert:
+    that:
+      - klip_recovery_key_verified | bool
+      - klip_node.backup_recipient is match('^age1[0-9a-z]+$')
+- name: Create encryption tool directory
+  ansible.builtin.file:
+    path: /opt/klip/age-1.3.2
+    state: directory
+    mode: '0755'
+- name: Unpack verified age release
+  ansible.builtin.unarchive:
+    src: '{{ klip_repository }}/artifacts/platform/age-linux-amd64'
+    dest: /opt/klip/age-1.3.2
+    creates: /opt/klip/age-1.3.2/age/age
+- name: Select the encryption binary
+  ansible.builtin.file:
+    src: /opt/klip/age-1.3.2/age/age
+    dest: /usr/local/bin/age
+    state: link
+- name: Install backup service
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/klip-etcd-backup.service
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Encrypted KLIP etcd recovery bundle
+      RequiresMountsFor=/var/lib/etcd
+      After=network-online.target kubelet.service
+      [Service]
+      Type=oneshot
+      UMask=0077
+      ExecStart=/usr/bin/python3 /usr/local/sbin/klip-node backup
+      TimeoutStartSec=10min
+      Nice=10
+- name: Install staggered daily backup timer
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/klip-etcd-backup.timer
+    mode: '0644'
+    content: |
+      [Unit]
+      Description=Daily etcd backup
+      [Timer]
+      OnCalendar=*-*-* 02:{{ '%02d' | format((inventory_hostname[-2:] | int - 1) * 15) }}:00 UTC
+      Persistent=true
+      RandomizedDelaySec=60
+      [Install]
+      WantedBy=timers.target
+- name: Enable daily backups
+  ansible.builtin.systemd_service:
+    name: klip-etcd-backup.timer
+    enabled: true
+    state: started
+    daemon_reload: true

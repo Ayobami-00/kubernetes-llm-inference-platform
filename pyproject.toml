@@ -10,8 +10,12 @@ package = false
 [tool.uv.workspace]
 members = ["packages/platform-contracts"]
 
+[tool.uv.sources]
+platform-contracts = { workspace = true }
+
 [dependency-groups]
 dev = ["pytest>=8,<10", "ruff>=0.9,<1", "jsonschema>=4,<5"]
+infrastructure = ["ansible-core==2.21.6", "ansible-lint==26.10.1", "platform-contracts"]
 
 [tool.pytest.ini_options]
 testpaths = ["packages/platform-contracts/tests", "tests/infrastructure"]

@@ -1,0 +1,19 @@
+---
+- name: Mount only the verified separate etcd volume
+  ansible.builtin.command: python3 /usr/local/sbin/klip-node storage
+  register: klip_storage_result
+  changed_when: "(klip_storage_result.stdout | from_json).action == 'format-empty'"
+- name: Create kubelet unit drop-in directory
+  ansible.builtin.file:
+    path: /etc/systemd/system/kubelet.service.d
+    state: directory
+    mode: '0755'
+- name: Prevent kubelet from using an absent etcd mount
+  ansible.builtin.copy:
+    dest: /etc/systemd/system/kubelet.service.d/20-klip-storage.conf
+    content: |
+      [Unit]
+      RequiresMountsFor=/var/lib/etcd
+      [Service]
+      ExecStartPre=/usr/bin/mountpoint -q /var/lib/etcd
+    mode: '0644'
