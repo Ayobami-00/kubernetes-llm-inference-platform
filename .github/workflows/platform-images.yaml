@@ -10,6 +10,17 @@ on:
       - 'apps/management/web/Dockerfile'
       - 'workload-runner/Dockerfile'
       - 'dev/inference-stub/Dockerfile'
+      - 'packages/**'
+      - 'workload-runner/**'
+      - 'dev/inference-stub/**'
+      - 'apps/management/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.dockerignore'
+      - 'configs/**'
+      - 'datasets/manifests/**'
+      - 'contracts/fixtures/**'
+      - 'scripts/management/stage_workspace.py'
   workflow_dispatch:
 
 permissions:

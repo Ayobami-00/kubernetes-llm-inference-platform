@@ -107,6 +107,26 @@ kubelet configuration, kubeadm flags and user argument files matched their
 pre-install hashes. Database/node checks passed between updates. No control-plane
 kubelet was changed. This evidence is separate from actual private-pull acceptance.
 
+Actual pull acceptance subsequently passed at 18:34:16 UTC (operation
+`308dd332f9bc`). The patched backend image ran on all three hosts using the explicit
+probe account. A missing annotation and the same account name in a different
+namespace were denied. All probes used `Always`, including when image bytes were
+already cached. They had no listener, credentials, volumes or service-account
+mount. All five Jobs/Pods and the temporary namespace were removed through
+UID-conditional deletion; cleanup is confirmed. An initial probe-harness race
+between completed Pod and delayed Job status was corrected with a regression
+test; the earlier test objects were also cleaned up.
+
+```sh
+uv run --locked --group infra python scripts/infrastructure/image_pull_acceptance.py \
+  --image <verified-backend-repository@sha256:digest>
+```
+
+The verifier records mutation intents and UIDs before advancing, reconciles an
+ambiguous create by reading its exact ownership annotation, and never interprets
+network failure as identity denial. It retains failures and incomplete cleanup.
+This proves the tested pull path; it does not deploy an application or prove its HA.
+
 ## CI publication
 
 The first private-branch CI identity audit verified GitHub's signature, issuer,
@@ -153,6 +173,15 @@ See the vendor [OpenSSL](https://security-tracker.debian.org/tracker/CVE-2026-75
 [Perl](https://security-tracker.debian.org/tracker/CVE-2026-42496) and
 [Nginx](https://nginx.org/en/security_advisories.html) advisories. A version upgrade
 alone does not establish that every finding has been resolved.
+
+The Python 3.12.16 backend rescan removed all six critical findings, with eight
+high findings still awaiting vendor/applicability review. Nginx 1.30.6's full Alpine
+variant still included vulnerable curl/brotli packages; the next recipe uses the
+upstream digest-pinned `alpine-slim` variant without those optional runtime
+packages/modules. Its scan and browser/runtime checks remain required. The
+publication workflow watches actual application, contract and configuration
+inputs as well as Dockerfiles, so source changes cannot silently leave an old
+image as the proposed deployment.
 
 Clean-checkout CI also exercises the OCI chart fetch. Helm may choose a filename
 different from the lock's cache name when pulling by digest. The fetcher downloads

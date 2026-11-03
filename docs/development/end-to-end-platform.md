@@ -262,3 +262,13 @@ The namespace-only pull-audience release is installed. At source `9567a39`, priv
 publication, contract CI, infrastructure CI and every management CI job (including
 the previously failing browser navigation) are green. Actual runner-Job integration
 CI is still running; patched-base rebuilds require their own results.
+
+The remaining `9567a39` workload CI has now passed too: all seven actual AIPerf
+scenario paths completed through management in Kind, alongside container/CPU
+integration checks. Live private-pull acceptance also passed five checks (three
+worker pulls and two wrong-identity denials), with complete UID-bound cleanup.
+The patched Python backend scan has zero critical findings but eight high findings
+to review. The full newer Nginx image still had vulnerable unused packages, so the
+frontend now selects its pinned upstream slim variant pending a fresh scan and
+runtime/browser checks. Management application deployment and HA acceptance remain
+outstanding; none of these isolated checks are live inference/SLO evidence.
