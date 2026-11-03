@@ -11,3 +11,9 @@ datasets/raw/
 datasets/prepared/
 .env
 .DS_Store
+
+node_modules/
+.secrets/
+playwright-report/
+test-results/
+*.tsbuildinfo

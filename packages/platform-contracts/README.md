@@ -25,8 +25,8 @@ missing dataset references, incompatible interactions and traffic outside the cu
 
 `build_run_snapshot(catalog, scenario_ref, bindings, ...)` resolves all participants, dataset manifests,
 serving profiles and worker groups. It includes defaults and makes an independent copy of inputs,
-versions, inventory and schedule metadata. Persist the snapshot once before execution; database
-write protection and published-revision enforcement belong to the future backend. Editing a
+versions, inventory and schedule metadata. Persist the snapshot once before execution; the management
+backend owns database write protection and published-revision enforcement. Editing a
 published configuration requires a new revision rather than rewriting historical inputs.
 
 `validate_for_execution(snapshot)` checks that draft placeholders have been resolved: prepared
@@ -72,7 +72,7 @@ The preparer must also record a real artifact checksum; this package does not re
   and routing enforcement remain deployment work.
 - Worker TTL starts at the first confirmed allocation, includes bootstrap/model loading, and does
   not reset on retry. Renewal is explicit. `expired` is a final observation with termination
-  confirmed; use `draining` during cleanup. GPU-ready is distinct from model-serving-ready.
+  confirmed; use `draining` during cleanup. Manual deletion uses `deleted` only after all members are confirmed terminated. GPU-ready is distinct from model-serving-ready.
 - Member identities include the provider instance ID and, after joining, the Kubernetes name and
   UID. Allocatable GPUs are distinct from allocated GPUs and provider availability.
 - Operation `completed` means the requested action finished, including required cleanup. A failed

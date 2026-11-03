@@ -1,0 +1,16 @@
+#!/usr/bin/env bash
+set -euo pipefail
+cd "$(dirname "$0")/.."
+umask 077
+mkdir -p dev/.secrets
+chmod 700 dev/.secrets
+if [[ ! -s dev/.secrets/admin_password ]]; then
+  read -r -s -p 'Choose the admin password: ' management_password
+  printf '\n'
+  [[ -n "$management_password" ]] || { printf 'Password is required.\n'; exit 1; }
+  printf '%s' "$management_password" > dev/.secrets/admin_password
+  unset management_password
+fi
+[[ -f dev/.secrets/lambda_api_key ]] || touch dev/.secrets/lambda_api_key
+docker compose -f dev/compose.yaml up --build -d --wait
+printf '\nManagement application: http://localhost:5173\nUsername: admin\n'

@@ -1,0 +1,62 @@
+name: Management application
+on: [push, pull_request]
+permissions:
+  contents: read
+jobs:
+  backend:
+    runs-on: ubuntu-latest
+    services:
+      postgres:
+        image: postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+        env:
+          POSTGRES_USER: management
+          POSTGRES_PASSWORD: management
+          POSTGRES_DB: management
+        ports: ['55432:5432']
+        options: >-
+          --health-cmd "pg_isready -U management" --health-interval 3s
+          --health-timeout 3s --health-retries 20
+    steps:
+      - uses: actions/checkout@v4
+      - uses: astral-sh/setup-uv@v6
+        with: {python-version: '3.12', enable-cache: true}
+      - run: uv sync --locked --all-packages
+      - run: uv run --locked --package platform-management ruff check .
+      - run: uv run --locked --package platform-management ruff format --check .
+      - run: uv run --locked --package platform-management pytest packages/platform-contracts/tests apps/management/backend/tests
+      - run: bash scripts/check-generated.sh
+      - run: uv run --locked --package platform-management python scripts/export-management.py --check
+  web:
+    runs-on: ubuntu-latest
+    defaults:
+      run: {working-directory: apps/management/web}
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '24'
+          cache: npm
+          cache-dependency-path: apps/management/web/package-lock.json
+      - run: npm ci
+      - run: npm run generate
+      - run: git diff --exit-code -- src/api/generated
+      - run: npm run format:check
+      - run: npm run build
+      - run: npm test
+      - run: npx playwright install --with-deps chromium
+      - name: Start complete local stack
+        working-directory: .
+        run: |
+          mkdir -p dev/.secrets
+          umask 077
+          openssl rand -base64 32 > dev/.secrets/admin_password
+          touch dev/.secrets/lambda_api_key
+          docker compose -f dev/compose.yaml up --build -d --wait
+      - run: npm run test:e2e
+      - if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: management-browser-results
+          path: |
+            artifacts/management
+            apps/management/web/test-results

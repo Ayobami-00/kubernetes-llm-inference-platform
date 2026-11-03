@@ -59,7 +59,14 @@ class WorkerCounts(ContractModel):
 class WorkerGroupStatus(ContractModel):
     worker_group_ref: RevisionRef
     phase: Literal[
-        "allocating", "joining", "ready", "partial_failure", "draining", "expired", "failed"
+        "allocating",
+        "joining",
+        "ready",
+        "partial_failure",
+        "draining",
+        "expired",
+        "deleted",
+        "failed",
     ]
     counts: WorkerCounts
     members: tuple[WorkerMember, ...] = ()
@@ -94,6 +101,8 @@ class WorkerGroupStatus(ContractModel):
         if self.allocated_at is not None:
             if self.expires_at <= self.allocated_at or self.observed_at < self.allocated_at:
                 raise ValueError("invalid allocation, observation, or expiry ordering")
+        if self.phase == "deleted" and active:
+            raise ValueError("deleted status requires confirmed termination")
         if self.phase == "expired":
             if active or self.expires_at is None or self.observed_at < self.expires_at:
                 raise ValueError(

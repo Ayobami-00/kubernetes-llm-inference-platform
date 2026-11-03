@@ -103,5 +103,22 @@ JSON Schemas from the Python models; do not edit the exported schemas by hand:
 uv run --locked --package platform-contracts python scripts/export-contracts.py
 ```
 
-CI runs the same checks and rejects schema drift. Management OpenAPI and a generated TypeScript
-client will be added when the management API routes exist.
+CI runs the same checks and rejects schema drift. The management API exports OpenAPI from its real routes and generates a TypeScript client; see the
+management development guide below for regeneration and drift checks.
+
+## Management application
+
+Stream C adds Stratum, a graph-based local management workspace with authenticated configuration
+authoring, immutable revisions, durable operations, live Lambda inventory and labelled simulation.
+
+```bash
+./dev/start
+```
+
+The startup command prompts for the `admin` password on first use, migrates PostgreSQL and seeds
+examples. Open [localhost:5173](http://localhost:5173). See the
+[development guide](docs/development/management.md) and
+[recovery runbook](docs/runbooks/management-recovery.md) for workflows, secrets and verification.
+
+Lambda observations are read-only. Allocation, cluster and runner workflows use persisted simulation
+adapters until downstream integrations are supplied. Synthetic results are not measured performance.

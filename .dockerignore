@@ -1,0 +1,15 @@
+.git
+.venv
+**/node_modules
+**/.secrets
+**/dist
+**/__pycache__
+**/test-results
+**/playwright-report
+artifacts
+datasets/raw
+datasets/prepared
+
+**/.env
+**/.env.*
+!dev/.env.example

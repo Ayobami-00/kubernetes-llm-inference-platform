@@ -187,6 +187,7 @@
         "partial_failure",
         "draining",
         "expired",
+        "deleted",
         "failed"
       ],
       "title": "Phase",

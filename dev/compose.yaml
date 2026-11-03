@@ -1,0 +1,67 @@
+name: inference-management
+x-backend: &backend
+  image: inference-management-backend:local
+  build:
+    context: ..
+    dockerfile: apps/management/backend/Dockerfile
+  environment: &environment
+    MANAGEMENT_DATABASE_URL: postgresql+psycopg://management:management@db:5432/management
+    MANAGEMENT_ADMIN_PASSWORD_FILE: /run/secrets/admin_password
+    MANAGEMENT_LAMBDA_API_KEY_FILE: /run/secrets/lambda_api_key
+    MANAGEMENT_ALLOWED_ORIGIN: http://localhost:5173
+  secrets: [admin_password, lambda_api_key]
+  volumes:
+    - ../apps/management/backend/src:/app/apps/management/backend/src:ro
+services:
+  db:
+    image: postgres:17.11-bookworm@sha256:839fbb5a4942a7758dd93e18b42ea5649807491a0545b5eeeb8f0b8bb11857a5
+    environment:
+      POSTGRES_DB: management
+      POSTGRES_USER: management
+      POSTGRES_PASSWORD: management
+    volumes: [postgres_data:/var/lib/postgresql/data]
+    ports: ['127.0.0.1:55432:5432']
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U management -d management']
+      interval: 2s
+      timeout: 3s
+      retries: 30
+  init:
+    <<: *backend
+    command: ['sh', '-c', 'alembic -c apps/management/backend/alembic.ini upgrade head && management-init']
+    depends_on:
+      db: {condition: service_healthy}
+  api:
+    <<: *backend
+    command: ['uvicorn', 'platform_management.api.app:app', '--host', '0.0.0.0', '--port', '8000', '--reload']
+    ports: ['127.0.0.1:58000:8000']
+    depends_on:
+      init: {condition: service_completed_successfully}
+    healthcheck:
+      test: ['CMD', 'python', '-c', 'import urllib.request; urllib.request.urlopen("http://localhost:8000/health/ready")']
+      interval: 3s
+      timeout: 3s
+      retries: 30
+  worker:
+    <<: *backend
+    command: ['management-worker']
+    depends_on:
+      init: {condition: service_completed_successfully}
+  web:
+    build:
+      context: ..
+      dockerfile: apps/management/web/Dockerfile
+    environment:
+      API_PROXY_TARGET: http://api:8000
+    ports: ['127.0.0.1:5173:5173']
+    volumes:
+      - ../apps/management/web/src:/web/src:ro
+    depends_on:
+      api: {condition: service_healthy}
+volumes:
+  postgres_data:
+secrets:
+  admin_password:
+    file: .secrets/admin_password
+  lambda_api_key:
+    file: .secrets/lambda_api_key

@@ -5,13 +5,13 @@ models. Python models are authoritative. `additionalProperties: false` rejects u
 cross-record, timestamp-ordering and arithmetic rules are additionally enforced by Pydantic and
 the shared validators, because JSON Schema alone does not encode all those checks.
 
-`fixtures/` contains 33 synthetic runtime records:
+`fixtures/` contains 34 synthetic runtime records:
 
 - Five customer folders each have queued, completed passing, completed violating and insufficient-
   data runs. Each run includes its resolved draft snapshot and has `fixture: true`.
 - Two queued mixed-scenario runs show the complete assignment chains.
 - Three execution cases illustrate failure, cancellation and invalid measurements.
-- Four worker-group cases cover joining, ready, partial failure and expired/terminated capacity.
+- Five worker-group cases cover joining, ready, partial failure, manual deletion and expired/terminated capacity.
 - Three operation cases cover running, completed and failed actions, including pending cleanup.
 - One inventory contains three AWS CPU control-plane nodes and three representative Lambda workers.
 
@@ -33,4 +33,5 @@ bash scripts/check-generated.sh
 ```
 
 The check command never rewrites files. It fails on missing, changed or obsolete schema exports.
-Management OpenAPI and the TypeScript client are intentionally deferred until real routes exist.
+`management.openapi.json` is generated from the real FastAPI routes. The web application generates
+its TypeScript SDK from that document and CI checks both outputs for drift.
