@@ -26,3 +26,8 @@ line-length = 100
 
 [tool.ruff.lint]
 select = ["E", "F", "I", "UP", "B"]
+
+[tool.ruff.lint.isort]
+# This flat operator module also names the observability asset directory.
+# Keep its existing import grouping independent of namespace-package discovery.
+known-third-party = ["observability"]
