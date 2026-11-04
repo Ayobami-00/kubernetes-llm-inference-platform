@@ -9,7 +9,9 @@ import yaml
 from platform_management.services.bootstrap import (
     SCRIPT_V1,
     SCRIPT_V2,
+    SCRIPT_V3,
     SSH_GUARD,
+    SSH_GUARD_V3,
     callback_origin,
     cloud_init,
     fingerprint,
@@ -30,16 +32,43 @@ def test_existing_v1_cloud_init_bytes_remain_compatible_and_v2_sources_are_froze
         == "4e7ebd36d83bbf38e96892264e79c2dfd3583ca74975d4619f1a402599f723ec"
     )
     content = cloud_init(IDENTITY, "a" * 64, ORIGIN, sources=SOURCES)
+    old = cloud_init(IDENTITY, "a" * 64, ORIGIN, sources=SOURCES, program_version=2)
+    assert hashlib.sha256(old.encode()).hexdigest() == (
+        "0cf00d4bd9828ea4e32b21cbb8abe50d4ecab152b6945461a2df1df6f85b88c0"
+    )
     assert content == cloud_init(IDENTITY, "a" * 64, ORIGIN, sources=list(reversed(SOURCES)))
     document = yaml.safe_load(content)
     files = {f["path"]: f for f in document["write_files"]}
     config = json.loads(files["/var/lib/klip/host-attestation.json"]["content"])
     assert config["ssh_sources"] == SOURCES
-    assert files["/var/lib/klip/attest-host.py"]["content"] == SCRIPT_V2
+    assert files["/var/lib/klip/attest-host.py"]["content"] == SCRIPT_V3
     policy = files["/etc/ssh/sshd_config.d/10-klip-bootstrap.conf"]
     assert "AllowUsers ubuntu@8.8.8.1 ubuntu@8.8.8.2 ubuntu@8.8.8.3\n" in policy["content"]
     assert policy["permissions"] == "0600"
     compile(SCRIPT_V2, "attestation-v2", "exec")
+    compile(SCRIPT_V3, "attestation-v3", "exec")
+
+
+def test_v3_starts_native_ssh_service_before_testing_privilege_separation(monkeypatch):
+    import subprocess
+
+    commands = []
+
+    def run(args, **kwargs):
+        if args == ["/usr/sbin/sshd", "-t"]:
+            assert commands == [["systemctl", "start", "ssh"]]
+        commands.append(args)
+
+    effective = (
+        "permitrootlogin no\npasswordauthentication no\nkbdinteractiveauthentication no\n"
+        "allowusers " + " ".join("ubuntu@" + s.split("/")[0] for s in SOURCES) + "\n"
+    )
+    monkeypatch.setattr(subprocess, "run", run)
+    monkeypatch.setattr(subprocess, "check_output", lambda *_a, **_kw: effective)
+    namespace = {}
+    exec(SSH_GUARD_V3, namespace)
+    namespace["check_ssh_sources"](SOURCES)
+    assert commands[-1] == ["systemctl", "reload-or-restart", "ssh"]
 
 
 @pytest.mark.parametrize(
@@ -139,6 +168,53 @@ def test_actual_v2_program_attests_only_after_effective_ssh_guard(monkeypatch, c
     assert bool(removed) is safe
     captured = capsys.readouterr()
     assert "a" * 64 not in captured.out + captured.err
+
+
+def test_actual_v3_program_reports_only_fixed_failure_without_attesting(monkeypatch, capsys):
+    import io
+    import pathlib
+    import subprocess
+    import types
+    import urllib.request
+
+    sent, removed = [], []
+
+    class FakePath:
+        def __init__(self, path):
+            self.path = path
+
+        def read_text(self):
+            assert self.path == "/var/lib/klip/host-attestation.json"
+            return json.dumps(
+                {
+                    "url": ORIGIN + "/api/v1/bootstrap/" + IDENTITY,
+                    "nonce": "a" * 64,
+                    "ssh_sources": SOURCES,
+                }
+            )
+
+        def unlink(self):
+            removed.append(self.path)
+
+    def run(*args, **kwargs):
+        raise subprocess.CalledProcessError(1, args, stderr="sensitive command output")
+
+    def send(request, timeout):
+        sent.append(request)
+        assert request.full_url.endswith("/failure") and timeout == 10
+        assert json.loads(request.data) == {"code": "ssh_policy"}
+        return io.BytesIO(b'{"status":"recorded"}')
+
+    with monkeypatch.context() as patch:
+        patch.setattr(pathlib, "Path", FakePath)
+        patch.setattr(subprocess, "run", run)
+        patch.setattr(urllib.request, "build_opener", lambda *_: types.SimpleNamespace(open=send))
+        with pytest.raises(SystemExit) as result:
+            exec(compile(SCRIPT_V3, "actual-v3-bootstrap", "exec"), {})
+    assert result.value.code == 1 and len(sent) == 1 and not removed
+    captured = capsys.readouterr()
+    assert "a" * 64 not in captured.out + captured.err
+    assert "sensitive command output" not in captured.out + captured.err
 
 
 def key(value=b"a" * 32):

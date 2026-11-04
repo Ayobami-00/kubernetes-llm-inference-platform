@@ -101,13 +101,48 @@ def test_source_restricted_bootstrap_pins_sources_without_rewriting_a_previous_i
     with session() as db:
         value = db.get(ProviderIntent, IDENTITY).payload["bootstrap"]
         assert (
-            value["schema_version"] == "klip-host-attestation.v2"
+            value["schema_version"] == "klip-host-attestation.v3"
             and value["ssh_sources"] == sources
         )
     with pytest.raises(AppError, match="sources changed"):
         issue(IDENTITY, ORIGIN, path, sources=["8.8.8.4/32", *sources[1:]])
     with pytest.raises(AppError, match="sources changed"):
         issue(IDENTITY, ORIGIN, path)
+
+
+@pytest.mark.parametrize("code", ["configuration", "ssh_policy", "host_key", "callback"])
+def test_failure_requires_original_nonce_never_attests_and_is_terminal(client, tmp_path, code):
+    _, _, _, nonce = prepare(tmp_path)
+    route = "/api/v1/bootstrap/" + IDENTITY
+    auth = {"Authorization": "Bearer " + nonce}
+    assert client.post(route + "/failure", json={"code": code}).status_code == 401
+    assert (
+        client.post(route + "/failure", json={"code": "arbitrary-output"}, headers=auth).status_code
+        == 422
+    )
+    first = client.post(route + "/failure", json={"code": code}, headers=auth)
+    assert first.status_code == 200 and first.json()["status"] == "recorded"
+    with session() as db:
+        metadata = db.get(ProviderIntent, IDENTITY).payload["bootstrap"]
+    assert metadata["failure"]["code"] == code and "host_key" not in metadata
+    assert client.post(route + "/failure", json={"code": code}, headers=auth).status_code == 200
+    with session() as db:
+        assert metadata == db.get(ProviderIntent, IDENTITY).payload["bootstrap"]
+    assert client.post(route, json={"host_key": key()}, headers=auth).status_code == 409
+    with session() as db, db.begin():
+        db.get(ProviderIntent, IDENTITY).state = "terminated"
+    assert client.post(route + "/failure", json={"code": code}, headers=auth).status_code == 401
+
+
+def test_failure_cannot_replace_a_trusted_identity(client, tmp_path):
+    _, _, _, nonce = prepare(tmp_path)
+    route = "/api/v1/bootstrap/" + IDENTITY
+    auth = {"Authorization": "Bearer " + nonce}
+    assert client.post(route, json={"host_key": key()}, headers=auth).status_code == 200
+    assert (
+        client.post(route + "/failure", json={"code": "ssh_policy"}, headers=auth).status_code
+        == 409
+    )
 
 
 @pytest.mark.parametrize("state", ["pending", "rejected", "terminated"])

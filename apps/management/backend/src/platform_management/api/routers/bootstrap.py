@@ -28,6 +28,29 @@ class HostAttestationAccepted(ContractModel):
     fingerprint: str
 
 
+class BootstrapFailure(ContractModel):
+    code: Literal["configuration", "ssh_policy", "host_key", "callback"]
+
+
+class BootstrapFailureRecorded(ContractModel):
+    status: Literal["recorded"]
+
+
+@router.post(
+    "/{identity}/failure",
+    response_model=BootstrapFailureRecorded,
+    operation_id="reportBootstrapFailure",
+)
+def failure(
+    identity: Annotated[str, Path(pattern=r"^op-[a-f0-9]{16,32}$")],
+    body: BootstrapFailure,
+    db: Db,
+    authorization: Annotated[HTTPAuthorizationCredentials | None, Depends(bootstrap_auth)],
+):
+    nonce = authorization.credentials if authorization else ""
+    return bootstrap.report_failure(db, identity, nonce, body.code)
+
+
 @router.post("/{identity}", response_model=HostAttestationAccepted, operation_id="attestHost")
 def attest(
     identity: Annotated[str, Path(pattern=r"^op-[a-f0-9]{16,32}$")],

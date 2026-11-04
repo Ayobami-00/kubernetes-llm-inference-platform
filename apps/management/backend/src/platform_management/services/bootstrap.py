@@ -85,6 +85,47 @@ SCRIPT_V2 = (
     ).replace("except (ValueError, KeyError, OSError):", "except Exception:")
 )
 
+# Preserve V1/V2 bytes: already issued launch plans bind their exact program hash.
+SSH_GUARD_V3 = SSH_GUARD.replace(
+    "    subprocess.run(['/usr/sbin/sshd','-t']",
+    "    subprocess.run(['systemctl','start','ssh'],check=True,\n"
+    "                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)\n"
+    "    subprocess.run(['/usr/sbin/sshd','-t']",
+    1,
+)
+
+SCRIPT_V3 = (
+    SSH_GUARD_V3
+    + "\n"
+    + SCRIPT_V1.replace(
+        "    key = ' '.join",
+        "    stage = 'ssh_policy'\n"
+        "    check_ssh_sources(config['ssh_sources'])\n"
+        "    stage = 'host_key'\n"
+        "    key = ' '.join",
+        1,
+    )
+    .replace("    body = json.dumps", "    stage = 'callback'\n    body = json.dumps", 1)
+    .replace(
+        "except (ValueError, KeyError, OSError):\n    pass",
+        "except Exception:\n"
+        "    try:\n"
+        "        # Fixed codes only: never send command output, credentials or file contents.\n"
+        "        code = locals().get('stage', 'configuration')\n"
+        "        opener = urllib.request.build_opener(\n"
+        "            urllib.request.ProxyHandler({}), NoRedirect())\n"
+        "        request = urllib.request.Request(config['url'] + '/failure',\n"
+        "            data=json.dumps({'code': code}).encode(), method='POST', headers={\n"
+        "                'Content-Type': 'application/json',\n"
+        "                'Authorization': 'Bearer ' + config['nonce']})\n"
+        "        with opener.open(request, timeout=10) as response:\n"
+        "            response.read(4096)\n"
+        "    except Exception:\n"
+        "        pass",
+        1,
+    )
+)
+
 
 def ssh_sources(values):
     if not isinstance(values, (list, tuple)) or len(values) != 3:
@@ -142,7 +183,7 @@ def nonce_for(seed: bytes, identity: str, origin: str, expires_at: str) -> str:
     return hmac.new(seed, message, hashlib.sha256).hexdigest()
 
 
-def cloud_init(identity: str, nonce: str, origin: str, *, sources=None) -> str:
+def cloud_init(identity: str, nonce: str, origin: str, *, sources=None, program_version=3) -> str:
     if not re.fullmatch(r"op-[a-f0-9]{16,32}", identity) or not re.fullmatch(
         r"[a-f0-9]{64}", nonce
     ):
@@ -152,6 +193,8 @@ def cloud_init(identity: str, nonce: str, origin: str, *, sources=None) -> str:
     if sources is not None:
         sources = ssh_sources(sources)
         config["ssh_sources"] = sources
+        if program_version not in {2, 3}:
+            raise ValueError("Unknown source-restricted bootstrap program")
     document = {
         "disable_root": True,
         "ssh_pwauth": False,
@@ -161,7 +204,10 @@ def cloud_init(identity: str, nonce: str, origin: str, *, sources=None) -> str:
             {"path": path, "owner": "root:root", "permissions": "0600", "content": content}
             for path, content in (
                 ("/var/lib/klip/host-attestation.json", json.dumps(config)),
-                ("/var/lib/klip/attest-host.py", SCRIPT_V1 if sources is None else SCRIPT_V2),
+                (
+                    "/var/lib/klip/attest-host.py",
+                    SCRIPT_V1 if sources is None else {2: SCRIPT_V2, 3: SCRIPT_V3}[program_version],
+                ),
             )
         ],
         "runcmd": [["python3", "/var/lib/klip/attest-host.py"]],
@@ -217,10 +263,16 @@ def issue(identity: str, origin: str, seed_file, *, sources=None):
                 "expires_at": (now() + timedelta(minutes=20)).isoformat(),
             }
             if sources is not None:
-                metadata.update(schema_version="klip-host-attestation.v2", ssh_sources=sources)
+                metadata.update(schema_version="klip-host-attestation.v3", ssh_sources=sources)
         nonce = nonce_for(seed, identity, origin, metadata["expires_at"])
         metadata = {**metadata, "nonce_sha256": hashlib.sha256(nonce.encode()).hexdigest()}
-        content = cloud_init(identity, nonce, origin, sources=sources)
+        content = cloud_init(
+            identity,
+            nonce,
+            origin,
+            sources=sources,
+            program_version=2 if metadata["schema_version"] == "klip-host-attestation.v2" else 3,
+        )
         content_sha = hashlib.sha256(content.encode()).hexdigest()
         if metadata.get("cloud_init_sha256", content_sha) != content_sha:
             raise AppError(409, "Bootstrap program changed; reconcile the original intent")
@@ -229,30 +281,51 @@ def issue(identity: str, origin: str, seed_file, *, sources=None):
     return content, content_sha
 
 
-def accept(db, identity: str, nonce: str, host_key: str):
-    def authenticate(row):
-        metadata = row.payload.get("bootstrap", {}) if row else {}
-        valid = (
-            row is not None
-            and row.payload.get("mode") == "real"
-            and row.state in {"dispatching", "allocated"}
-            and re.fullmatch(r"[a-f0-9]{64}", nonce)
-            and metadata.get("expires_at")
-            and datetime.fromisoformat(metadata["expires_at"]) > now()
-            and hmac.compare_digest(
-                metadata.get("nonce_sha256", ""), hashlib.sha256(nonce.encode()).hexdigest()
-            )
+def authenticate(row, nonce):
+    metadata = row.payload.get("bootstrap", {}) if row else {}
+    valid = (
+        row is not None
+        and row.payload.get("mode") == "real"
+        and row.state in {"dispatching", "allocated"}
+        and re.fullmatch(r"[a-f0-9]{64}", nonce)
+        and metadata.get("expires_at")
+        and datetime.fromisoformat(metadata["expires_at"]) > now()
+        and hmac.compare_digest(
+            metadata.get("nonce_sha256", ""), hashlib.sha256(nonce.encode()).hexdigest()
         )
-        if not valid:
-            raise AppError(
-                401, "Bootstrap credential is invalid or expired", "bootstrap_unauthorized"
-            )
-        return metadata
+    )
+    if not valid:
+        raise AppError(401, "Bootstrap credential is invalid or expired", "bootstrap_unauthorized")
+    return metadata
 
+
+def locked_bootstrap(db, identity, nonce):
     # Invalid guesses do not hold the intent's update lock or write attempt rows.
-    authenticate(db.get(ProviderIntent, identity))
+    authenticate(db.get(ProviderIntent, identity), nonce)
     row = db.get(ProviderIntent, identity, with_for_update=True, populate_existing=True)
-    metadata = authenticate(row)
+    return row, authenticate(row, nonce)
+
+
+def report_failure(db, identity, nonce, code):
+    if code not in {"configuration", "ssh_policy", "host_key", "callback"}:
+        raise AppError(422, "Unknown bootstrap failure code")
+    row, metadata = locked_bootstrap(db, identity, nonce)
+    if metadata.get("host_key") or metadata.get("failure", {}).get("code", code) != code:
+        raise AppError(409, "Bootstrap already has a different terminal observation")
+    row.payload = {
+        **row.payload,
+        "bootstrap": {
+            **metadata,
+            "failure": metadata.get("failure") or {"code": code, "at": now().isoformat()},
+        },
+    }
+    return {"status": "recorded"}
+
+
+def accept(db, identity: str, nonce: str, host_key: str):
+    row, metadata = locked_bootstrap(db, identity, nonce)
+    if metadata.get("failure"):
+        raise AppError(409, "Bootstrap previously reported a terminal failure")
     key = public_host_key(host_key)
     if metadata.get("host_key") not in {None, key}:
         raise AppError(409, "Previously attested host key changed", "host_identity_conflict")

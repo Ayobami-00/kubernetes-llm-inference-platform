@@ -57,3 +57,35 @@ Record its provider ID, native host-task Job UIDs, lease deadline, actual kernel
 GPU/CUDA/network proof and fresh DCGM observations. Confirm termination through
 the same management workflow when the experiment ends. No serving/model/SLO
 gate is complete merely because this browser script succeeds.
+
+## First paid bootstrap timeout, 4 November 2026
+
+The real UI admitted `writer-a10-20261104-b` as operation
+`op-9f64299963344461`. Lambda allocated Virginia A10
+`d42f3dc7064b45158ea3075e3f86f1ce` at 10:18:28 UTC. The VM became active,
+but no authenticated host-key callback arrived. Management expired the bootstrap
+at 10:38:30, initiated its unbootstrapped cleanup path, confirmed provider
+termination at 10:40:22 and cleared the cleanup obligation at 10:40:27.
+No host task, cluster join, GPU readiness or inference result was claimed.
+The allocation-to-confirmation estimate is approximately $0.47 at $1.29/hour;
+this is not a provider invoice.
+
+The retained evidence is in the ignored acceptance directory
+`artifacts/acceptance/a10-ui-replacement-20261104/`. In particular, its terminal
+operation and member observations retain the timeout and confirmed termination.
+Do not repeat this operation or reuse its expired credential.
+
+Bootstrap V3 starts Ubuntu's native SSH service before the explicit `sshd -t`
+check. This permits systemd to establish SSH's runtime directory on socket-based
+early boots. Exact effective source restrictions and disabled password/root
+authentication are still checked before attesting. The early-boot runtime-directory
+race is a corrected failure mode, not a proven diagnosis of the terminated VM.
+V1/V2 launch programs and their existing hashes remain reproducible.
+
+If V3 reaches a bootstrap exception, it can report only a fixed stage code over
+the same authenticated, expiring HTTPS nonce. It sends no exception text, host
+private key or command output. A failure never establishes host trust, cannot
+replace an accepted key and triggers the existing cleanup workflow. If cloud-init
+or outbound connectivity fails before that report is possible, the bounded
+attestation deadline still applies. An absent callback never authorizes blind
+SSH host-key acceptance.

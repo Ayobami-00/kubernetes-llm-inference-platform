@@ -111,6 +111,26 @@ export type ArtifactView = {
 };
 
 /**
+ * BootstrapFailure
+ */
+export type BootstrapFailure = {
+    /**
+     * Code
+     */
+    code: 'configuration' | 'ssh_policy' | 'host_key' | 'callback';
+};
+
+/**
+ * BootstrapFailureRecorded
+ */
+export type BootstrapFailureRecorded = {
+    /**
+     * Status
+     */
+    status: 'recorded';
+};
+
+/**
  * Capacity
  */
 export type Capacity = {
@@ -3051,6 +3071,64 @@ export type AttestHostResponses = {
 };
 
 export type AttestHostResponse = AttestHostResponses[keyof AttestHostResponses];
+
+export type ReportBootstrapFailureData = {
+    body: BootstrapFailure;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/bootstrap/{identity}/failure';
+};
+
+export type ReportBootstrapFailureErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ReportBootstrapFailureError = ReportBootstrapFailureErrors[keyof ReportBootstrapFailureErrors];
+
+export type ReportBootstrapFailureResponses = {
+    /**
+     * Successful Response
+     */
+    200: BootstrapFailureRecorded;
+};
+
+export type ReportBootstrapFailureResponse = ReportBootstrapFailureResponses[keyof ReportBootstrapFailureResponses];
 
 export type GetCapacityData = {
     body?: never;

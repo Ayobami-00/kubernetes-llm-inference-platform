@@ -316,6 +316,24 @@ def test_failed_attestation_terminates_without_inventing_host_identity():
     assert not io.host_calls and not io.native_jobs
 
 
+def test_authenticated_bootstrap_failure_cleans_up_before_attestation_timeout():
+    io = FakeIO()
+    created = advance(io, until="host_access")
+    with session() as db, db.begin():
+        row = db.get(ProviderIntent, "op-" + "1" * 16)
+        row.payload = {
+            **row.payload,
+            "bootstrap": {
+                "expires_at": (now() + timedelta(minutes=15)).isoformat(),
+                "failure": {"code": "ssh_policy", "at": now().isoformat()},
+            },
+        }
+    result = advance(io, created[0], checkpoint=created[1])
+    assert result[2] and result[3] and io.terminations == 1
+    assert result[1]["failure"]["code"] == "host_bootstrap_failed"
+    assert not io.host_calls and not io.native_jobs
+
+
 def test_drain_failure_never_terminates_provider_and_preserves_reservation():
     io = FakeIO()
     created = advance(io)

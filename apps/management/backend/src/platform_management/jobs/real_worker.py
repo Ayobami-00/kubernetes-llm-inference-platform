@@ -337,6 +337,12 @@ class RealWorkerWorkflow:
         owned_instances(self.plan, [instance], value["instance_ids"])
         attestation = self.intent().get("bootstrap", {})
         if not attestation.get("host_key"):
+            if attestation.get("failure"):
+                self.failed(
+                    "host_bootstrap_failed",
+                    "Host bootstrap reported failure at " + attestation["failure"]["code"],
+                )
+                return "Cleanup pending · host bootstrap failed"
             if (
                 not attestation.get("expires_at")
                 or datetime.fromisoformat(attestation["expires_at"]) <= now()
