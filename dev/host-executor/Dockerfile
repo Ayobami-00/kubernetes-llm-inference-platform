@@ -22,6 +22,7 @@ RUN --mount=type=bind,source=.,target=/workspace-context,readonly \
     && uv sync --locked --package kubernetes-llm-inference-platform --package platform-management --group infrastructure --no-dev
 COPY scripts/infrastructure scripts/infrastructure
 COPY infra/ansible infra/ansible
+COPY observability/agents observability/agents
 COPY infra/terraform/project.json infra/terraform/platform.json infra/terraform/identity.json infra/terraform/
 COPY deploy/artifacts.lock.json deploy/gpu-host.lock.json deploy/gpu-operator.lock.json deploy/
 COPY deploy/gpu-runtime-risk-review.json deploy/

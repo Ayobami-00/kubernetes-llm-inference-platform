@@ -295,6 +295,7 @@ def checked_image_source(review):
         "scripts/infrastructure/host_executor_recovery.py",
         "scripts/infrastructure/host_executor_openssh.py",
         "infra/ansible",
+        "observability/agents",
         "deploy/artifacts.lock.json",
         "deploy/gpu-host.lock.json",
         "deploy/gpu-operator.lock.json",

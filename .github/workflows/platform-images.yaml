@@ -12,6 +12,7 @@ on:
       - 'scripts/infrastructure/cluster*.py'
       - 'dev/host-executor/**'
       - 'infra/ansible/**'
+      - 'observability/agents/**'
       - 'deploy/gpu-host.lock.json'
       - 'deploy/gpu-operator.lock.json'
       - 'deploy/gpu-runtime-risk-review.json'

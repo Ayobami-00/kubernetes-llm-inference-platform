@@ -145,3 +145,22 @@ Image-only upgrades can accept repeated `--fenced-recovery-task` arguments for
 distinct already-fenced, never-joined instances. Every complete chain is
 independently rechecked under both native locks and every corresponding Node
 must be absent; an unrelated pending task still blocks the upgrade.
+
+The clock-wait image was deployed at 12:27:18 UTC as
+`sha256:94f80588b133257062e66370b770ee11ceff243b8cb0a6873dcc95127f4cdad4`,
+under image-only approval
+`bb907b3121292f7663802f93ad7b96c2beafc27422fa7b101653f3a1d6369344`.
+Its native guard verified all six CPU transports, both custody locks and the
+three independent completed cleanup chains. Both new replicas became Ready
+on separate CPU hosts; storage and credential UIDs were preserved.
+
+`writer-a10-20261104-f` / `op-c8d10b3aa78d4fe2` then passed clock synchronization,
+base safety checks and exact Kubernetes/containerd installation. It failed
+later when Ansible could not find the local WireGuard observer source in the
+executor image. Automatic provider termination and address cleanup completed
+at 12:40:28 UTC. No Kubernetes join or GPU readiness was claimed.
+The image now copies the three public `observability/agents/` inputs, verifies
+every repository-backed worker input is readable and compiles its Python
+sources during the non-root build check. The source guard also includes those
+agent files. The read-only observer already handles an absent initial mesh and
+its service is conditional on WireGuard configuration.

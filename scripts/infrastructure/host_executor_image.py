@@ -16,6 +16,12 @@ REQUIRED = (
     "session-manager-plugin-linux-amd64",
 )
 MAX_BYTES = 128 * 1024 * 1024
+PUBLIC_HOST_INPUTS = (
+    "scripts/infrastructure/node_agent.py",
+    "observability/agents/wireguard_metrics.py",
+    "observability/agents/klip-wireguard-metrics.service",
+    "observability/agents/klip-wireguard-metrics.timer",
+)
 
 
 def download(item):
@@ -86,6 +92,15 @@ def verify_installed():
         body = (ROOT / "artifacts/platform" / name).read_bytes()
         if hashlib.sha256(body).hexdigest() != lock["artifacts"][name]["sha256"]:
             raise ValueError("Installed executor artifact differs from its release lock")
+    for relative in PUBLIC_HOST_INPUTS:
+        path = ROOT / relative
+        if not path.is_file() or not os.access(path, os.R_OK):
+            raise ValueError("Missing/unreadable shipped host input: " + relative)
+        body = path.read_bytes()
+        if not body:
+            raise ValueError("Empty shipped host input: " + relative)
+        if path.suffix == ".py":
+            compile(body, relative, "exec")
 
 
 if __name__ == "__main__":

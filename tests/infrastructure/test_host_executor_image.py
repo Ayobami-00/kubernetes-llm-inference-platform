@@ -22,6 +22,10 @@ def installed(tmp_path, monkeypatch):
         (cache / name).write_bytes(body)
         lock["artifacts"][name] = {"sha256": hashlib.sha256(body).hexdigest()}
     (root / "deploy/artifacts.lock.json").write_text(json.dumps(lock))
+    for relative in host_executor_image.PUBLIC_HOST_INPUTS:
+        path = root / relative
+        path.parent.mkdir(parents=True, exist_ok=True)
+        path.write_text("# Synthetic build closure fixture\n")
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode="w:gz") as archive:
         item = tarfile.TarInfo("bin/containerd")
@@ -45,4 +49,11 @@ def test_image_verifies_installed_inputs_without_network_or_host_operations(inst
 def test_image_rejects_corrupt_shipped_tool_before_runtime(installed, artifact):
     (installed / artifact).write_bytes(b"corrupt")
     with pytest.raises(ValueError, match="checksum|release lock"):
+        host_executor_image.verify_installed()
+
+
+@pytest.mark.parametrize("relative", host_executor_image.PUBLIC_HOST_INPUTS)
+def test_missing_ansible_host_input_fails_the_image_build(installed, relative):
+    (host_executor_image.ROOT / relative).unlink()
+    with pytest.raises(ValueError, match="shipped host input"):
         host_executor_image.verify_installed()
