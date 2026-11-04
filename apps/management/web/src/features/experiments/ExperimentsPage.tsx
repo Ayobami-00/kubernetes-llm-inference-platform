@@ -7,6 +7,14 @@ import { Badge, formatDate } from '../../components/Inspector';
 
 const terminal = new Set(['completed', 'failed', 'cancelled']);
 
+export function experimentDiagnosticsUrl(createdAt: string, finishedAt?: string | null) {
+  const range = new URLSearchParams({
+    from: String(new Date(createdAt).getTime()),
+    to: String(finishedAt ? new Date(finishedAt).getTime() : Date.now()),
+  });
+  return `http://127.0.0.1:13000/d/klip-a10-speculation?${range}`;
+}
+
 export default function ExperimentsPage() {
   const queryClient = useQueryClient();
   const preview = useQuery({
@@ -202,10 +210,15 @@ function ExperimentCard({
         )}
       </div>
       <p>
-        <a href="http://127.0.0.1:13000/d/klip-a10-speculation" target="_blank" rel="noreferrer">
+        <a
+          href={experimentDiagnosticsUrl(item.created_at, item.finished_at)}
+          target="_blank"
+          rel="noreferrer"
+        >
           Open A10 Grafana diagnostics
         </a>{' '}
-        (requires the private access tunnel).
+        (this experiment's time range; requires the private access tunnel). Exact warmup and
+        scoring boundaries are retained in the stage timeline and child reports.
       </p>
     </article>
   );

@@ -1,8 +1,17 @@
 import { describe, expect, it } from 'vitest';
 import { renderToStaticMarkup } from 'react-dom/server';
-import { ComparisonTable } from './ExperimentsPage';
+import { ComparisonTable, experimentDiagnosticsUrl } from './ExperimentsPage';
 
 describe('paired experiment result presentation', () => {
+  it('opens historical diagnostics over the original execution interval', () => {
+    const url = new URL(
+      experimentDiagnosticsUrl('2026-11-04T17:20:00Z', '2026-11-04T17:40:00Z'),
+    );
+    expect(url.hostname).toBe('127.0.0.1');
+    expect(url.searchParams.get('from')).toBe(String(Date.parse('2026-11-04T17:20:00Z')));
+    expect(url.searchParams.get('to')).toBe(String(Date.parse('2026-11-04T17:40:00Z')));
+  });
+
   it('keeps completed execution, invalid delivery and SLO verdict separate', () => {
     const html = renderToStaticMarkup(
       <ComparisonTable
