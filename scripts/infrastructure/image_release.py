@@ -14,7 +14,7 @@ from publish_images import COMPONENTS, REGISTRY
 REVIEW = ROOT / "deploy/image-risk-review.json"
 
 
-def assess(receipts: Path, commit: str, *, now: datetime | None = None) -> dict:
+def assess(receipts: Path, commit: str, *, now: datetime | None = None, components=None) -> dict:
     now = now or datetime.now(UTC)
     review = json.loads(REVIEW.read_text())
     if (
@@ -25,8 +25,12 @@ def assess(receipts: Path, commit: str, *, now: datetime | None = None) -> dict:
         raise ValueError("Runtime vulnerability review expired or is not yet effective")
     if not re.fullmatch(r"[a-f0-9]{40}", commit):
         raise ValueError("Exact build source commit required")
+    selected = tuple(COMPONENTS) if components is None else tuple(components)
+    if not selected or len(set(selected)) != len(selected) or set(selected) - COMPONENTS.keys():
+        raise ValueError("Select explicit known image components without duplicates")
     resolved = {}
-    for component, (repository, _) in COMPONENTS.items():
+    for component in selected:
+        repository, _ = COMPONENTS[component]
         paths = list(receipts.rglob(component + ".json"))
         if len(paths) != 1:
             raise ValueError("Exactly one CI image receipt is required for " + component)

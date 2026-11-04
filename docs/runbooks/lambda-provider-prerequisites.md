@@ -50,7 +50,9 @@ CPU-only unit tests exercise the actual bounded HTTP transport against synthetic
 responses. Management PostgreSQL tests additionally cover concurrent setup and
 committed intent before I/O; they run against the isolated CI test database.
 
-The operator workflow uses the reviewed four-image CI receipt bundle:
+The operator workflow uses the reviewed backend CI image receipt. This CPU Job
+does not depend on the runner, stub or web image; full management releases still
+require their complete four-image assessment:
 
 ```sh
 PYTHONPATH=scripts/infrastructure .venv/bin/python \

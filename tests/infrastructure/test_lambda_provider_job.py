@@ -91,3 +91,18 @@ def test_changed_frozen_input_is_rejected_before_cluster_dispatch(plan, file):
     path.write_text(json.dumps(value))
     with pytest.raises(ValueError):
         setup.checked_plan(approval)
+
+
+def test_historical_observation_keeps_frozen_integrity_without_current_source_or_credentials(
+    plan, monkeypatch
+):
+    root, approval = plan
+    monkeypatch.setattr(setup, "source_digest", lambda: "new-source")
+    monkeypatch.setattr(
+        setup,
+        "image_assessment",
+        lambda *_: pytest.fail("Readonly history needs no fresh registry credentials"),
+    )
+    assert setup.checked_plan(approval, for_execution=False)[0] == root / approval
+    with pytest.raises(ValueError):
+        setup.checked_plan(approval)

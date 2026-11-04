@@ -104,3 +104,21 @@ def test_declared_controls_reject_privileged_workloads():
     pod["containers"][0]["securityContext"]["capabilities"]["add"] = ["SYS_ADMIN"]
     with pytest.raises(ValueError, match="privilege"):
         guard_workloads(documents)
+
+
+def test_single_component_job_review_does_not_claim_other_images_or_weaken_full_release(tmp_path):
+    receipts(tmp_path)
+    for name in ("web", "runner", "stub"):
+        (tmp_path / (name + ".json")).unlink()
+    assert set(assess(tmp_path, SHA, now=NOW, components=("backend",))["images"]) == {"backend"}
+    with pytest.raises(ValueError, match="Exactly one"):
+        assess(tmp_path, SHA, now=NOW)
+    receipts(tmp_path, critical=1)
+    with pytest.raises(ValueError, match="Critical"):
+        assess(tmp_path, SHA, now=NOW, components=("backend",))
+
+
+@pytest.mark.parametrize("components", [(), ("unknown",), ("backend", "backend")])
+def test_empty_or_ambiguous_image_review_scope_is_rejected(tmp_path, components):
+    with pytest.raises(ValueError, match="explicit known"):
+        assess(tmp_path, SHA, now=NOW, components=components)

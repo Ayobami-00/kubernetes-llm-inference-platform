@@ -277,7 +277,7 @@ def image_assessment(receipts):
         ["git", "ls-files", "--others", "--exclude-standard", "--", *paths], cwd=ROOT
     ):
         raise ValueError("Untracked application inputs differ from the provider Job image")
-    return assess(receipts.resolve(), source)
+    return assess(receipts.resolve(), source, components=("backend",))
 
 
 def prepare(receipts):
@@ -321,7 +321,7 @@ def prepare(receipts):
     return value
 
 
-def checked_plan(approval):
+def checked_plan(approval, *, for_execution=True):
     if not isinstance(approval, str) or not re.fullmatch(r"[a-f0-9]{64}", approval):
         raise ValueError("Exact saved provider setup plan identity required")
     root = folder() / approval
@@ -329,8 +329,8 @@ def checked_plan(approval):
     if (
         approval != sha(encoded({k: v for k, v in plan.items() if k != "approval_sha256"}))
         or plan["approval_sha256"] != approval
-        or plan["source_sha256"] != source_digest()
-        or plan["image_assessment"] != image_assessment(Path(plan["receipts"]))
+        or (for_execution and plan["source_sha256"] != source_digest())
+        or (for_execution and plan["image_assessment"] != image_assessment(Path(plan["receipts"])))
         or plan["spec_sha256"] != sha((root / "spec.json").read_bytes())
         or plan["config_sha256"] != sha((root / "configmap.json").read_bytes())
         or plan["job_sha256"] != sha((root / "job.json").read_bytes())
@@ -399,8 +399,10 @@ def observe(approval):
     from cluster import kubectl
     from workload_acceptance import validate_preparation
 
-    root, plan = checked_plan(approval)
+    root, plan = checked_plan(approval, for_execution=False)
     value = json.loads((root / "execution.json").read_text())
+    if value.get("approval_sha256") != approval:
+        raise ValueError("Provider setup observation belongs to another attempt")
     if value["status"] in {"ready", "failed"}:
         return value
     expected = json.loads((root / "job.json").read_text())
