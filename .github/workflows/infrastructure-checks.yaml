@@ -1,7 +1,6 @@
 name: Infrastructure checks
 
 on:
-  workflow_dispatch:
   push:
     paths:
       - 'infra/**'
