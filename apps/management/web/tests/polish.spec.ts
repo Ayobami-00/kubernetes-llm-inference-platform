@@ -25,6 +25,22 @@ async function inspect(page: Page, id: string) {
   await expect(panel).toBeVisible();
   return panel;
 }
+test('visible resources retain their measurements when layers change repeatedly', async ({
+  page,
+}) => {
+  await page.goto('/');
+  await signIn(page);
+  await page.getByRole('button', { name: 'Layers', exact: true }).click();
+  const scenarios = page.getByLabel('Scenario', { exact: true });
+  for (let change = 0; change < 5; change++) {
+    await scenarios.check();
+    await expect(page.getByTestId('node-platform-mixed').first()).toBeVisible();
+    await scenarios.uncheck();
+    await expect(page.getByTestId('node-platform-mixed')).toHaveCount(0);
+    await expect(page.getByTestId('node-writer-assist').first()).toBeVisible();
+  }
+});
+
 for (const theme of ['dark', 'light'] as const) {
   test(`${theme} appearance persists and specifications are readable`, async ({ page }) => {
     const errors: string[] = [];

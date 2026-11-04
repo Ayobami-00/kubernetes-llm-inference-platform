@@ -1,0 +1,7 @@
+apiVersion: v2
+name: klip-database
+description: Three-instance management PostgreSQL with CloudNativePG and Barman backups
+type: application
+version: 0.1.0
+appVersion: "17"
+kubeVersion: ">=1.34.0-0"

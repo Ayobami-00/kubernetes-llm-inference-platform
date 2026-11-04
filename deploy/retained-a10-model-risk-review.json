@@ -1,0 +1,189 @@
+{
+  "schema_version": "klip-retained-a10-model-review.v1",
+  "scope": "private-authenticated-writerassist-experiment",
+  "instance_id": "8f2e29b7279b42148ffaaed4a4dcdd8e",
+  "reviewed_at": "2026-11-04T13:43:19.335619+00:00",
+  "expires_at": "2026-11-05T13:43:19.335619+00:00",
+  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/model-serving@sha256:5d22b814fb6a5d90d2f24a94fa4f379704ffe5c89107bc58b3a76324e1584784",
+  "report_sha256": "d950f6fb07b28f108f97b599800f975fa828216e1ef76c6805dcdf50126b59db",
+  "header_inventory_sha256": "6e622fd0c25164fd760168ef95c3bb7084f73cbc37bb13ec8b89c222ef0dd765",
+  "patch_receipt_sha256": "8ea9b0008e2ae47ce765f375bfc6537d9271795c39ff6671aba0aa3cb3625810",
+  "critical_header_package": {
+    "name": "linux-libc-dev",
+    "version": "6.8.0-147.147",
+    "count": 15
+  },
+  "runtime_high_findings": [
+    {
+      "finding": [
+        "CVE-2025-47273",
+        "setuptools",
+        "70.3.0"
+      ],
+      "title": "setuptools: Path Traversal Vulnerability in setuptools PackageIndex"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "dirmngr",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gnupg",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gnupg-utils",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gnupg2",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gpg",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gpg-agent",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gpgconf",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gpgsm",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "gpgv",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2025-68973",
+        "keyboxd",
+        "2.4.4-2ubuntu17.3"
+      ],
+      "title": "GnuPG: GnuPG: Information disclosure and potential arbitrary code execution via out-of-bounds write"
+    },
+    {
+      "finding": [
+        "CVE-2026-111497",
+        "libbrotli1",
+        "1.1.0-2build2"
+      ],
+      "title": "brotli: Out-of-Bounds Write in Google Brotli Decoder"
+    },
+    {
+      "finding": [
+        "CVE-2026-119194",
+        "pyasn1",
+        "0.6.4"
+      ],
+      "title": "pyasn1: pyasn1: Denial of Service via hash collisions in schemaless decoding"
+    },
+    {
+      "finding": [
+        "CVE-2026-119195",
+        "pyasn1",
+        "0.6.4"
+      ],
+      "title": "pyasn1: pyasn1: Denial of Service via quadratic processing of fragmented ASN.1 data"
+    },
+    {
+      "finding": [
+        "CVE-2026-119196",
+        "pyasn1",
+        "0.6.4"
+      ],
+      "title": "pyasn1: pyasn1: Denial of Service via constructed bit string decoding"
+    },
+    {
+      "finding": [
+        "CVE-2026-119197",
+        "pyasn1",
+        "0.6.4"
+      ],
+      "title": "pyasn1: pyasn1: Denial of Service via quadratic complexity in binary REAL decoding"
+    },
+    {
+      "finding": [
+        "CVE-2026-45447",
+        "libssl3t64",
+        "3.0.13-0ubuntu3.6"
+      ],
+      "title": "openssl: Heap Use-After-Free in OpenSSL PKCS7_verify()"
+    },
+    {
+      "finding": [
+        "CVE-2026-45447",
+        "openssl",
+        "3.0.13-0ubuntu3.6"
+      ],
+      "title": "openssl: Heap Use-After-Free in OpenSSL PKCS7_verify()"
+    },
+    {
+      "finding": [
+        "CVE-2026-84782",
+        "libssl3t64",
+        "3.0.13-0ubuntu3.6"
+      ],
+      "title": "openssl: compat-openssl: openssl: Information disclosure via DTLS handshake retransmission"
+    },
+    {
+      "finding": [
+        "CVE-2026-84782",
+        "openssl",
+        "3.0.13-0ubuntu3.6"
+      ],
+      "title": "openssl: compat-openssl: openssl: Information disclosure via DTLS handshake retransmission"
+    }
+  ],
+  "conditions": {
+    "kernel_headers": "All 990 native package files are headers or documentation, without executable permission. They are not the running host kernel. All 15 Critical and 370 High header-package advisories remain in the native scan, and do not establish the security of the external host kernel.",
+    "fixed_inputs": "Only the pinned public Qwen3-4B revision and JFLEG text are admitted. No remote model code, packages, user URLs, tools, custom code, uploads, GnuPG, PKCS7 verification or DTLS is enabled. setuptools PackageIndex is not used at runtime.",
+    "no_asn1_input": "No user ASN.1 input or pyasn1 decoding endpoint. Public model HTTPS uses the patched trust bundle and fixed source identity. No external credentials, untrusted intermediates or arbitrary certificates are supplied.",
+    "brotli": "No request decompression or tenant-supplied compressed files. Model artifacts come only from the authenticated pinned Hugging Face source.",
+    "isolation": "One externally retained A10; unprivileged read-only model container, no host mounts or Kubernetes token, bounded resources, private model Service. Gateway must enforce authentication and model/path controls before scored traffic. No public load-balancer listener or public inference DNS is authorized by this review."
+  },
+  "limitations": [
+    "Native scan still reports 15 Critical header-package advisories and 390 High findings; its CI gate remains failed. This bounded applicability review is separate from that gate.",
+    "This is an isolated experiment approval, not production readiness or a host-kernel vulnerability assessment."
+  ]
+}

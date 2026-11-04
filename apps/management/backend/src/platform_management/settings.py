@@ -10,8 +10,14 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(env_prefix="MANAGEMENT_", extra="ignore")
     database_url: str = "postgresql+psycopg://management:management@localhost:55432/management"
+    database_require_tls: bool = False
+    database_ca_file: Path | None = None
     admin_password_file: Path = Path("dev/.secrets/admin_password")
     lambda_api_key_file: Path = Path("dev/.secrets/lambda_api_key")
+    bootstrap_seed_file: Path | None = None
+    real_lifecycle_enabled: bool = False
+    lambda_lifecycle_policy_file: Path | None = None
+    host_executor_tls_home: Path | None = None
     secure_cookies: bool = False
     allowed_origin: str = "http://localhost:5173"
     simulation_step_seconds: float = 2.0
@@ -25,6 +31,14 @@ class Settings(BaseSettings):
         "requests": {"cpu": "100m", "memory": "128Mi"},
         "limits": {"cpu": "2", "memory": "2Gi"},
     }
+    runner_node_selector: dict[str, str] = {"node-role.kubernetes.io/control-plane": ""}
+    runner_tolerations: list[dict[str, str]] = [
+        {
+            "key": "node-role.kubernetes.io/control-plane",
+            "operator": "Exists",
+            "effect": "NoSchedule",
+        }
+    ]
     serving_namespace: str = "llm-d"
     runner_namespace: str = "klip"
     runner_secret_refs: list[str] = []

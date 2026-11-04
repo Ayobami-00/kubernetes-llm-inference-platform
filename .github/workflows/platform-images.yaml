@@ -1,0 +1,213 @@
+name: Platform experiment images
+
+on:
+  push:
+    branches: [codex/end-to-end-platform]
+    paths:
+      - '.github/workflows/platform-images.yaml'
+      - 'scripts/infrastructure/publish_images.py'
+      - 'scripts/infrastructure/host_executor_image.py'
+      - 'scripts/infrastructure/host_executor_openssh.py'
+      - 'scripts/infrastructure/host_executor_security.py'
+      - 'scripts/infrastructure/cluster*.py'
+      - 'dev/host-executor/**'
+      - 'infra/ansible/**'
+      - 'observability/agents/**'
+      - 'deploy/gpu-host.lock.json'
+      - 'deploy/gpu-operator.lock.json'
+      - 'deploy/gpu-runtime-risk-review.json'
+      - 'infra/terraform/identity.json'
+      - 'deploy/artifacts.lock.json'
+      - 'deploy/host-executor-aws-config'
+      - 'apps/management/backend/Dockerfile'
+      - 'apps/management/web/Dockerfile'
+      - 'workload-runner/Dockerfile'
+      - 'dev/inference-stub/Dockerfile'
+      - 'packages/**'
+      - 'workload-runner/**'
+      - 'dev/inference-stub/**'
+      - 'apps/management/**'
+      - 'pyproject.toml'
+      - 'uv.lock'
+      - '.dockerignore'
+      - 'configs/**'
+      - 'datasets/manifests/**'
+      - 'contracts/fixtures/**'
+      - 'scripts/management/stage_workspace.py'
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Build all experiment images or one independently reviewed component
+        type: choice
+        default: all
+        options: [all, backend, web, runner, stub, host-executor]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: platform-experiment-images-${{ github.ref }}-${{ inputs.component || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    permissions:
+      contents: read
+      id-token: write
+    outputs:
+      components: ${{ steps.components.outputs.value }}
+    steps:
+      - name: Select the bounded image build set
+        id: components
+        env:
+          SELECTED_COMPONENT: ${{ inputs.component || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          components = [
+              {'component': 'backend', 'file': 'apps/management/backend/Dockerfile', 'target': 'production'},
+              {'component': 'web', 'file': 'apps/management/web/Dockerfile', 'target': 'production'},
+              {'component': 'runner', 'file': 'workload-runner/Dockerfile', 'target': ''},
+              {'component': 'stub', 'file': 'dev/inference-stub/Dockerfile', 'target': ''},
+              {'component': 'host-executor', 'file': 'dev/host-executor/Dockerfile', 'target': ''},
+          ]
+          selected = os.environ['SELECTED_COMPONENT']
+          if selected != 'all':
+              components = [item for item in components if item['component'] == selected]
+          if not components:
+              raise ValueError('Unknown build component')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('value=' + json.dumps(components) + '\n')
+          PY
+      - name: Verify the repository's signed publishing identity
+        shell: bash
+        run: |
+          node --input-type=module <<'NODE'
+          import { webcrypto } from 'node:crypto';
+          try {
+            const issuer = 'https://token.actions.githubusercontent.com';
+            const audience = 'sts.amazonaws.com';
+            const url = new URL(process.env.ACTIONS_ID_TOKEN_REQUEST_URL);
+            url.searchParams.set('audience', audience);
+            const response = await fetch(url, {
+              headers: { Authorization: 'Bearer ' + process.env.ACTIONS_ID_TOKEN_REQUEST_TOKEN },
+              signal: AbortSignal.timeout(20000)
+            });
+            if (!response.ok) throw new Error('token request');
+            const token = (await response.json()).value;
+            const [encodedHeader, encodedPayload, encodedSignature] = token.split('.');
+            const header = JSON.parse(Buffer.from(encodedHeader, 'base64url'));
+            const claims = JSON.parse(Buffer.from(encodedPayload, 'base64url'));
+            const keysResponse = await fetch(issuer + '/.well-known/jwks', {
+              signal: AbortSignal.timeout(20000)
+            });
+            if (!keysResponse.ok || header.alg !== 'RS256') throw new Error('signing metadata');
+            const jwk = (await keysResponse.json()).keys.find(key => key.kid === header.kid);
+            if (!jwk) throw new Error('signing key');
+            const key = await webcrypto.subtle.importKey('jwk', jwk, {
+              name: 'RSASSA-PKCS1-v1_5', hash: 'SHA-256'
+            }, false, ['verify']);
+            const verified = await webcrypto.subtle.verify(
+              'RSASSA-PKCS1-v1_5', key, Buffer.from(encodedSignature, 'base64url'),
+              Buffer.from(encodedHeader + '.' + encodedPayload)
+            );
+            const now = Math.floor(Date.now() / 1000);
+            const audiences = Array.isArray(claims.aud) ? claims.aud : [claims.aud];
+            if (!verified || claims.iss !== issuer || !audiences.includes(audience) ||
+                claims.exp <= now || claims.iat > now + 60 ||
+                claims.repository !== process.env.GITHUB_REPOSITORY ||
+                String(claims.repository_id) !== process.env.GITHUB_REPOSITORY_ID ||
+                claims.ref !== process.env.GITHUB_REF) throw new Error('identity validation');
+            const evidence = { verified: true };
+            for (const name of ['iss', 'aud', 'sub', 'repository', 'repository_id',
+                                'repository_owner_id', 'ref']) evidence[name] = claims[name];
+            console.log('KLIP_OIDC_CLAIMS=' + JSON.stringify(evidence));
+          } catch {
+            console.error('Publishing identity audit failed; credential-bearing diagnostics withheld.');
+            process.exit(1);
+          }
+          NODE
+  publish:
+    needs: identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    strategy:
+      fail-fast: false
+      matrix:
+        include: ${{ fromJSON(needs.identity.outputs.components) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-images-push
+          allowed-account-ids: '127811062476'
+          role-duration-seconds: 3600
+          role-session-name: images-${{ github.run_id }}-${{ matrix.component }}
+          unset-current-credentials: true
+      - name: Reconcile the immutable source tag
+        id: existing
+        run: python3 scripts/infrastructure/publish_images.py resolve '${{ matrix.component }}'
+      - uses: docker/setup-buildx-action@8d2750c68a42422c14e847fe6c8ac0403b4cbd6f # v3
+        if: steps.existing.outputs.exists != 'true'
+      - name: Authenticate to the private registry
+        if: steps.existing.outputs.exists != 'true'
+        run: |
+          aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 127811062476.dkr.ecr.eu-west-2.amazonaws.com
+      - uses: docker/build-push-action@10e90e3645eae34f1e60eeb005ba3a3d33f178e8 # v6
+        if: steps.existing.outputs.exists != 'true'
+        with:
+          context: .
+          file: ${{ matrix.file }}
+          target: ${{ matrix.target }}
+          platforms: linux/amd64
+          push: true
+          tags: ${{ steps.existing.outputs.image }}
+          # A single platform manifest is scanned by ECR BASIC. Build records and
+          # source/digest receipts remain separate from runnable image manifests.
+          provenance: false
+          labels: |
+            org.opencontainers.image.source=https://github.com/${{ github.repository }}
+            org.opencontainers.image.revision=${{ github.sha }}
+      - name: Retain digest, source and complete registry scan evidence
+        run: python3 scripts/infrastructure/publish_images.py record '${{ matrix.component }}'
+      - name: Install the pinned full-image scanner for the SSH executor
+        if: matrix.component == 'host-executor'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/tools/bin
+          scanner_archive="$RUNNER_TEMP/klip-host-trivy.tar.gz"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_archive"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_archive" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_archive" --directory artifacts/tools/bin trivy
+      - name: Scan executor OS packages, Python packages and embedded Go binaries
+        if: matrix.component == 'host-executor'
+        env:
+          GOMAXPROCS: '2'
+        run: >-
+          python3 scripts/infrastructure/host_executor_security.py scan
+          --receipt artifacts/releases/host-executor.json
+          --directory artifacts/security/host-executor --ci-credentials
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.component == 'host-executor'
+        with:
+          name: host-executor-security-${{ github.sha }}
+          path: |
+            artifacts/security/host-executor/scan.json
+            artifacts/security/host-executor/summary.json
+          if-no-files-found: error
+          retention-days: 90
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        with:
+          name: private-image-${{ matrix.component }}-${{ github.sha }}
+          path: artifacts/releases/${{ matrix.component }}.json
+          if-no-files-found: error
+          retention-days: 90

@@ -1,0 +1,75 @@
+{
+  "schema_version": "klip-gpu-operator.v1",
+  "chart": {
+    "name": "gpu-operator",
+    "version": "v26.7.2",
+    "url": "https://helm.ngc.nvidia.com/nvidia/charts/gpu-operator-v26.7.2.tgz",
+    "file": "gpu-operator-v26.7.2.tgz",
+    "sha256": "a94a88628a90fac1df8d47469baf14dd352126553f30fd1ecd8e182516ae1bf6"
+  },
+  "images": {
+    "nvcr.io/nvidia/gpu-operator:v26.7.2": {
+      "digest": "sha256:e118f631813f93a43fa17332fb2060d3d1f3f150359dd6744f3a9b2f7b7c5707",
+      "index_digest": "sha256:02933b43d286d1321cd0dadd460b9ae8f5e5c0ee99a087e2d10254febc94ba45",
+      "platform": "linux/amd64"
+    },
+    "nvcr.io/nvidia/driver:595.91.07-ubuntu24.04": {
+      "platform": "linux/amd64",
+      "digest": "sha256:93e07958a6640507677b596257557b7fc9f8f0bc0351b06f0fcbe4e251fb12fc",
+      "index_digest": "sha256:dd2913cb7fe0240c32351ac50ccfbae7a8dfe068e3b336ae75b5575745cb000d"
+    },
+    "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1": {
+      "platform": "linux/amd64",
+      "digest": "sha256:12c47fcad17b7ef8eb668b8ad6394219c62b156603438567c8dd3de0102a82c0",
+      "index_digest": "sha256:37e6bf0cf02b5888288a173353b858da8823cc9f9fb9c6e8d6d1e2cf5bfb16c8"
+    },
+    "nvcr.io/nvidia/k8s/container-toolkit:v1.20.1": {
+      "platform": "linux/amd64",
+      "digest": "sha256:c4a052b4013b2a5ab36e9c88225cb1bdb8d968808364f65fa7bfbd0bcd5032de",
+      "index_digest": "sha256:00a422252dd875b112f5974321c2feebbdf11c338f8ad131e5ce18e5b3a3bfac"
+    },
+    "nvcr.io/nvidia/k8s-device-plugin:v0.20.1": {
+      "platform": "linux/amd64",
+      "digest": "sha256:d279ecdb47b252c4cd96f4224650e9808c36012f6979570c9611ddbc5b0749a7",
+      "index_digest": "sha256:27c1b2553a690ca3d29889dcd61df97525d46f58272c0be8dc63c2b18f120075"
+    },
+    "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless": {
+      "platform": "linux/amd64",
+      "digest": "sha256:804c17f67ab63e8a4dd5301546beefaa104129f833dae4a68f5ff7c4819f471b",
+      "index_digest": "sha256:148b0c025e5f2850256816fa33754fbf4733b7a086697a95613fc0ba3db5b003"
+    },
+    "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0": {
+      "platform": "linux/amd64",
+      "digest": "sha256:9855f4c8500addf185360474184b9efdaf4384284779aa9173dcd70164a4ae6f",
+      "index_digest": "sha256:7c7540bdf1f942d4fb6db97069fd6c289471b54ac29e3c7fcdf914cf77af7d41"
+    },
+    "registry.k8s.io/nfd/node-feature-discovery:v0.20.1": {
+      "digest": "sha256:fe0b7420834216bfafadeb082da3df55be3501a631bc689b8512326fbc2e65e3",
+      "index_digest": "sha256:6fc5c9af9176e1acb5ce57a4a1d0c0d3eb25cd34f5bdd0efefebf0efe45a8379",
+      "platform": "linux/amd64"
+    }
+  },
+  "evidence": {
+    "checked_at": "2026-11-04",
+    "operator_source_commit": "5a9c8a8b3f5bac7fb06ad3c2a05771fceb8b4832",
+    "operator_source_archive_sha256": "3d15bad270316e2e1db5616c2d00a66f9e89bf81a7ec54553a4533a50d38534d",
+    "platform_support": "https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/26.7/platform-support.html",
+    "cuda_compatibility": "https://docs.nvidia.com/deploy/cuda-compatibility/minor-version-compatibility.html",
+    "vllm_cuda_version": "13.0.2",
+    "nfd_release": "https://github.com/kubernetes-sigs/node-feature-discovery/releases/tag/v0.20.1"
+  },
+  "limitations": [
+    "Registry metadata and rendering establish artifact identity, not GPU readiness.",
+    "The CUDA 12.5 vector-add canary tests device execution; the pinned vLLM deployment separately validates CUDA 13.0.2.",
+    "GPU and driver operands are privileged within gpu-system; management and runner namespaces retain their existing restrictions.",
+    "MIG, time slicing, DRA, RDMA and automatic driver upgrades are disabled.",
+    "Bundled NFD is disabled; the matching standalone NFD 0.20.1 chart/image replaces the older bundled dependency."
+  ],
+  "nfd_chart": {
+    "name": "node-feature-discovery",
+    "version": "0.20.1",
+    "file": "node-feature-discovery-0.20.1.tgz",
+    "oci": "oci://registry.k8s.io/nfd/charts/node-feature-discovery@sha256:5c4df0919041454a3a2095965e3ada6bb514095731921f3055aa539669e79e54",
+    "sha256": "fb6e0bcc17eacc0dc7be0422204a6d50d19a06a3a06b40c61c856ff34e88d510"
+  }
+}

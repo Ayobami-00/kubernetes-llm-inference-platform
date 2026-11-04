@@ -1,0 +1,136 @@
+---
+- name: Check the reviewed kubelet version
+  ansible.builtin.command: /usr/bin/kubelet --version
+  register: klip_image_credentials_kubelet_version
+  changed_when: false
+- name: Require the tested Kubernetes release
+  ansible.builtin.assert:
+    that:
+      - klip_image_credentials_kubelet_version.stdout == 'Kubernetes v1.36.5'
+- name: Inspect managed paths without following links
+  ansible.builtin.stat:
+    path: '{{ item }}'
+    follow: false
+  loop: '{{ klip_image_credentials_install_paths }}'
+  register: klip_image_credentials_originals
+- name: Refuse linked or non-file credential configuration
+  ansible.builtin.assert:
+    that:
+      - not item.stat.exists or (item.stat.isreg and not item.stat.islnk)
+  loop: '{{ klip_image_credentials_originals.results }}'
+  loop_control:
+    label: '{{ item.item }}'
+- name: Create a private rollback directory
+  ansible.builtin.tempfile:
+    state: directory
+    prefix: klip-image-rollback-
+  register: klip_image_credentials_backup
+- name: Preserve previous reviewed files
+  ansible.builtin.command:
+    argv: [cp, '--preserve=mode,timestamps', --, '{{ item.item }}', '{{ klip_image_credentials_backup.path }}/{{ index }}']
+  loop: '{{ klip_image_credentials_originals.results }}'
+  loop_control:
+    index_var: index
+    label: '{{ item.item }}'
+  when: item.stat.exists
+  changed_when: false
+- name: Install and health-check with rollback
+  block:
+    - name: Create managed configuration directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        owner: root
+        group: root
+        mode: '0755'
+      loop: [/opt/klip/image-credentials, /etc/kubernetes/image-credentials, /etc/systemd/system/kubelet.service.d]
+    - name: Install the checksum-verified upstream executable
+      ansible.builtin.copy:
+        src: '{{ klip_image_credentials_binary }}'
+        dest: /opt/klip/image-credentials/ecr-credential-provider
+        owner: root
+        group: root
+        mode: '0755'
+      register: klip_image_credentials_binary_copy
+    - name: Install exact project registry and Pod-token configuration
+      ansible.builtin.copy:
+        content: '{{ klip_image_credentials_provider_yaml }}'
+        dest: /etc/kubernetes/image-credentials/provider.yaml
+        owner: root
+        group: root
+        mode: '0644'
+      register: klip_image_credentials_config_copy
+    - name: Add credential flags while retaining every existing kubeadm argument
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/kubelet.service.d/30-klip-image-credentials.conf
+        owner: root
+        group: root
+        mode: '0644'
+        content: |
+          [Service]
+          Environment="KUBELET_IMAGE_CREDENTIAL_ARGS=\
+            --image-credential-provider-bin-dir=/opt/klip/image-credentials \
+            --image-credential-provider-config=/etc/kubernetes/image-credentials/provider.yaml"
+          ExecStart=
+          ExecStart=/usr/bin/kubelet $KUBELET_KUBECONFIG_ARGS $KUBELET_CONFIG_ARGS $KUBELET_KUBEADM_ARGS $KUBELET_EXTRA_ARGS $KUBELET_IMAGE_CREDENTIAL_ARGS
+      register: klip_image_credentials_unit_copy
+    - name: Activate the reviewed unit on this host only
+      ansible.builtin.systemd_service:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+      when: klip_image_credentials_binary_copy.changed or klip_image_credentials_config_copy.changed or klip_image_credentials_unit_copy.changed
+    - name: Check the actual kubelet health endpoint
+      ansible.builtin.uri:
+        url: http://127.0.0.1:10248/healthz
+        return_content: true
+      register: klip_image_credentials_health
+      until: klip_image_credentials_health.status == 200 and klip_image_credentials_health.content == 'ok'
+      retries: 30
+      delay: 2
+    - name: Record successful local verification
+      ansible.builtin.set_fact:
+        klip_image_credentials_remove_backup: true
+  rescue:
+    - name: Restore previous files byte for byte
+      ansible.builtin.command:
+        argv: [cp, '--preserve=mode,timestamps', --, '{{ klip_image_credentials_backup.path }}/{{ index }}', '{{ item.item }}']
+      loop: '{{ klip_image_credentials_originals.results }}'
+      loop_control:
+        index_var: index
+        label: '{{ item.item }}'
+      when: item.stat.exists
+      changed_when: true
+    - name: Remove only newly introduced files
+      ansible.builtin.file:
+        path: '{{ item.item }}'
+        state: absent
+      loop: '{{ klip_image_credentials_originals.results }}'
+      loop_control:
+        label: '{{ item.item }}'
+      when: not item.stat.exists
+    - name: Reactivate the original kubelet configuration
+      ansible.builtin.systemd_service:
+        name: kubelet
+        state: restarted
+        daemon_reload: true
+    - name: Verify the restored kubelet
+      ansible.builtin.uri:
+        url: http://127.0.0.1:10248/healthz
+        return_content: true
+      register: klip_image_credentials_rollback_health
+      until: klip_image_credentials_rollback_health.status == 200 and klip_image_credentials_rollback_health.content == 'ok'
+      retries: 30
+      delay: 2
+    - name: Record verified rollback
+      ansible.builtin.set_fact:
+        klip_image_credentials_remove_backup: true
+    - name: Stop the rollout after a failed installation
+      ansible.builtin.fail:
+        msg: Installation failed and was rolled back; no subsequent host may be changed.
+  always:
+    - name: Remove verified rollback copies
+      ansible.builtin.file:
+        path: '{{ klip_image_credentials_backup.path }}'
+        state: absent
+      when: klip_image_credentials_remove_backup | default(false)

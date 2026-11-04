@@ -1,0 +1,338 @@
+{
+  "schema_version": "klip-observability-runtime-review.v1",
+  "reviewed_at": "2026-11-03T21:43:08+00:00",
+  "expires_at": "2026-11-10T21:43:08+00:00",
+  "scan_source_commit": "07f64053b32508bc4d6e1dd1014790130b8a7211",
+  "configuration": {
+    "values_sha256": "cdde2069e7233de4bea07b159ba7717b4cb3120bd6615198edecebfb43d5bdf9",
+    "thanos_values_sha256": "9ebf437bd3514b33d6c231474f475720cbd446960ebf718b39af92beeb689911",
+    "boundary_sha256": "942f2fe39d03f2e260c4f27ed8fc0434c419d1c2faabcca0439b1da499f3dbaa",
+    "chart_sha256": "fc8fe107f94a3009c04af63a03fb811393970db0eb973a9c513941acfce565c1"
+  },
+  "images": {
+    "quay.io/prometheus-operator/prometheus-operator:v0.94.2@sha256:051606fe50e8c4bf6a433f0972bc3dcf3b90a62bc712f55692a9c4be83fe6f46": {
+      "report_file": "image-00.json",
+      "report_sha256": "8987d2f01017c66581ab099e99397ec7b52122779e5b6fecf281525844a15fac",
+      "high_findings": []
+    },
+    "quay.io/prometheus-operator/prometheus-config-reloader:v0.94.2@sha256:e825978c71333cc8e140400506da8fa4972c7087f62805b378a1b93259924fdb": {
+      "report_file": "image-01.json",
+      "report_sha256": "efc3aa1778e0724865c15dbecc4d3195e147495299e4fe014e7b40f5068305ae",
+      "high_findings": []
+    },
+    "quay.io/prometheus/alertmanager:v0.34.2@sha256:7619e9399e623c9f99a40cb199c2bceb972cbf725598a51dcbde69d51dcaaedf": {
+      "report_file": "image-02.json",
+      "report_sha256": "fc3f4cd9e1055242d8ccde6a835edea48b1d6241840ce4fa623ff356a89df1a8",
+      "high_findings": []
+    },
+    "quay.io/prometheus/prometheus:v3.15.1-distroless@sha256:654d8f0008e660c00203e0b94938ec7b804e35b5772641d6416c20fff7684ee9": {
+      "report_file": "image-03.json",
+      "report_sha256": "071df49f33173a1683f9059055f71c04ba66c7e836a7621225543bf99b4fb708",
+      "high_findings": []
+    },
+    "quay.io/prometheus/node-exporter:v1.12.1-distroless@sha256:bbfbd533202cfef891c70383ddf6f0c32acece66400ad8091a18bed7aad5db6f": {
+      "report_file": "image-04.json",
+      "report_sha256": "19ade7046e7b9b5185716be9d0afdb810738925fe2ba15f9cbf31f0ddd78eac6",
+      "high_findings": [
+        {
+          "id": "CVE-2026-56854",
+          "package": "golang.org/x/crypto",
+          "version": "v0.54.0",
+          "fixed_version": "0.55.0",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "golang.org/x/net",
+          "version": "v0.57.0",
+          "fixed_version": "0.60.0",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-56851",
+          "package": "golang.org/x/text",
+          "version": "v0.40.0",
+          "fixed_version": "0.41.0",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-111943",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.26.10, 1.27.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-33818",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-39821",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-46600",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-56853",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-56858",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-56859",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-56860",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-56862",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.25.13, 1.26.6, 1.27.0-rc.3",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-78667",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "node-exporter-isolation"
+        },
+        {
+          "id": "CVE-2026-97031",
+          "package": "stdlib",
+          "version": "v1.26.5",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "node-exporter-isolation"
+        }
+      ]
+    },
+    "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0@sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016": {
+      "report_file": "image-05.json",
+      "report_sha256": "c489ce1820ece7c9ddd84accd320dd79506532de71cb0ca46f2c4163114a3358",
+      "high_findings": [
+        {
+          "id": "CVE-2026-56854",
+          "package": "golang.org/x/crypto",
+          "version": "v0.54.0",
+          "fixed_version": "0.55.0",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "golang.org/x/net",
+          "version": "v0.57.0",
+          "fixed_version": "0.60.0",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-56851",
+          "package": "golang.org/x/text",
+          "version": "v0.40.0",
+          "fixed_version": "0.41.0",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-84304",
+          "package": "google.golang.org/grpc",
+          "version": "v1.79.3",
+          "fixed_version": "1.83.1",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-84445",
+          "package": "google.golang.org/grpc",
+          "version": "v1.79.3",
+          "fixed_version": "1.82.2, 1.83.2, 1.84.0-dev.0.20260825144003-d5a41119e0e3, 1.85.0-dev.0.20260825072537-93e31b48545e",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "GHSA-hrxh-6v49-42gf",
+          "package": "google.golang.org/grpc",
+          "version": "v1.79.3",
+          "fixed_version": "1.82.1",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-111943",
+          "package": "stdlib",
+          "version": "v1.26.6",
+          "fixed_version": "1.26.10, 1.27.3",
+          "condition": "ksm-private-ca"
+        },
+        {
+          "id": "CVE-2026-78667",
+          "package": "stdlib",
+          "version": "v1.26.6",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "stdlib",
+          "version": "v1.26.6",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "ksm-metrics-only"
+        },
+        {
+          "id": "CVE-2026-97031",
+          "package": "stdlib",
+          "version": "v1.26.6",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "ksm-metrics-only"
+        }
+      ]
+    },
+    "quay.io/thanos/thanos:v0.42.5@sha256:a13aade5af3866e40d0f01c17750ad4decbb500fdb6a37a54b8348d4dfa09f49": {
+      "report_file": "image-07.json",
+      "report_sha256": "889390f4c3c06f852ec153d8565d022a4a5188dca6b88c6237e5b2c137ffde57",
+      "high_findings": [
+        {
+          "id": "CVE-2026-116587",
+          "package": "github.com/go-jose/go-jose/v4",
+          "version": "v4.1.4",
+          "fixed_version": "4.1.6",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "CVE-2026-63209",
+          "package": "github.com/klauspost/compress",
+          "version": "v1.18.2",
+          "fixed_version": "1.18.7",
+          "condition": "trusted-metrics-blocks"
+        },
+        {
+          "id": "CVE-2026-42151",
+          "package": "github.com/prometheus/prometheus",
+          "version": "v0.309.1",
+          "fixed_version": "0.311.3",
+          "condition": "unused-prometheus-server-apis"
+        },
+        {
+          "id": "CVE-2026-42154",
+          "package": "github.com/prometheus/prometheus",
+          "version": "v0.309.1",
+          "fixed_version": "0.311.3, 0.305.2",
+          "condition": "unused-prometheus-server-apis"
+        },
+        {
+          "id": "CVE-2026-56854",
+          "package": "golang.org/x/crypto",
+          "version": "v0.53.0",
+          "fixed_version": "0.55.0",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "golang.org/x/net",
+          "version": "v0.56.0",
+          "fixed_version": "0.60.0",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "CVE-2026-56851",
+          "package": "golang.org/x/text",
+          "version": "v0.38.0",
+          "fixed_version": "0.41.0",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "CVE-2026-56852",
+          "package": "golang.org/x/text",
+          "version": "v0.38.0",
+          "fixed_version": "0.39.0",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "CVE-2026-84304",
+          "package": "google.golang.org/grpc",
+          "version": "v1.81.1",
+          "fixed_version": "1.83.1",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "CVE-2026-84445",
+          "package": "google.golang.org/grpc",
+          "version": "v1.81.1",
+          "fixed_version": "1.82.2, 1.83.2, 1.84.0-dev.0.20260825144003-d5a41119e0e3, 1.85.0-dev.0.20260825072537-93e31b48545e",
+          "condition": "internal-thanos-transports"
+        },
+        {
+          "id": "GHSA-hrxh-6v49-42gf",
+          "package": "google.golang.org/grpc",
+          "version": "v1.81.1",
+          "fixed_version": "1.82.1",
+          "condition": "internal-thanos-transports"
+        }
+      ]
+    }
+  },
+  "conditions": {
+    "node-exporter-isolation": "Pod-network HTTP/1 metrics only; no TLS/web-config, outbound access, Kubernetes/AWS token or privileged network namespace. Host mounts are read-only and process is non-root. Only Prometheus and node-local health probes may connect. Network-namespace collectors are disabled. Optional XML-RPC/TLS collectors remain disabled; host input is administrator-controlled. Potential static call paths remain visible; this is a bounded residual review, not a claim that all reported code is unreachable.",
+    "ksm-metrics-only": "Only port/resources arguments and default metrics operation; no gRPC/xDS server, OTel exporter, custom resources, TLS web config or public listener. Only Prometheus may connect; egress is restricted to DNS and the Kubernetes API. Secrets/ConfigMaps are excluded from collectors and RBAC. Read-only non-root workload with bounded resources.",
+    "ksm-private-ca": "The API client uses the explicitly projected private Kubernetes CA; system roots and the distrusted public intermediates described by GO-2026-6809 are not used for that connection. No arbitrary API server, root store or TLS web configuration is admitted.",
+    "unused-prometheus-server-apis": "Only Thanos sidecar/query/store/compact are in scope, with S3 object storage. No Receive/Ruler, Azure OAuth remote-write configuration, Prometheus config API or remote-read ingestion handler is enabled. Embedded-module findings remain retained; changing components or configuration requires a new review.",
+    "internal-thanos-transports": "Only internal Prometheus/Thanos/Grafana endpoints may reach the HTTP/gRPC services. No public service or xDS authentication is enabled. No SSH or arbitrary JWK/OIDC key configuration is consumed. IAM grants only the selected bucket role, metadata fallback is disabled and resources are bounded. Reachable transport paths remain residual risk until upstream dependency fixes.",
+    "trusted-metrics-blocks": "No Receive/remote-write ingestion or external block import. Only the selected Prometheus role writes the private project metrics bucket; store/query are read-only and compactor has scoped block deletion. No external/custom compression dictionaries are configured. The dependency finding is not declared unreachable; trusted data, network controls and resource limits bound current exposure."
+  },
+  "source_analysis": {
+    "exporters": {
+      "workflow_run": 41722600867,
+      "commit": "07f64053b32508bc4d6e1dd1014790130b8a7211",
+      "node_exporter": "6044da783597cc3b57aef7580ddcdcff58a4ee99",
+      "kube_state_metrics": "4ffeda2ef866b0fef372849825a803296483b336"
+    },
+    "thanos": {
+      "workflow_run": 41723266847,
+      "commit": "ea75f8902bf5fdf3f712140c402aa54ac44abdac",
+      "source": "4f05efeeadbacdc6552d68ef0850b40317109b4f",
+      "go": "1.26.10"
+    }
+  },
+  "references": [
+    "https://prometheus.io/docs/operating/security/",
+    "https://pkg.go.dev/golang.org/x/vuln/cmd/govulncheck",
+    "https://go.dev/issue/82345"
+  ],
+  "limitations": [
+    "High findings remain. Fixed upstream images should replace these pins after compatibility validation.",
+    "Source analysis is conservative; absence from its output does not waive a finding.",
+    "This review does not authorize public telemetry, tenant-controlled scrape configuration or arbitrary external data sources."
+  ],
+  "configuration_amended_at": "2026-11-03T23:45:38.189706+00:00",
+  "amended_at": "2026-11-03T22:53:28.824580+00:00"
+}

@@ -87,6 +87,7 @@ def test_role_creation_and_passrole_cannot_escape_node_boundary(documents):
     assert create["Resource"] == [
         f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-control-plane",
         f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-network-probe",
+        f"arn:aws:iam::{ACCOUNT}:role/kubernetes-llm-inference-platform/klip-platform-worker",
     ]
     assert create["Condition"]["StringEquals"]["iam:PermissionsBoundary"].endswith(
         "/kubernetes-llm-control-plane-boundary"
@@ -133,6 +134,19 @@ def test_managed_policies_fit_aws_size_limit(documents):
     for name, document in documents.items():
         if name != "trust":
             assert len(json.dumps(document, separators=(",", ":"))) <= 6144
+
+
+def test_cpu_options_are_granted_only_to_owned_lab_platform_workers(documents):
+    permission = next(
+        s for s in documents["compute"]["Statement"] if s["Sid"] == "ResizeOwnedPlatformCpu"
+    )
+    assert permission["Action"] == ["ec2:ModifyInstanceCpuOptions"]
+    conditions = permission["Condition"]["StringEquals"]
+    assert conditions["ec2:ResourceTag/Node"] == ["platform-01", "platform-02", "platform-03"]
+    assert conditions["ec2:ResourceTag/Cluster"] == "klip"
+    assert conditions["ec2:ResourceTag/Environment"] == "lab"
+    assert conditions["aws:RequestedRegion"] == "eu-west-2"
+    assert "ModifyInstanceCpuOptions" not in json.dumps(documents["node-boundary"])
 
 
 def test_dns_has_exact_record_scope_and_separate_state(documents):

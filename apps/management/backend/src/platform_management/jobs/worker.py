@@ -31,6 +31,10 @@ from platform_management.providers.base import (
     CapacityUnavailable,
     TransientProviderError,
 )
+from platform_management.providers.lambda_mutations import (
+    ProviderIdentityConflict,
+    ProviderRejected,
+)
 from platform_management.services.common import AppError, lock_key, now
 from platform_management.settings import get_settings
 
@@ -71,6 +75,13 @@ def counts(group):
 
 def step_group(op, payload, checkpoint, config=None):
     """Return a replacement resource payload and next checkpoint; provider calls have no DB tx."""
+    config = config or registry.configuration()
+    if config.get("mode") == "real":
+        from platform_management.jobs.real_worker import step_real_group
+
+        result = step_real_group(op, payload, checkpoint, config)
+        counts(result[0]["group"])
+        return result
     payload = copy.deepcopy(payload)
     group, fault = payload["group"], payload["fault"]
     state, spec = group["status"], group["spec"]
@@ -93,7 +104,6 @@ def step_group(op, payload, checkpoint, config=None):
         request["expiry"] = True
         phase = "drain"
     done, failed = False, checkpoint.get("creation_failed", False)
-    config = config or registry.configuration()
     provider = registry.simulated(config, "provider")
     if phase == "allocate":
         with session() as db, db.begin():
@@ -395,7 +405,8 @@ def execute(identity, owner):
                         operation.payload,
                         status="failed",
                         step=step,
-                        error={
+                        error=checkpoint.get("failure")
+                        or {
                             "code": "lease_expired"
                             if checkpoint["request"].get("expiry")
                             else "partial_failure",
@@ -436,10 +447,23 @@ def execute(identity, owner):
                     None,
                 )
                 job.attempt = 0
-                job.due_at = now() + timedelta(seconds=get_settings().simulation_step_seconds)
+                job.due_at = now() + timedelta(
+                    seconds=5
+                    if config.get("provider") == "lambda:v1"
+                    else get_settings().simulation_step_seconds
+                )
                 db.add(Event(operation_id=identity, message=step.replace("_", " ")))
         except Exception as exc:
-            permanent = isinstance(exc, (CapacityUnavailable, ValueError, AppError))
+            permanent = isinstance(
+                exc,
+                (
+                    CapacityUnavailable,
+                    ValueError,
+                    AppError,
+                    ProviderIdentityConflict,
+                    ProviderRejected,
+                ),
+            )
             with session() as db, db.begin():
                 job = owned(db, identity, owner)
                 job.attempt += 1
@@ -483,6 +507,10 @@ def execute(identity, owner):
                         )
                     )
                     cleanup = cleanup or unresolved is not None
+                    if payload.get("mode") == "real":
+                        from platform_management.jobs.real_worker import recover_real_group
+
+                        cleanup = recover_real_group(db, payload) or cleanup
                     if terminal:
                         status["phase"] = "draining" if cleanup else "failed"
                         status["active_operation_id"] = None

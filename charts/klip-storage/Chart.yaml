@@ -1,0 +1,5 @@
+apiVersion: v2
+name: klip-storage
+version: 0.1.0
+type: application
+description: Retained static IAM/TLS EFS artifact volume and claim

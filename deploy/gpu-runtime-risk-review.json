@@ -1,0 +1,346 @@
+{
+  "schema_version": "klip-gpu-runtime-risk-review.v1",
+  "profile": "single-a10",
+  "reviewed_at": "2026-11-04T09:05:02.273130+00:00",
+  "expires_at": "2026-11-11T09:05:02.273130+00:00",
+  "configuration": {
+    "gpu-operator.lock.json": "f043710f0d5e24de65d5c6df0336007e3097cc34a10788841887554dbf4d7866",
+    "gpu-host.lock.json": "9d6dfbd16b1e9e36913c75ea32deb152b48961cf863143a5b1c88342db59c5cc",
+    "artifacts.lock.json": "cd8ba33331162411ac9f5ddad0f6d59e8139759c15c903693bb80ce0bbf3cdd3",
+    "values": "89a4a8467c371dbbe9303b49e248aa10dc574cda69493d280fbc781ae143c5c3",
+    "boundary": "27aae6f38130e3476da903e3d1cc5c7fd174a3e1d2283d058d01fbd878b253c2"
+  },
+  "scope": "One quarantined A10 bootstrap and hardware/network/GPU readiness validation only; no public inference or arbitrary tenant workloads.",
+  "limitations": [
+    "Conditional experiment risk acceptance; vulnerable dependencies are retained and are not production security certification.",
+    "Kernel package/header CVEs cannot prove running-host applicability. Ubuntu GA 6.8.0-147 remains an experimental preparation baseline with known unresolved advisories; only trusted project administration and fixed validation workloads are permitted.",
+    "GPU memory, CUDA, networking, DCGM freshness and the actual host kernel must pass separate live checks.",
+    "Public serving/gateway/model images require their own review and validation before exposing inference.",
+    "Changed locks, boundaries, images, native findings, file inventory or expiry require a new review."
+  ],
+  "images": {
+    "nvcr.io/nvidia/gpu-operator:v26.7.2@sha256:e118f631813f93a43fa17332fb2060d3d1f3f150359dd6744f3a9b2f7b7c5707": {
+      "directory": "gpu-runtime-operator-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "60fe984087fded79b937bded0e4b0669c87b397cb43e387d5267cf55ad795306",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 5,
+          "sha256": "bb48ad78bb33694506576f193c84d3812c94692ef5e5d9dcce1e1fa7cc3a34f1",
+          "rationale": [
+            {
+              "cve": "CVE-2026-111943",
+              "reason": "The verifier denylist is outdated. Only fixed Kubernetes and public registry/package origins are used; no caller-selected certificate chain or arbitrary URL is accepted. Public upstream or trust-store compromise remains a risk; these dependencies are not declared fixed."
+            },
+            {
+              "cve": "CVE-2026-78667",
+              "reason": "No GPU operand or containerd listener serves caller-selected files through Go FileServer/ServeFile/ServeContent. Metrics/health ingress remains private. The affected library is retained."
+            },
+            {
+              "cve": "CVE-2026-78669",
+              "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+            },
+            {
+              "cve": "CVE-2026-97031",
+              "reason": "No public Go TLS server or caller-supplied ECH handshake is accepted by the configured GPU/runtime components. Private metrics/health and local sockets remain restricted. Exposing a TLS listener invalidates this scope."
+            }
+          ]
+        }
+      }
+    },
+    "nvcr.io/nvidia/driver:595.91.07-ubuntu24.04@sha256:93e07958a6640507677b596257557b7fc9f8f0bc0351b06f0fcbe4e251fb12fc": {
+      "directory": "gpu-runtime-driver-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "65d90f4c3917e171832cf16eae6f5a65a37f8e41c8a8464065a8afc625caed18",
+      "groups": {
+        "kernel_headers": {
+          "count": 549,
+          "sha256": "02128c888250f22e07ad975267fcbec7cb87ac0f8814b7b43694e02bc73c2d06",
+          "rationale": [
+            "All attributed findings belong to the exact linux-libc-dev userspace header package: its complete native inventory contains only /usr/include/*.h and package documentation. These files do not contain the affected running kernel implementations. This is a component-applicability decision, not a repaired kernel or a waiver of running-host risks. The host independently requires the pinned GA kernel/package identities, disabled GCOV, Nouveau exclusion, root-only administration, restricted SSH, host firewall, quarantine and bounded lease. Raw findings remain retained."
+          ],
+          "file_count": 990,
+          "files_sha256": "9ff2a95eb384fd1c9b235fd7f6b2aaa4ab7247822ced20d7cea663a9026c6622"
+        },
+        "runtime": {
+          "count": 3,
+          "sha256": "31c1e91566a501b652637c4575489db33437c19bb8d4b71b52b765a35b0be118",
+          "rationale": [
+            {
+              "cve": "CVE-2026-111497",
+              "reason": "The driver bootstrap does not accept user-supplied Brotli content. Its package/kernel inputs use fixed distribution repositories. The decoder remains present; an upstream compromise or added Brotli input invalidates this applicability decision."
+            },
+            {
+              "cve": "CVE-2026-84782",
+              "reason": "Configured operands and runtime do not use DTLS. Driver downloads use HTTPS/TCP; the installed OpenSSL implementation remains vulnerable when used for the affected DTLS operation."
+            }
+          ]
+        }
+      }
+    },
+    "nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1@sha256:12c47fcad17b7ef8eb668b8ad6394219c62b156603438567c8dd3de0102a82c0": {
+      "directory": "gpu-runtime-driver-manager-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "b3af986ccef72d6a753e8b2dc34a568101921f29abf79dc3a33ff219b65abf18",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 7,
+          "sha256": "783c1d2b5b937b1e523f5963958235dbfda0ab850a90c92dda9ac8d6f2202b25",
+          "rationale": [
+            {
+              "cve": "CVE-2026-111943",
+              "reason": "The verifier denylist is outdated. Only fixed Kubernetes and public registry/package origins are used; no caller-selected certificate chain or arbitrary URL is accepted. Public upstream or trust-store compromise remains a risk; these dependencies are not declared fixed."
+            },
+            {
+              "cve": "CVE-2026-78667",
+              "reason": "No GPU operand or containerd listener serves caller-selected files through Go FileServer/ServeFile/ServeContent. Metrics/health ingress remains private. The affected library is retained."
+            },
+            {
+              "cve": "CVE-2026-78669",
+              "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+            },
+            {
+              "cve": "CVE-2026-84782",
+              "reason": "Configured operands and runtime do not use DTLS. Driver downloads use HTTPS/TCP; the installed OpenSSL implementation remains vulnerable when used for the affected DTLS operation."
+            },
+            {
+              "cve": "CVE-2026-97031",
+              "reason": "No public Go TLS server or caller-supplied ECH handshake is accepted by the configured GPU/runtime components. Private metrics/health and local sockets remain restricted. Exposing a TLS listener invalidates this scope."
+            }
+          ]
+        }
+      }
+    },
+    "nvcr.io/nvidia/k8s/container-toolkit:v1.20.1@sha256:c4a052b4013b2a5ab36e9c88225cb1bdb8d968808364f65fa7bfbd0bcd5032de": {
+      "directory": "gpu-runtime-toolkit-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "f1e58ba0fcd4680e48fa9541a416a34d53f38fd86687c05ac902df2c6986eb25",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 7,
+          "sha256": "977bd02cd8a98af2266dad54d4e3c1c90934439d22de263b95ff6da798412ce1",
+          "rationale": [
+            {
+              "cve": "CVE-2026-111943",
+              "reason": "The verifier denylist is outdated. Only fixed Kubernetes and public registry/package origins are used; no caller-selected certificate chain or arbitrary URL is accepted. Public upstream or trust-store compromise remains a risk; these dependencies are not declared fixed."
+            },
+            {
+              "cve": "CVE-2026-78667",
+              "reason": "No GPU operand or containerd listener serves caller-selected files through Go FileServer/ServeFile/ServeContent. Metrics/health ingress remains private. The affected library is retained."
+            },
+            {
+              "cve": "CVE-2026-78669",
+              "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+            },
+            {
+              "cve": "CVE-2026-84445",
+              "reason": "The device-plugin/runtime gRPC path is a local host Unix socket, not an inference or public RPC service. A compromised host workload remains in the threat boundary; no arbitrary tenant containers are admitted in this experiment."
+            },
+            {
+              "cve": "CVE-2026-84782",
+              "reason": "Configured operands and runtime do not use DTLS. Driver downloads use HTTPS/TCP; the installed OpenSSL implementation remains vulnerable when used for the affected DTLS operation."
+            },
+            {
+              "cve": "CVE-2026-97031",
+              "reason": "No public Go TLS server or caller-supplied ECH handshake is accepted by the configured GPU/runtime components. Private metrics/health and local sockets remain restricted. Exposing a TLS listener invalidates this scope."
+            }
+          ]
+        }
+      }
+    },
+    "nvcr.io/nvidia/k8s-device-plugin:v0.20.1@sha256:d279ecdb47b252c4cd96f4224650e9808c36012f6979570c9611ddbc5b0749a7": {
+      "directory": "gpu-runtime-device-plugin-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "b79b2234078d0666eabf2d15ea515fc0c9d994e1de3e77ce7eca2a2ae0739d4c",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 7,
+          "sha256": "783c1d2b5b937b1e523f5963958235dbfda0ab850a90c92dda9ac8d6f2202b25",
+          "rationale": [
+            {
+              "cve": "CVE-2026-111943",
+              "reason": "The verifier denylist is outdated. Only fixed Kubernetes and public registry/package origins are used; no caller-selected certificate chain or arbitrary URL is accepted. Public upstream or trust-store compromise remains a risk; these dependencies are not declared fixed."
+            },
+            {
+              "cve": "CVE-2026-78667",
+              "reason": "No GPU operand or containerd listener serves caller-selected files through Go FileServer/ServeFile/ServeContent. Metrics/health ingress remains private. The affected library is retained."
+            },
+            {
+              "cve": "CVE-2026-78669",
+              "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+            },
+            {
+              "cve": "CVE-2026-84782",
+              "reason": "Configured operands and runtime do not use DTLS. Driver downloads use HTTPS/TCP; the installed OpenSSL implementation remains vulnerable when used for the affected DTLS operation."
+            },
+            {
+              "cve": "CVE-2026-97031",
+              "reason": "No public Go TLS server or caller-supplied ECH handshake is accepted by the configured GPU/runtime components. Private metrics/health and local sockets remain restricted. Exposing a TLS listener invalidates this scope."
+            }
+          ]
+        }
+      }
+    },
+    "nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless@sha256:804c17f67ab63e8a4dd5301546beefaa104129f833dae4a68f5ff7c4819f471b": {
+      "directory": "gpu-runtime-dcgm-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "a1de24afbc7327dfac302bc5a876ea87c822eb65ee2dabcad54929f538e42fd9",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 7,
+          "sha256": "f213a2a37ff726f46f549e4972d9c1111062b08f53ff8c385d3d9cf6021dea2c",
+          "rationale": [
+            {
+              "cve": "CVE-2026-111943",
+              "reason": "The verifier denylist is outdated. Only fixed Kubernetes and public registry/package origins are used; no caller-selected certificate chain or arbitrary URL is accepted. Public upstream or trust-store compromise remains a risk; these dependencies are not declared fixed."
+            },
+            {
+              "cve": "CVE-2026-78667",
+              "reason": "No GPU operand or containerd listener serves caller-selected files through Go FileServer/ServeFile/ServeContent. Metrics/health ingress remains private. The affected library is retained."
+            },
+            {
+              "cve": "CVE-2026-78669",
+              "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+            },
+            {
+              "cve": "CVE-2026-84782",
+              "reason": "Configured operands and runtime do not use DTLS. Driver downloads use HTTPS/TCP; the installed OpenSSL implementation remains vulnerable when used for the affected DTLS operation."
+            },
+            {
+              "cve": "CVE-2026-97031",
+              "reason": "No public Go TLS server or caller-supplied ECH handshake is accepted by the configured GPU/runtime components. Private metrics/health and local sockets remain restricted. Exposing a TLS listener invalidates this scope."
+            }
+          ]
+        }
+      }
+    },
+    "nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0@sha256:9855f4c8500addf185360474184b9efdaf4384284779aa9173dcd70164a4ae6f": {
+      "directory": "gpu-runtime-cuda-canary-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "a90ea1c5e9f3794778655f63daeb86f09a1e10cce52a4d036856b4b9d2e66fb4",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 16,
+          "sha256": "3cc57ba20581d34a099b545793be278cfe89d35f9c51b861fd5659a9e47dbcfb",
+          "rationale": [
+            {
+              "cve": "CVE-2025-68973",
+              "reason": "GnuPG programs in the CUDA sample are not invoked by the fixed vectorAdd/nvidia-smi command; no key import, network keyserver or signed benchmark input is exposed. This is not approval for general use of the CUDA image."
+            },
+            {
+              "cve": "CVE-2026-45447",
+              "reason": "The CUDA validation command does not perform PKCS7 verification, import signed user content or process benchmark payloads. This review permits only the fixed vectorAdd/nvidia-smi canary, not arbitrary execution of this image."
+            },
+            {
+              "cve": "CVE-2026-84782",
+              "reason": "Configured operands and runtime do not use DTLS. Driver downloads use HTTPS/TCP; the installed OpenSSL implementation remains vulnerable when used for the affected DTLS operation."
+            }
+          ]
+        }
+      }
+    },
+    "registry.k8s.io/nfd/node-feature-discovery:v0.20.1@sha256:fe0b7420834216bfafadeb082da3df55be3501a631bc689b8512326fbc2e65e3": {
+      "directory": "gpu-runtime-nfd-75d0ec7d86360412465d2505b5c7492bb5e8a826",
+      "report_sha256": "e5921489c4e1aa32dbe63de6ff58138e50db3b7798cd297feec5fdc5053cf523",
+      "groups": {
+        "kernel_headers": {
+          "count": 0,
+          "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+          "rationale": []
+        },
+        "runtime": {
+          "count": 1,
+          "sha256": "d77b1d46edc269f758448fb33accc547cc3e3d2fc0a14b228c7483e5ec2f8e39",
+          "rationale": [
+            {
+              "cve": "CVE-2026-78669",
+              "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+            }
+          ]
+        }
+      }
+    }
+  },
+  "host_binaries": {
+    "report_sha256": "4e0c479cea1de58b8610992adf5efe4dff98055bf5c300444bfd9e934a429dc5",
+    "files": {
+      "bin/containerd": "41a7ebd6e9a2e69cb9e38303ad3582af272b1bae526bacc310324f0851fe9457",
+      "bin/containerd-shim-runc-v2": "9c4eb9d87cfa5e8480775949c350ec20a4a6b6fdc24e4568c6ec6197a9b52c45",
+      "bin/containerd-stress": "6f1a872e76b442c3be29c2e7b7faf13c953e203ba272adf9aa63ff674d940bb9",
+      "bin/ctr": "661ff4471e1c1bc19d59ff2471c0778b8fcbcbda0c49f5c2c76bfdebad306c03",
+      "runc": "599f6f94ff8c5057241eff0d54c3c74f95c34935b6457b33fe545defc61e9488"
+    },
+    "groups": {
+      "kernel_headers": {
+        "count": 0,
+        "sha256": "4f53cda18c2baa0c0354bb5f9a3ecbe5ed12ab4d8e11ba873c2f11161202b945",
+        "rationale": []
+      },
+      "runtime": {
+        "count": 12,
+        "sha256": "5171bf646194df9967f6865cd3472d3e21856f0c9abfe289aa801dbd99bab023",
+        "rationale": [
+          {
+            "cve": "CVE-2026-111943",
+            "reason": "The verifier denylist is outdated. Only fixed Kubernetes and public registry/package origins are used; no caller-selected certificate chain or arbitrary URL is accepted. Public upstream or trust-store compromise remains a risk; these dependencies are not declared fixed."
+          },
+          {
+            "cve": "CVE-2026-116587",
+            "reason": "The host runtime accepts no submitted RSA private JWK or configurable JWK URL. Registry authentication is fixed by the operator; CRI and containerd sockets remain host-local. Parsing arbitrary JWK material is outside the permitted profile."
+          },
+          {
+            "cve": "CVE-2026-46600",
+            "reason": "The affected DNS parser remains present. Runtime registry lookups use the configured trusted host resolver and fixed registries; arbitrary tenant DNS inputs are not admitted. A compromised resolver can still deny service."
+          },
+          {
+            "cve": "CVE-2026-56864",
+            "reason": "The prebuilt runtime does not fetch/build Go modules or contact a Go module proxy/checksum service on the GPU host. Module build-time compromise is not ruled out by this runtime applicability decision."
+          },
+          {
+            "cve": "CVE-2026-56865",
+            "reason": "No Go module proxy or sumdb operation runs in the admitted host runtime. The reviewed binaries are checksum-pinned upstream artifacts; build-chain assurance remains an upstream dependency."
+          },
+          {
+            "cve": "CVE-2026-63209",
+            "reason": "The affected s2.NewDict/Dict.Encode path is not used for submitted dictionaries. Only pinned registry artifacts are installed; no arbitrary tenant image or dictionary is accepted. Compromised upstream artifacts remain a risk."
+          },
+          {
+            "cve": "CVE-2026-78667",
+            "reason": "No GPU operand or containerd listener serves caller-selected files through Go FileServer/ServeFile/ServeContent. Metrics/health ingress remains private. The affected library is retained."
+          },
+          {
+            "cve": "CVE-2026-78669",
+            "reason": "HTTP/2 and gRPC peers are restricted to the private Kubernetes API, trusted local runtime sockets and operator namespace endpoints. There is no public operand/runtime API. A compromised authenticated peer can still cause denial of service; this is a bounded single-node experiment, not immunity."
+          },
+          {
+            "cve": "CVE-2026-97031",
+            "reason": "No public Go TLS server or caller-supplied ECH handshake is accepted by the configured GPU/runtime components. Private metrics/health and local sockets remain restricted. Exposing a TLS listener invalidates this scope."
+          }
+        ]
+      }
+    }
+  }
+}

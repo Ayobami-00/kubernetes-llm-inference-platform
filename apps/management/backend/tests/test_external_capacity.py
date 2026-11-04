@@ -35,7 +35,7 @@ def test_runner_resource_reservations_reject_impossible_limits(resources):
         Settings(runner_resources=resources)
 
 
-def example():
+def example(retained=False):
     stamp = now()
     inventory = json.loads((ROOT / "contracts/fixtures/inventories/cluster.json").read_text())
     inventory.update(
@@ -62,6 +62,9 @@ def example():
         allocated_at=(stamp - timedelta(minutes=1)).isoformat(),
         expires_at=(stamp + timedelta(minutes=89)).isoformat(),
     )
+    if retained:
+        group["spec"].update(capacity_lifecycle="externally_retained", ttl_minutes=None)
+        group["status"].update(capacity_lifecycle="externally_retained", expires_at=None)
     snapshot = json.loads(
         (ROOT / "contracts/fixtures/runs/writer-assist/completed-passing.json").read_text()
     )["snapshot"]
@@ -94,8 +97,8 @@ def example():
     return inventory, document, RunSnapshot.model_validate(snapshot)
 
 
-def onboard(client):
-    inventory, document, snapshot = example()
+def onboard(client, retained=False):
+    inventory, document, snapshot = example(retained)
     assert (
         receipt(client, post(client, "inventory", inventory, provenance="measured"))["status"]
         == "completed"
@@ -105,8 +108,9 @@ def onboard(client):
     return inventory, document, snapshot
 
 
-def test_onboarding_is_idempotent_and_external_resources_are_read_only(client):
-    _, document, _ = onboard(client)
+@pytest.mark.parametrize("retained", [False, True])
+def test_onboarding_is_idempotent_and_external_resources_are_read_only(client, retained):
+    _, document, _ = onboard(client, retained)
     assert (
         receipt(client, post(client, "external-capacity", document, provenance="measured"))[
             "status"
@@ -175,9 +179,11 @@ def test_expiry_does_not_delete_external_capacity(client):
         )
 
 
-@pytest.mark.parametrize("mismatch", [None, "image", "uid", "profile", "gpu", "stale", "lease"])
+@pytest.mark.parametrize(
+    "mismatch", [None, "retained", "image", "uid", "profile", "gpu", "stale", "lease"]
+)
 def test_live_evidence_and_remaining_lease_are_required(client, mismatch, monkeypatch):
-    _, _, snapshot = onboard(client)
+    _, _, snapshot = onboard(client, retained=mismatch == "retained")
     monkeypatch.setenv("MANAGEMENT_KUBE_API_URL", str(snapshot.inventory.cluster.api_endpoint))
     get_settings.cache_clear()
     profile = snapshot.serving_profiles[0]
@@ -228,7 +234,7 @@ def test_live_evidence_and_remaining_lease_are_required(client, mismatch, monkey
             snapshot,
         )
     checks = {c.code: c.status for c in report.checks}
-    if mismatch is None:
+    if mismatch in {None, "retained"}:
         assert (
             checks["gpu-latency-workers"]
             == checks["lease-latency-workers"]

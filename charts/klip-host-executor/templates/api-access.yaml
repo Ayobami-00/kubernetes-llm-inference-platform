@@ -1,0 +1,14 @@
+# Cilium's default CIDR selectors exclude cluster node identities. Match the
+# API-server entity without changing the cluster-wide CIDR matching mode.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: host-kube-api}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: klip-host-executor
+      app.kubernetes.io/component: api
+  egress:
+    - toEntities: [kube-apiserver]
+      toPorts:
+        - ports: [{port: '443', protocol: TCP}, {port: '6443', protocol: TCP}]

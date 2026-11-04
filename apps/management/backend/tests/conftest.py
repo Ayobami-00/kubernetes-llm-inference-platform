@@ -42,6 +42,7 @@ def test_database(tmp_path_factory):
     os.environ["MANAGEMENT_ADMIN_PASSWORD_FILE"] = str(secret)
     os.environ["MANAGEMENT_LAMBDA_API_KEY_FILE"] = str(secret.parent / "absent")
     os.environ["MANAGEMENT_SIMULATION_STEP_SECONDS"] = "0"
+    os.environ["MANAGEMENT_REAL_LIFECYCLE_ENABLED"] = "false"
     get_settings.cache_clear()
     engine.cache_clear()
     password_hash.cache_clear()

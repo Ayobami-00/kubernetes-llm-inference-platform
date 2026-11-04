@@ -1,0 +1,204 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "replicas": {
+      "type": "object",
+      "properties": {
+        "api": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "worker": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "web": {
+          "type": "integer",
+          "minimum": 1
+        }
+      }
+    },
+    "availability": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "minAvailable": {
+          "type": "integer",
+          "minimum": 1
+        },
+        "spreadAcrossZones": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled",
+        "minAvailable",
+        "spreadAcrossZones"
+      ]
+    },
+    "terminationGracePeriodSeconds": {
+      "type": "integer",
+      "minimum": 30
+    },
+    "imagePullRoleArn": {
+      "type": "string",
+      "pattern": "^$|^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$"
+    },
+    "web": {
+      "type": "object",
+      "properties": {
+        "tls": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enabled": {
+              "type": "boolean"
+            },
+            "existingSecret": {
+              "type": "string",
+              "minLength": 1
+            },
+            "createCertificate": {
+              "type": "boolean"
+            },
+            "dnsNames": {
+              "type": "array",
+              "items": {
+                "type": "string",
+                "minLength": 1
+              },
+              "uniqueItems": true
+            }
+          },
+          "required": [
+            "enabled",
+            "existingSecret",
+            "createCertificate",
+            "dnsNames"
+          ]
+        },
+        "trustedProxyCIDRs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$"
+          }
+        },
+        "serviceType": {
+          "enum": [
+            "ClusterIP",
+            "NodePort"
+          ]
+        },
+        "nodePort": {
+          "type": [
+            "integer",
+            "null"
+          ],
+          "minimum": 30000,
+          "maximum": 32767
+        }
+      }
+    },
+    "database": {
+      "type": "object",
+      "properties": {
+        "requireTLS": {
+          "type": "boolean"
+        },
+        "caSecret": {
+          "type": "string"
+        },
+        "caKey": {
+          "type": "string",
+          "minLength": 1
+        }
+      }
+    },
+    "api": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "trustedProxyCIDRs": {
+          "type": "array",
+          "uniqueItems": true,
+          "items": {
+            "type": "string",
+            "pattern": "^([0-9]{1,3}\\.){3}[0-9]{1,3}/([0-9]|[12][0-9]|3[0-2])$"
+          }
+        }
+      },
+      "required": [
+        "trustedProxyCIDRs"
+      ]
+    },
+    "networkPolicy": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        }
+      },
+      "required": [
+        "enabled"
+      ]
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clientTLSSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bootstrapSeedSecret": {
+          "type": "string"
+        },
+        "bootstrapSeedKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "clientTLSSecret",
+        "bootstrapSeedSecret",
+        "bootstrapSeedKey",
+        "policy"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bootstrapSeedSecret": {
+                "minLength": 1
+              },
+              "policy": {
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      ]
+    }
+  }
+}

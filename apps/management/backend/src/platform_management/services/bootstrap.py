@@ -1,0 +1,339 @@
+"""Bind launch-time cloud-init possession to a strict SSH host key.
+
+Only an operation-scoped nonce reaches the VM. The seed remains a separate
+mounted credential. PostgreSQL retains its hash/expiry and the public host key.
+"""
+
+import base64
+import hashlib
+import hmac
+import json
+import re
+from datetime import datetime, timedelta
+from ipaddress import IPv4Network
+from urllib.parse import urlsplit
+
+import yaml
+
+from platform_management.db.models import ProviderIntent
+from platform_management.db.session import session
+from platform_management.services.common import AppError, now
+
+SCRIPT_V1 = r"""import json, sys, time, urllib.error, urllib.request
+from pathlib import Path
+
+class NoRedirect(urllib.request.HTTPRedirectHandler):
+    def redirect_request(self, req, fp, code, msg, headers, newurl):
+        return None
+
+config_path = Path('/var/lib/klip/host-attestation.json')
+try:
+    config = json.loads(config_path.read_text())
+    key = ' '.join(Path('/etc/ssh/ssh_host_ed25519_key.pub').read_text().split()[:2])
+    body = json.dumps({'host_key': key}).encode()
+    opener = urllib.request.build_opener(urllib.request.ProxyHandler({}), NoRedirect())
+    for attempt in range(30):
+        request = urllib.request.Request(config['url'], data=body, method='POST', headers={
+            'Content-Type': 'application/json', 'Authorization': 'Bearer ' + config['nonce']})
+        try:
+            with opener.open(request, timeout=10) as response:
+                if response.status == 200:
+                    response.read(4096)
+                    config_path.unlink()
+                    sys.exit(0)
+        except urllib.error.HTTPError as error:
+            if error.code in (400, 401, 403, 409, 410, 422):
+                break
+        except (urllib.error.URLError, TimeoutError, OSError):
+            pass
+        if attempt < 29:
+            time.sleep(10)
+except (ValueError, KeyError, OSError):
+    pass
+print('KLIP host attestation failed; bootstrap remains quarantined', file=sys.stderr)
+sys.exit(1)
+"""
+
+SSH_GUARD = r"""import subprocess
+
+def check_ssh_sources(sources):
+    expected = {'ubuntu@' + value.split('/')[0] for value in sources}
+    subprocess.run(['/usr/sbin/sshd','-t'],check=True,
+                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15)
+    effective = subprocess.check_output(['/usr/sbin/sshd','-T'],text=True,
+                                       stderr=subprocess.DEVNULL,timeout=15)
+    values = {}
+    for line in effective.splitlines():
+        name,_,value=line.partition(' ')
+        values.setdefault(name,[]).extend(value.split())
+    if (set(values.get('allowusers',[])) != expected or
+        values.get('permitrootlogin') != ['no'] or
+        values.get('passwordauthentication') != ['no'] or
+        values.get('kbdinteractiveauthentication') != ['no']):
+        raise ValueError('Bootstrap SSH authentication policy differs')
+    subprocess.run(['systemctl','reload-or-restart','ssh'],check=True,
+                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
+"""
+
+SCRIPT_V2 = (
+    SSH_GUARD
+    + "\n"
+    + SCRIPT_V1.replace(
+        "    key = ' '.join",
+        "    check_ssh_sources(config['ssh_sources'])\n    key = ' '.join",
+        1,
+    ).replace("except (ValueError, KeyError, OSError):", "except Exception:")
+)
+
+# Preserve V1/V2 bytes: already issued launch plans bind their exact program hash.
+SSH_GUARD_V3 = SSH_GUARD.replace(
+    "    subprocess.run(['/usr/sbin/sshd','-t']",
+    "    subprocess.run(['systemctl','start','ssh'],check=True,\n"
+    "                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)\n"
+    "    subprocess.run(['/usr/sbin/sshd','-t']",
+    1,
+)
+
+SCRIPT_V3 = (
+    SSH_GUARD_V3
+    + "\n"
+    + SCRIPT_V1.replace(
+        "    key = ' '.join",
+        "    stage = 'ssh_policy'\n"
+        "    check_ssh_sources(config['ssh_sources'])\n"
+        "    stage = 'host_key'\n"
+        "    key = ' '.join",
+        1,
+    )
+    .replace("    body = json.dumps", "    stage = 'callback'\n    body = json.dumps", 1)
+    .replace(
+        "except (ValueError, KeyError, OSError):\n    pass",
+        "except Exception:\n"
+        "    try:\n"
+        "        # Fixed codes only: never send command output, credentials or file contents.\n"
+        "        code = locals().get('stage', 'configuration')\n"
+        "        opener = urllib.request.build_opener(\n"
+        "            urllib.request.ProxyHandler({}), NoRedirect())\n"
+        "        request = urllib.request.Request(config['url'] + '/failure',\n"
+        "            data=json.dumps({'code': code}).encode(), method='POST', headers={\n"
+        "                'Content-Type': 'application/json',\n"
+        "                'Authorization': 'Bearer ' + config['nonce']})\n"
+        "        with opener.open(request, timeout=10) as response:\n"
+        "            response.read(4096)\n"
+        "    except Exception:\n"
+        "        pass",
+        1,
+    )
+)
+
+
+def ssh_sources(values):
+    if not isinstance(values, (list, tuple)) or len(values) != 3:
+        raise ValueError("Bootstrap requires three platform CPU SSH sources")
+    networks = [IPv4Network(value, strict=True) for value in values]
+    if len(set(networks)) != 3 or any(
+        n.prefixlen != 32 or not n.network_address.is_global for n in networks
+    ):
+        raise ValueError("Bootstrap SSH sources require three distinct public /32s")
+    return sorted(str(n) for n in networks)
+
+
+def public_host_key(value: str) -> str:
+    if not isinstance(value, str) or "\n" in value or "\r" in value:
+        raise ValueError("Expected one Ed25519 public host key")
+    fields = value.split()
+    try:
+        blob = base64.b64decode(fields[1], validate=True) if len(fields) == 2 else b""
+    except ValueError:
+        blob = b""
+    if (
+        len(fields) != 2
+        or fields[0] != "ssh-ed25519"
+        or len(blob) != 51
+        or blob[:19] != b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20"
+    ):
+        raise ValueError("Expected one Ed25519 public host key")
+    return "ssh-ed25519 " + base64.b64encode(blob).decode()
+
+
+def fingerprint(key: str) -> str:
+    blob = base64.b64decode(public_host_key(key).split()[1], validate=True)
+    return "SHA256:" + base64.b64encode(hashlib.sha256(blob).digest()).decode().rstrip("=")
+
+
+def callback_origin(value: str) -> str:
+    parsed = urlsplit(value)
+    if (
+        parsed.scheme != "https"
+        or not parsed.hostname
+        or parsed.username
+        or parsed.password
+        or parsed.query
+        or parsed.fragment
+        or parsed.path not in {"", "/"}
+    ):
+        raise ValueError("Host attestation requires the configured HTTPS management origin")
+    return value.rstrip("/")
+
+
+def nonce_for(seed: bytes, identity: str, origin: str, expires_at: str) -> str:
+    if len(seed) != 32 or not re.fullmatch(r"op-[a-f0-9]{16,32}", identity):
+        raise ValueError("Invalid bootstrap seed or operation identity")
+    message = json.dumps(["klip-host-attestation.v1", identity, origin, expires_at]).encode()
+    return hmac.new(seed, message, hashlib.sha256).hexdigest()
+
+
+def cloud_init(identity: str, nonce: str, origin: str, *, sources=None, program_version=3) -> str:
+    if not re.fullmatch(r"op-[a-f0-9]{16,32}", identity) or not re.fullmatch(
+        r"[a-f0-9]{64}", nonce
+    ):
+        raise ValueError("Invalid bootstrap identity or credential")
+    origin = callback_origin(origin)
+    config = {"url": origin + "/api/v1/bootstrap/" + identity, "nonce": nonce}
+    if sources is not None:
+        sources = ssh_sources(sources)
+        config["ssh_sources"] = sources
+        if program_version not in {2, 3}:
+            raise ValueError("Unknown source-restricted bootstrap program")
+    document = {
+        "disable_root": True,
+        "ssh_pwauth": False,
+        "ssh_deletekeys": True,
+        "ssh_genkeytypes": ["ed25519"],
+        "write_files": [
+            {"path": path, "owner": "root:root", "permissions": "0600", "content": content}
+            for path, content in (
+                ("/var/lib/klip/host-attestation.json", json.dumps(config)),
+                (
+                    "/var/lib/klip/attest-host.py",
+                    SCRIPT_V1 if sources is None else {2: SCRIPT_V2, 3: SCRIPT_V3}[program_version],
+                ),
+            )
+        ],
+        "runcmd": [["python3", "/var/lib/klip/attest-host.py"]],
+    }
+    if sources is not None:
+        allow = " ".join("ubuntu@" + source.split("/")[0] for source in sources)
+        document["write_files"].append(
+            {
+                "path": "/etc/ssh/sshd_config.d/10-klip-bootstrap.conf",
+                "owner": "root:root",
+                "permissions": "0600",
+                "content": "PermitRootLogin no\nPasswordAuthentication no\n"
+                "KbdInteractiveAuthentication no\nAllowUsers " + allow + "\n",
+            }
+        )
+    return "#cloud-config\n" + yaml.safe_dump(document, sort_keys=False)
+
+
+def issue(identity: str, origin: str, seed_file, *, sources=None):
+    """Before dispatch, commit nonce metadata and reconstruct deterministic user data.
+
+    Callers must not print or retain the returned user data in ordinary artifacts.
+    The exact digest becomes part of the immutable Lambda launch plan.
+    """
+    origin = callback_origin(origin)
+    if sources is not None:
+        sources = ssh_sources(sources)
+    if seed_file is None or not seed_file.is_file():
+        raise AppError(422, "Bootstrap seed reference is unconfigured", "adapter_unavailable")
+    seed = seed_file.read_bytes()
+    if len(seed) != 32:
+        raise AppError(422, "Bootstrap seed reference is invalid", "adapter_unavailable")
+    with session() as db, db.begin():
+        row = db.get(ProviderIntent, identity, with_for_update=True)
+        if not row or row.payload.get("mode") != "real" or row.state != "pending":
+            raise AppError(409, "Bootstrap requires an unattempted real intent", "bootstrap_state")
+        existing = row.payload.get("bootstrap")
+        seed_sha = hashlib.sha256(seed).hexdigest()
+        if existing:
+            if existing["origin"] != origin or existing["seed_sha256"] != seed_sha:
+                raise AppError(409, "Bootstrap identity changed; reconcile the original intent")
+            if existing.get("ssh_sources") != sources:
+                raise AppError(409, "Bootstrap SSH sources changed; reconcile the original intent")
+            if datetime.fromisoformat(existing["expires_at"]) <= now():
+                raise AppError(409, "Bootstrap credential expired", "bootstrap_expired")
+            metadata = existing
+        else:
+            metadata = {
+                "schema_version": "klip-host-attestation.v1",
+                "origin": origin,
+                "seed_sha256": seed_sha,
+                "issued_at": now().isoformat(),
+                "expires_at": (now() + timedelta(minutes=20)).isoformat(),
+            }
+            if sources is not None:
+                metadata.update(schema_version="klip-host-attestation.v3", ssh_sources=sources)
+        nonce = nonce_for(seed, identity, origin, metadata["expires_at"])
+        metadata = {**metadata, "nonce_sha256": hashlib.sha256(nonce.encode()).hexdigest()}
+        content = cloud_init(
+            identity,
+            nonce,
+            origin,
+            sources=sources,
+            program_version=2 if metadata["schema_version"] == "klip-host-attestation.v2" else 3,
+        )
+        content_sha = hashlib.sha256(content.encode()).hexdigest()
+        if metadata.get("cloud_init_sha256", content_sha) != content_sha:
+            raise AppError(409, "Bootstrap program changed; reconcile the original intent")
+        metadata["cloud_init_sha256"] = content_sha
+        row.payload = {**row.payload, "bootstrap": metadata}
+    return content, content_sha
+
+
+def authenticate(row, nonce):
+    metadata = row.payload.get("bootstrap", {}) if row else {}
+    valid = (
+        row is not None
+        and row.payload.get("mode") == "real"
+        and row.state in {"dispatching", "allocated"}
+        and re.fullmatch(r"[a-f0-9]{64}", nonce)
+        and metadata.get("expires_at")
+        and datetime.fromisoformat(metadata["expires_at"]) > now()
+        and hmac.compare_digest(
+            metadata.get("nonce_sha256", ""), hashlib.sha256(nonce.encode()).hexdigest()
+        )
+    )
+    if not valid:
+        raise AppError(401, "Bootstrap credential is invalid or expired", "bootstrap_unauthorized")
+    return metadata
+
+
+def locked_bootstrap(db, identity, nonce):
+    # Invalid guesses do not hold the intent's update lock or write attempt rows.
+    authenticate(db.get(ProviderIntent, identity), nonce)
+    row = db.get(ProviderIntent, identity, with_for_update=True, populate_existing=True)
+    return row, authenticate(row, nonce)
+
+
+def report_failure(db, identity, nonce, code):
+    if code not in {"configuration", "ssh_policy", "host_key", "callback"}:
+        raise AppError(422, "Unknown bootstrap failure code")
+    row, metadata = locked_bootstrap(db, identity, nonce)
+    if metadata.get("host_key") or metadata.get("failure", {}).get("code", code) != code:
+        raise AppError(409, "Bootstrap already has a different terminal observation")
+    row.payload = {
+        **row.payload,
+        "bootstrap": {
+            **metadata,
+            "failure": metadata.get("failure") or {"code": code, "at": now().isoformat()},
+        },
+    }
+    return {"status": "recorded"}
+
+
+def accept(db, identity: str, nonce: str, host_key: str):
+    row, metadata = locked_bootstrap(db, identity, nonce)
+    if metadata.get("failure"):
+        raise AppError(409, "Bootstrap previously reported a terminal failure")
+    key = public_host_key(host_key)
+    if metadata.get("host_key") not in {None, key}:
+        raise AppError(409, "Previously attested host key changed", "host_identity_conflict")
+    observed = {
+        **metadata,
+        "host_key": key,
+        "fingerprint": fingerprint(key),
+        "accepted_at": metadata.get("accepted_at") or now().isoformat(),
+    }
+    row.payload = {**row.payload, "bootstrap": observed}
+    return {"status": "accepted", "fingerprint": observed["fingerprint"]}

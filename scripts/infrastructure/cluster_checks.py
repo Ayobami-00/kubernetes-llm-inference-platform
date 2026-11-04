@@ -18,30 +18,66 @@ def render_role_templates() -> None:
 
     init_plugin_loader()
     variables = {
-        "klip_node": {"role": "control_plane", "backup_recipient": "age1example"},
+        "klip_node": {
+            "role": "control_plane",
+            "provider": "aws",
+            "containerd_version": VERSIONS["containerd"],
+            "runtime_profile": "standard",
+            "backup_recipient": "age1example",
+            "quarantine": False,
+        },
+        "ansible_facts": {
+            "distribution": "Ubuntu",
+            "distribution_version": "24.04",
+            "architecture": "x86_64",
+            "kernel": "6.8.0-101-generic",
+        },
         "inventory_hostname": "cp-01",
-        "item": "example",
+        "item": {"item": "/example/path", "stat": {"exists": False}},
         "klip_repository": str(ROOT),
         "klip_peer_registry": "/example/peers.json",
         "klip_ca_bundle": "/example/ca.crt",
         "klip_firewall_file": "/example/firewall.rules",
         "klip_recovery_key_verified": True,
         "klip_runtime_images": {"stdout_lines": ["registry.k8s.io/pause:3.11"]},
+        "klip_image_credentials_install_paths": [
+            "/opt/klip/image-credentials/ecr-credential-provider"
+        ],
+        "klip_image_credentials_originals": {"results": []},
+        "klip_image_credentials_backup": {"path": "/tmp/example"},
+        "klip_image_credentials_binary": "/example/verified-binary",
+        "klip_image_credentials_provider_yaml": "apiVersion: kubelet.config.k8s.io/v1\n",
+        "index": 0,
     }
-    templar = Templar(variables=variables)
 
-    def visit(value):
+    def visit(value, templar):
         if isinstance(value, dict):
             for nested in value.values():
-                visit(nested)
+                visit(nested, templar)
         elif isinstance(value, list):
             for nested in value:
-                visit(nested)
+                visit(nested, templar)
         elif isinstance(value, str) and "{{" in value:
             templar.template(trust_as_template(value))
 
-    for path in (ROOT / "infra/ansible/roles").rglob("*.yaml"):
-        visit(yaml.safe_load(path.read_text()))
+    from gpu_runtime import settings as gpu_settings
+
+    for profile in ("standard", "nvidia-operator"):
+        context = {**variables, "klip_node": {**variables["klip_node"]}}
+        if profile == "nvidia-operator":
+            context["klip_node"].update(
+                role="worker",
+                provider="lambda",
+                runtime_profile=profile,
+                containerd_version=gpu_settings()["containerd_version"],
+                quarantine=True,
+                gpu_kernel=gpu_settings()["kernel"],
+            )
+        templar = Templar(variables=context)
+        for path in (ROOT / "infra/ansible/roles").rglob("*.yaml"):
+            if "klip_gpu_host" in path.parts and profile != "nvidia-operator":
+                continue  # This role is conditional; CPU hosts have no GPU kernel policy.
+            visit(yaml.safe_load(path.read_text()), templar)
 
 
 def main() -> None:
@@ -128,6 +164,10 @@ def main() -> None:
                 raise ValueError("Metadata guard must deny IMDS without isolating all Pod egress")
     (ROOT / "artifacts/helm-rendered.yaml").write_text(rendered.stdout)
     print(f"Rendered and checked {len(documents)} static release resources")
+    from observability_release import render
+
+    for component in ("monitoring", "thanos", "grafana", "loki", "tempo", "otel"):
+        render(component)
 
 
 if __name__ == "__main__":

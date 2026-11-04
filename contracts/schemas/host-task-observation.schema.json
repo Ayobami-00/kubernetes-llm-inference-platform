@@ -1,0 +1,288 @@
+{
+  "$defs": {
+    "ErrorInfo": {
+      "additionalProperties": false,
+      "properties": {
+        "code": {
+          "minLength": 1,
+          "title": "Code",
+          "type": "string"
+        },
+        "message": {
+          "minLength": 1,
+          "title": "Message",
+          "type": "string"
+        }
+      },
+      "required": [
+        "code",
+        "message"
+      ],
+      "title": "ErrorInfo",
+      "type": "object"
+    },
+    "GPUCapacityObservation": {
+      "additionalProperties": false,
+      "description": "Observed usable memory, distinct from the provider's advertised hardware.",
+      "properties": {
+        "allocatable_gpu_count": {
+          "minimum": 0,
+          "title": "Allocatable Gpu Count",
+          "type": "integer"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/GPUDeviceObservation"
+          },
+          "minItems": 1,
+          "title": "Devices",
+          "type": "array"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "observed_at",
+        "devices",
+        "allocatable_gpu_count"
+      ],
+      "title": "GPUCapacityObservation",
+      "type": "object"
+    },
+    "GPUDeviceObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "driver_version": {
+          "minLength": 1,
+          "title": "Driver Version",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "memory_total_mib": {
+          "exclusiveMinimum": 0,
+          "title": "Memory Total Mib",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "uuid": {
+          "pattern": "^GPU-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "uuid",
+        "name",
+        "memory_total_mib",
+        "driver_version"
+      ],
+      "title": "GPUDeviceObservation",
+      "type": "object"
+    }
+  },
+  "$id": "https://schemas.inference-platform.example/0.1/host-task-observation.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "bootstrap_cleanup_complete": {
+      "default": false,
+      "title": "Bootstrap Cleanup Complete",
+      "type": "boolean"
+    },
+    "bootstrap_fence_permitted": {
+      "default": false,
+      "title": "Bootstrap Fence Permitted",
+      "type": "boolean"
+    },
+    "cilium_ready": {
+      "default": false,
+      "title": "Cilium Ready",
+      "type": "boolean"
+    },
+    "cleanup_pending": {
+      "default": false,
+      "title": "Cleanup Pending",
+      "type": "boolean"
+    },
+    "connectivity_verified": {
+      "default": false,
+      "title": "Connectivity Verified",
+      "type": "boolean"
+    },
+    "error": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ErrorInfo"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "evidence_sha256": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{64}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Evidence Sha256"
+    },
+    "gpu_canary_verified": {
+      "default": false,
+      "title": "Gpu Canary Verified",
+      "type": "boolean"
+    },
+    "gpu_observation": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/GPUCapacityObservation"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
+    },
+    "gpu_runtime_ready": {
+      "default": false,
+      "title": "Gpu Runtime Ready",
+      "type": "boolean"
+    },
+    "host_ready": {
+      "default": false,
+      "title": "Host Ready",
+      "type": "boolean"
+    },
+    "input_sha256": {
+      "pattern": "^[a-f0-9]{64}$",
+      "title": "Input Sha256",
+      "type": "string"
+    },
+    "job_uid": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Job Uid"
+    },
+    "kubernetes_ready": {
+      "default": false,
+      "title": "Kubernetes Ready",
+      "type": "boolean"
+    },
+    "node_name": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Node Name"
+    },
+    "node_uid": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Node Uid"
+    },
+    "observed_at": {
+      "format": "date-time",
+      "title": "Observed At",
+      "type": "string"
+    },
+    "public_wireguard_key": {
+      "anyOf": [
+        {
+          "minLength": 1,
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Public Wireguard Key"
+    },
+    "registry_revision": {
+      "exclusiveMinimum": 0,
+      "title": "Registry Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "stage": {
+      "minLength": 1,
+      "title": "Stage",
+      "type": "string"
+    },
+    "status": {
+      "enum": [
+        "queued",
+        "running",
+        "completed",
+        "failed"
+      ],
+      "title": "Status",
+      "type": "string"
+    },
+    "task_id": {
+      "pattern": "^host-[a-f0-9]{24}$",
+      "title": "Task Id",
+      "type": "string"
+    },
+    "wireguard_ready": {
+      "default": false,
+      "title": "Wireguard Ready",
+      "type": "boolean"
+    }
+  },
+  "required": [
+    "task_id",
+    "input_sha256",
+    "status",
+    "stage",
+    "observed_at",
+    "registry_revision"
+  ],
+  "title": "HostTaskObservation",
+  "type": "object"
+}

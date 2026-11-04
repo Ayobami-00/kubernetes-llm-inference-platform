@@ -1,0 +1,11 @@
+[Unit]
+Description=Refresh WireGuard metrics every thirty seconds
+
+[Timer]
+OnBootSec=30s
+OnUnitActiveSec=30s
+AccuracySec=2s
+Unit=klip-wireguard-metrics.service
+
+[Install]
+WantedBy=timers.target

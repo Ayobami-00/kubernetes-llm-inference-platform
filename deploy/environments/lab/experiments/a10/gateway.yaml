@@ -1,0 +1,156 @@
+# Private experiment entry point: no public Service, listener or DNS change.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyProxy
+metadata: {name: retained-a10, namespace: llm-d}
+spec:
+  provider:
+    type: Kubernetes
+    kubernetes:
+      envoyService: {type: ClusterIP, name: inference}
+      envoyDeployment:
+        replicas: 2
+        pod:
+          nodeSelector: {klip.dev.node-restriction.kubernetes.io/platform: 'true'}
+          affinity:
+            podAntiAffinity:
+              requiredDuringSchedulingIgnoredDuringExecution:
+                - topologyKey: kubernetes.io/hostname
+                  labelSelector:
+                    matchLabels: {gateway.envoyproxy.io/owning-gateway-name: inference}
+        container:
+          image: docker.io/envoyproxy/envoy@sha256:00c38048aeb4bb4b49d9ec6f3d7742a7c9f3d4d33f0371632a76734c02bebb7d
+          resources:
+            requests: {cpu: 150m, memory: 256Mi}
+            limits: {cpu: '1', memory: 768Mi}
+  telemetry:
+    metrics:
+      prometheus: {}
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: GatewayClass
+metadata: {name: klip-retained-a10}
+spec:
+  controllerName: gateway.envoyproxy.io/gatewayclass-controller
+  parametersRef:
+    group: gateway.envoyproxy.io
+    kind: EnvoyProxy
+    name: retained-a10
+    namespace: llm-d
+---
+apiVersion: gateway.networking.k8s.io/v1
+kind: Gateway
+metadata: {name: inference, namespace: llm-d}
+spec:
+  gatewayClassName: klip-retained-a10
+  listeners:
+    - name: http
+      protocol: HTTP
+      port: 8080
+      allowedRoutes:
+        namespaces: {from: Same}
+---
+apiVersion: aigateway.envoyproxy.io/v1beta1
+kind: AIGatewayRoute
+metadata: {name: writer-assist-a10, namespace: llm-d}
+spec:
+  parentRefs:
+    - {group: gateway.networking.k8s.io, kind: Gateway, name: inference}
+  rules:
+    - matches:
+        - headers:
+            - {name: x-ai-eg-model, type: Exact, value: gec-small}
+      backendRefs:
+        - {group: inference.networking.k8s.io, kind: InferencePool, name: writer-assist-a10}
+---
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: SecurityPolicy
+metadata: {name: writer-inference-auth, namespace: llm-d}
+spec:
+  targetRefs:
+    - {group: gateway.networking.k8s.io, kind: Gateway, name: inference}
+  apiKeyAuth:
+    credentialRefs:
+      - {group: '', kind: Secret, name: writer-inference-auth}
+    extractFrom:
+      - headers: [Authorization]
+    sanitize: true
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: retained-a10-gateway, namespace: llm-d}
+spec:
+  podSelector:
+    matchLabels: {gateway.envoyproxy.io/owning-gateway-name: inference}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: klip}
+      ports: [{port: 8080, protocol: TCP}]
+    - from:
+        - namespaceSelector:
+            matchLabels: {kubernetes.io/metadata.name: observability}
+          podSelector:
+            matchLabels: {app.kubernetes.io/name: prometheus}
+      ports: [{port: 19001, protocol: TCP}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: retained-a10-epp, namespace: llm-d}
+spec:
+  endpointSelector:
+    matchLabels: {llm-d-router-gateway: writer-assist-a10-epp}
+  ingress:
+    - fromEndpoints:
+        - matchLabels: {gateway.envoyproxy.io/owning-gateway-name: inference}
+      toPorts: [{ports: [{port: '9002', protocol: TCP}]}]
+    - fromEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: observability, app.kubernetes.io/name: prometheus}
+      toPorts: [{ports: [{port: '9090', protocol: TCP}]}]
+  egress:
+    - toEntities: [kube-apiserver]
+      toPorts: [{ports: [{port: '443', protocol: TCP}, {port: '6443', protocol: TCP}]}]
+    - toEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: kube-system, k8s-app: kube-dns}
+      toPorts: [{ports: [{port: '53', protocol: UDP}, {port: '53', protocol: TCP}]}]
+    - toEndpoints:
+        - matchLabels: {klip.dev/serving-deployment: writer-assist-a10}
+      toPorts: [{ports: [{port: '8000', protocol: TCP}]}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: retained-a10-epp-model, namespace: llm-d}
+spec:
+  podSelector:
+    matchLabels: {klip.dev/serving-deployment: writer-assist-a10}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {llm-d-router-gateway: writer-assist-a10-epp}
+      ports: [{port: 8000, protocol: TCP}]
+---
+# Self-managed API-server connections originate from Cilium host identities.
+# They are private WireGuard node traffic, not public ingress.
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: retained-a10-admission, namespace: envoy-ai-gateway-system}
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: ai-gateway-helm}
+  ingress:
+    - fromEntities: [host, remote-node]
+      toPorts: [{ports: [{port: '9443', protocol: TCP}]}]
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: retained-a10-xds, namespace: envoy-gateway-system}
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: gateway-helm}
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: llm-d
+            gateway.envoyproxy.io/owning-gateway-name: inference
+      toPorts: [{ports: [{port: '18000', protocol: TCP}, {port: '18002', protocol: TCP}]}]

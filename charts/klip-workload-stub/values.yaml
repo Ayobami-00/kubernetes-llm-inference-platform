@@ -1,0 +1,8 @@
+# Intentionally unusable without the reviewed immutable image.
+image: ""
+serviceAccount: klip-runner
+nodeSelector:
+  klip.dev.node-restriction.kubernetes.io/platform: "true"
+resources:
+  requests: {cpu: 100m, memory: 128Mi}
+  limits: {cpu: "1", memory: 512Mi}

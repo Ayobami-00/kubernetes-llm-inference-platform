@@ -111,6 +111,26 @@ export type ArtifactView = {
 };
 
 /**
+ * BootstrapFailure
+ */
+export type BootstrapFailure = {
+    /**
+     * Code
+     */
+    code: 'configuration' | 'ssh_policy' | 'host_key' | 'callback';
+};
+
+/**
+ * BootstrapFailureRecorded
+ */
+export type BootstrapFailureRecorded = {
+    /**
+     * Status
+     */
+    status: 'recorded';
+};
+
+/**
  * Capacity
  */
 export type Capacity = {
@@ -185,7 +205,7 @@ export type CreateGroup = {
     /**
      * Mode
      */
-    mode?: 'simulation';
+    mode?: 'simulation' | 'real';
     /**
      * Spec Ref
      */
@@ -744,6 +764,52 @@ export type FoundationObservation = {
 };
 
 /**
+ * GPUCapacityObservation
+ *
+ * Observed usable memory, distinct from the provider's advertised hardware.
+ */
+export type GpuCapacityObservation = {
+    /**
+     * Allocatable Gpu Count
+     */
+    allocatable_gpu_count: number;
+    /**
+     * Devices
+     */
+    devices: Array<GpuDeviceObservation>;
+    /**
+     * Observed At
+     */
+    observed_at: string;
+};
+
+/**
+ * GPUDeviceObservation
+ */
+export type GpuDeviceObservation = {
+    /**
+     * Driver Version
+     */
+    driver_version: string;
+    /**
+     * Index
+     */
+    index: number;
+    /**
+     * Memory Total Mib
+     */
+    memory_total_mib: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Uuid
+     */
+    uuid: string;
+};
+
+/**
  * GPUHardware
  */
 export type GpuHardware = {
@@ -902,6 +968,30 @@ export type HostAccess = {
      * Ssh User
      */
     ssh_user: string;
+};
+
+/**
+ * HostAttestation
+ */
+export type HostAttestation = {
+    /**
+     * Host Key
+     */
+    host_key: string;
+};
+
+/**
+ * HostAttestationAccepted
+ */
+export type HostAttestationAccepted = {
+    /**
+     * Fingerprint
+     */
+    fingerprint: string;
+    /**
+     * Status
+     */
+    status: 'accepted';
 };
 
 /**
@@ -2357,6 +2447,10 @@ export type WorkerGroup = {
  */
 export type WorkerGroupSpec = {
     /**
+     * Capacity Lifecycle
+     */
+    capacity_lifecycle?: 'leased' | 'externally_retained';
+    /**
      * Desired Instances
      */
     desired_instances?: number;
@@ -2400,7 +2494,7 @@ export type WorkerGroupSpec = {
     /**
      * Ttl Minutes
      */
-    ttl_minutes?: number;
+    ttl_minutes?: number | null;
     /**
      * Worker Class
      */
@@ -2419,6 +2513,10 @@ export type WorkerGroupStatus = {
      * Allocated At
      */
     allocated_at?: string | null;
+    /**
+     * Capacity Lifecycle
+     */
+    capacity_lifecycle?: 'leased' | 'externally_retained';
     counts: WorkerCounts;
     /**
      * Expires At
@@ -2443,10 +2541,63 @@ export type WorkerGroupStatus = {
 };
 
 /**
+ * WorkerLeaseOption
+ */
+export type WorkerLeaseOption = {
+    /**
+     * Lease Minutes
+     */
+    lease_minutes: number;
+    /**
+     * Spec Ref
+     */
+    spec_ref: string;
+    /**
+     * Worker Class
+     */
+    worker_class: string;
+};
+
+/**
+ * WorkerLifecycleOptions
+ */
+export type WorkerLifecycleOptions = {
+    /**
+     * Compatible Specs
+     */
+    compatible_specs?: Array<WorkerLeaseOption>;
+    /**
+     * Configured
+     */
+    configured?: boolean;
+    /**
+     * Instance Type
+     */
+    instance_type?: string | null;
+    /**
+     * Max Total Lease Minutes
+     */
+    max_total_lease_minutes?: number | null;
+    /**
+     * Price Ceiling Cents Per Hour
+     */
+    price_ceiling_cents_per_hour?: number | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Region
+     */
+    region?: string | null;
+};
+
+/**
  * WorkerMember
  */
 export type WorkerMember = {
     error?: ErrorInfo | null;
+    gpu_observation?: GpuCapacityObservation | null;
     /**
      * Node Name
      */
@@ -2870,6 +3021,122 @@ export type GetSessionResponses = {
 };
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type AttestHostData = {
+    body: HostAttestation;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/bootstrap/{identity}';
+};
+
+export type AttestHostErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type AttestHostError = AttestHostErrors[keyof AttestHostErrors];
+
+export type AttestHostResponses = {
+    /**
+     * Successful Response
+     */
+    200: HostAttestationAccepted;
+};
+
+export type AttestHostResponse = AttestHostResponses[keyof AttestHostResponses];
+
+export type ReportBootstrapFailureData = {
+    body: BootstrapFailure;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/bootstrap/{identity}/failure';
+};
+
+export type ReportBootstrapFailureErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ReportBootstrapFailureError = ReportBootstrapFailureErrors[keyof ReportBootstrapFailureErrors];
+
+export type ReportBootstrapFailureResponses = {
+    /**
+     * Successful Response
+     */
+    200: BootstrapFailureRecorded;
+};
+
+export type ReportBootstrapFailureResponse = ReportBootstrapFailureResponses[keyof ReportBootstrapFailureResponses];
 
 export type GetCapacityData = {
     body?: never;
@@ -6147,3 +6414,56 @@ export type SetSimulationFaultResponses = {
 };
 
 export type SetSimulationFaultResponse = SetSimulationFaultResponses[keyof SetSimulationFaultResponses];
+
+export type GetWorkerLifecycleOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/worker-lifecycle-options';
+};
+
+export type GetWorkerLifecycleOptionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type GetWorkerLifecycleOptionsError = GetWorkerLifecycleOptionsErrors[keyof GetWorkerLifecycleOptionsErrors];
+
+export type GetWorkerLifecycleOptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkerLifecycleOptions;
+};
+
+export type GetWorkerLifecycleOptionsResponse = GetWorkerLifecycleOptionsResponses[keyof GetWorkerLifecycleOptionsResponses];

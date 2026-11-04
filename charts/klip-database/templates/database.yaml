@@ -1,0 +1,167 @@
+{{- if not (regexMatch "^[^[:space:]@]+@sha256:[a-f0-9]{64}$" .Values.imageName) }}
+{{- fail "imageName must be a verified digest-pinned CloudNativePG PostgreSQL image" }}
+{{- end }}
+{{- if ne (int .Values.instances) 3 }}
+{{- fail "The management HA policy requires exactly three PostgreSQL instances" }}
+{{- end }}
+{{- $destination := required "backup.destinationPath is required" .Values.backup.destinationPath }}
+{{- if not (regexMatch "^s3://[a-z0-9][a-z0-9.-]+/[A-Za-z0-9_./-]+$" $destination) }}
+{{- fail "backup.destinationPath must identify a dedicated S3 archive prefix" }}
+{{- end }}
+{{- if not (has .Values.bootstrap.mode (list "initdb" "recovery")) }}
+{{- fail "bootstrap.mode must be initdb or recovery" }}
+{{- end }}
+{{- if and (eq .Values.bootstrap.mode "recovery") (eq $destination .Values.bootstrap.recovery.destinationPath) (eq .Release.Name .Values.bootstrap.recovery.serverName) }}
+{{- fail "Recovery must use a new cluster identity or archive prefix to preserve the source archive" }}
+{{- end }}
+{{- if eq .Values.backup.authentication "webIdentity" }}
+{{- if or (not (regexMatch "^arn:aws:iam::[0-9]{12}:role/[A-Za-z0-9_+=,.@/-]+$" .Values.backup.roleArn)) .Values.backup.credentialsSecret }}
+{{- fail "webIdentity requires an exact backup.roleArn and no backup.credentialsSecret" }}
+{{- end }}
+{{- end }}
+apiVersion: postgresql.cnpg.io/v1
+kind: Cluster
+metadata:
+  name: {{ .Release.Name }}
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  instances: 3
+  imageName: {{ .Values.imageName | quote }}
+  {{- if eq .Values.backup.authentication "webIdentity" }}
+  serviceAccountTemplate:
+    metadata:
+      annotations:
+        eks.amazonaws.com/role-arn: {{ .Values.backup.roleArn | quote }}
+        eks.amazonaws.com/sts-regional-endpoints: "true"
+        eks.amazonaws.com/token-expiration: "3600"
+  {{- end }}
+  enableSuperuserAccess: false
+  enablePDB: true
+  failoverDelay: 30
+  smartShutdownTimeout: {{ .Values.smartShutdownTimeout }}
+  primaryUpdateStrategy: supervised
+  primaryUpdateMethod: switchover
+  affinity:
+    enablePodAntiAffinity: true
+    podAntiAffinityType: required
+    topologyKey: kubernetes.io/hostname
+    nodeSelector: {{ toYaml .Values.nodeSelector | nindent 6 }}
+  topologySpreadConstraints:
+    - maxSkew: 1
+      topologyKey: topology.kubernetes.io/zone
+      whenUnsatisfiable: DoNotSchedule
+      labelSelector:
+        matchLabels: {cnpg.io/cluster: {{ .Release.Name }}}
+  storage:
+    storageClass: {{ required "storage.storageClass is required" .Values.storage.storageClass | quote }}
+    size: {{ .Values.storage.size }}
+  walStorage:
+    storageClass: {{ required "walStorage.storageClass is required" .Values.walStorage.storageClass | quote }}
+    size: {{ .Values.walStorage.size }}
+  resources: {{ toYaml .Values.resources | nindent 4 }}
+  postgresql:
+    synchronous:
+      method: any
+      number: 1
+      dataDurability: required
+      failoverQuorum: true
+    parameters:
+      password_encryption: scram-sha-256
+      max_connections: "150"
+      archive_timeout: "60s"
+    pg_hba:
+      - hostnossl all all all reject
+  bootstrap:
+    {{- if eq .Values.bootstrap.mode "initdb" }}
+    initdb:
+      database: {{ .Values.database | quote }}
+      owner: {{ .Values.owner | quote }}
+      secret:
+        name: {{ required "applicationSecret is required for initialization" .Values.applicationSecret }}
+    {{- else }}
+    recovery:
+      source: source
+      database: {{ .Values.database | quote }}
+      owner: {{ .Values.owner | quote }}
+      secret:
+        name: {{ required "applicationSecret is required for recovery" .Values.applicationSecret }}
+      {{- with .Values.bootstrap.recovery.target }}
+      recoveryTarget: {{ toYaml . | nindent 8 }}
+      {{- end }}
+    {{- end }}
+  {{- if eq .Values.bootstrap.mode "recovery" }}
+  externalClusters:
+    - name: source
+      plugin:
+        name: barman-cloud.cloudnative-pg.io
+        parameters:
+          barmanObjectName: {{ .Release.Name }}-source
+          serverName: {{ required "bootstrap.recovery.serverName is required" .Values.bootstrap.recovery.serverName | quote }}
+  {{- end }}
+  plugins:
+    - name: barman-cloud.cloudnative-pg.io
+      isWALArchiver: true
+      parameters:
+        barmanObjectName: {{ .Release.Name }}-backups
+  monitoring:
+    enablePodMonitor: {{ .Values.monitoring.enablePodMonitor }}
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Release.Name }}-backups
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  instanceSidecarConfiguration:
+    resources: {{ toYaml .Values.backup.sidecarResources | nindent 6 }}
+    env:
+      - {name: AWS_EC2_METADATA_DISABLED, value: "true"}
+  retentionPolicy: {{ .Values.backup.retentionPolicy | quote }}
+  configuration:
+    destinationPath: {{ $destination | quote }}
+    {{- include "klip-database.credentials" . | nindent 4 }}
+    wal: {compression: gzip}
+    data: {compression: gzip, jobs: 2}
+{{- if eq .Values.bootstrap.mode "recovery" }}
+---
+apiVersion: barmancloud.cnpg.io/v1
+kind: ObjectStore
+metadata:
+  name: {{ .Release.Name }}-source
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  configuration:
+    destinationPath: {{ required "bootstrap.recovery.destinationPath is required" .Values.bootstrap.recovery.destinationPath | quote }}
+    {{- include "klip-database.credentials" . | nindent 4 }}
+{{- end }}
+---
+apiVersion: postgresql.cnpg.io/v1
+kind: ScheduledBackup
+metadata:
+  name: {{ .Release.Name }}-daily
+spec:
+  schedule: {{ .Values.backup.schedule | quote }}
+  backupOwnerReference: self
+  cluster: {name: {{ .Release.Name }}}
+  method: plugin
+  pluginConfiguration:
+    name: barman-cloud.cloudnative-pg.io
+{{- define "klip-database.credentials" }}
+s3Credentials:
+  {{- if eq .Values.backup.authentication "webIdentity" }}
+  inheritFromIAMRole: true
+  {{- else }}
+  region:
+    name: {{ .Values.backup.credentialsSecret }}
+    key: region
+  accessKeyId:
+    name: {{ required "backup.credentialsSecret is required" .Values.backup.credentialsSecret }}
+    key: access-key-id
+  secretAccessKey:
+    name: {{ .Values.backup.credentialsSecret }}
+    key: secret-access-key
+  sessionToken:
+    name: {{ .Values.backup.credentialsSecret }}
+    key: session-token
+  {{- end }}
+{{- end }}

@@ -3,6 +3,7 @@ import { ThemeControl } from './theme';
 import ImportsPage from '../features/integrations/ImportsPage';
 import ReadinessPage from '../features/integrations/ReadinessPage';
 import CapacityView from '../features/capacity/CapacityView';
+import WorkerProvisioner from '../features/capacity/WorkerProvisioner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -247,6 +248,8 @@ function Workspace() {
     queryFn: () => unwrap(e.listWorkerGroups()),
     refetchInterval: 2000,
   });
+  const readyGroups = groups.data?.filter((g) => g.group.status.phase === 'ready') || [];
+  const readyRealGroups = readyGroups.filter((g) => g.mode === 'real').length;
   const operations = useQuery({
     queryKey: ['operations'],
     queryFn: () => unwrap(e.listOperations()),
@@ -550,7 +553,7 @@ function Workspace() {
               hint={
                 snapshot
                   ? 'Frozen configuration inputs'
-                  : `${groups.data?.filter((g) => g.group.status.phase === 'ready').length || 0} GPU-ready · simulated`
+                  : `${readyGroups.length} GPU-ready · ${readyRealGroups} real · ${readyGroups.length - readyRealGroups} simulated`
               }
             />
             <Summary
@@ -670,11 +673,13 @@ function Workspace() {
                         }
                       >
                         <Graph
+                          key={snapshot || 'current'}
                           topology={topology.data}
                           selected={selected?.id || null}
                           onSelect={select}
                           visibleKinds={kinds}
                           search={search}
+                          persistPreferences={!snapshot}
                         />
                       </Suspense>
                     )
@@ -704,6 +709,15 @@ function Workspace() {
                 requestError={capacity.error ? message(capacity.error) : undefined}
                 busy={busy}
                 refresh={() => act(() => unwrap(e.refreshCapacity()), 'Capacity refresh requested')}
+                provisioning={(current) => (
+                  <WorkerProvisioner
+                    capacity={capacity.data}
+                    current={current}
+                    groups={groups.data || []}
+                    busy={busy || groups.isPending || Boolean(groups.error)}
+                    act={act}
+                  />
+                )}
               />
             ) : pathname === '/imports' ? (
               <ImportsPage act={act} busy={busy} />

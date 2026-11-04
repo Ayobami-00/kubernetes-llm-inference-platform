@@ -1,0 +1,84 @@
+fullnameOverride: klip-tempo
+nodeSelector:
+  klip.dev.node-restriction.kubernetes.io/platform: 'true'
+persistence:
+  enabled: true
+  size: 10Gi
+  storageClassName: klip-gp3
+replicas: 1
+securityContext:
+  fsGroup: 10001
+  fsGroupChangePolicy: OnRootMismatch
+  runAsGroup: 10001
+  runAsNonRoot: true
+  runAsUser: 10001
+  seccompProfile:
+    type: RuntimeDefault
+serviceAccount:
+  automountServiceAccountToken: false
+  create: true
+  name: klip-tempo
+serviceMonitor:
+  additionalLabels:
+    release: klip-monitoring
+  enabled: true
+  interval: 30s
+tempo:
+  extraEnv:
+  - name: AWS_EC2_METADATA_DISABLED
+    value: 'true'
+  liveStore:
+    max_block_duration: 5m
+  metricsGenerator:
+    enabled: false
+  overrides:
+    defaults:
+      global:
+        max_bytes_per_trace: 1048576
+      ingestion:
+        burst_size_bytes: 2097152
+        max_traces_per_user: 10000
+        rate_limit_bytes: 1048576
+  querier:
+    max_concurrent_queries: 4
+  receivers:
+    jaeger:
+      protocols:
+        grpc: null
+        thrift_binary: null
+        thrift_compact: null
+        thrift_http: null
+    otlp:
+      protocols:
+        grpc:
+          endpoint: 0.0.0.0:4317
+        http:
+          endpoint: 0.0.0.0:4318
+  reportingEnabled: false
+  resources:
+    limits:
+      cpu: '1'
+      memory: 2Gi
+    requests:
+      cpu: 200m
+      memory: 512Mi
+  retention: 168h
+  securityContext:
+    allowPrivilegeEscalation: false
+    capabilities:
+      drop:
+      - ALL
+    readOnlyRootFilesystem: true
+  storage:
+    trace:
+      backend: s3
+      local: null
+      s3:
+        bucket: klip-traces-127811062476-eu-west-2
+        endpoint: s3.eu-west-2.amazonaws.com
+        insecure: false
+        region: eu-west-2
+      wal:
+        path: /var/tempo/wal
+tempoQuery:
+  enabled: false

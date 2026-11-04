@@ -1,0 +1,64 @@
+name: GPU runtime image security
+
+on:
+  push:
+    branches: [codex/end-to-end-platform]
+    paths:
+      - 'deploy/gpu-operator.lock.json'
+      - 'scripts/infrastructure/gpu_runtime_scan.py'
+      - '.github/workflows/gpu-runtime-security.yaml'
+  workflow_dispatch:
+
+permissions:
+  contents: read
+
+concurrency:
+  group: gpu-runtime-security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 18
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - {name: operator, reference: 'nvcr.io/nvidia/gpu-operator:v26.7.2'}
+          - {name: driver, reference: 'nvcr.io/nvidia/driver:595.91.07-ubuntu24.04'}
+          - {name: driver-manager, reference: 'nvcr.io/nvidia/cloud-native/k8s-driver-manager:v0.12.1'}
+          - {name: toolkit, reference: 'nvcr.io/nvidia/k8s/container-toolkit:v1.20.1'}
+          - {name: device-plugin, reference: 'nvcr.io/nvidia/k8s-device-plugin:v0.20.1'}
+          - {name: dcgm, reference: 'nvcr.io/nvidia/k8s/dcgm-exporter:4.6.1-4.8.4-distroless'}
+          - {name: cuda-canary, reference: 'nvcr.io/nvidia/k8s/cuda-sample:vectoradd-cuda12.5.0'}
+          - {name: nfd, reference: 'registry.k8s.io/nfd/node-feature-discovery:v0.20.1'}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with:
+          persist-credentials: false
+      - name: Install checksum-verified Trivy
+        shell: bash
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/klip-gpu-trivy"
+          mkdir -p "$scanner_dir"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_dir/trivy.tar.gz"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_dir/trivy.tar.gz" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_dir/trivy.tar.gz" --directory "$scanner_dir" trivy
+          printf '%s\n' "$scanner_dir" >> "$GITHUB_PATH"
+      - name: Scan the exact AMD64 manifest without registry credentials
+        env:
+          GPU_SCAN_REFERENCE: ${{ matrix.reference }}
+        run: python3 scripts/infrastructure/gpu_runtime_scan.py --reference "$GPU_SCAN_REFERENCE" --directory artifacts/security/gpu-runtime
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: gpu-runtime-${{ matrix.name }}-${{ github.sha }}
+          path: |
+            artifacts/security/gpu-runtime/scan.json
+            artifacts/security/gpu-runtime/summary.json
+          if-no-files-found: error
+          retention-days: 90

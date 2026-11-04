@@ -1,0 +1,20 @@
+{{- if and .Values.api.trustedProxyCIDRs (not .Values.networkPolicy.enabled) }}
+{{- fail "api.trustedProxyCIDRs requires networkPolicy.enabled to restrict proxy identity" }}
+{{- end }}
+{{- if and .Values.web.trustedProxyCIDRs (not .Values.web.tls.enabled) }}
+{{- fail "web.trustedProxyCIDRs currently requires web.tls.enabled" }}
+{{- end }}
+{{- if .Values.networkPolicy.enabled }}
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: {{ .Release.Name }}-api-ingress}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: api}
+  policyTypes: [Ingress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
+      ports: [{protocol: TCP, port: 8000}]
+{{- end }}

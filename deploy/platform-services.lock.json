@@ -1,0 +1,162 @@
+{
+  "schema_version": "klip-platform-services.v1",
+  "compatibility": {
+    "kubernetes": "1.36.5",
+    "cloudnative_pg": "1.30.1",
+    "cloudnative_pg_chart": "0.29.1",
+    "barman_cloud_plugin": "0.15.1",
+    "barman_cloud_chart": "0.8.1",
+    "validation": "Upstream support matrix and CRD schemas checked; live acceptance pending",
+    "cert_manager": "1.21.3",
+    "pod_identity_webhook": "0.6.19",
+    "efs_csi_driver": "3.5.4",
+    "efs_csi_chart": "4.5.4",
+    "ebs_csi_driver": "1.67.2",
+    "ebs_csi_chart": "2.67.2",
+    "postgresql": "18.6-standard-trixie"
+  },
+  "schemas": {
+    "postgresql.cnpg.io/v1/Cluster": {
+      "file": "cnpg-cluster-1.30.1.yaml",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_clusters.yaml",
+      "sha256": "d255176c368727b8ee84893bb2f37b5c5578a497e6ee7461a81fa6f3f80e552b"
+    },
+    "postgresql.cnpg.io/v1/ScheduledBackup": {
+      "file": "cnpg-scheduledbackup-1.30.1.yaml",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/cloudnative-pg/v1.30.1/config/crd/bases/postgresql.cnpg.io_scheduledbackups.yaml",
+      "sha256": "fcd133df3056601c1a306a4bf0cd2fac6413c99b88b459e0296321299f7e5062"
+    },
+    "barmancloud.cnpg.io/v1/ObjectStore": {
+      "file": "barman-objectstore-0.15.1.yaml",
+      "url": "https://raw.githubusercontent.com/cloudnative-pg/plugin-barman-cloud/v0.15.1/config/crd/bases/barmancloud.cnpg.io_objectstores.yaml",
+      "sha256": "2d8be9265b99571a560e80f2a54dbbcc19cbfb2254575ff2e7bba9dc4429e99e"
+    }
+  },
+  "verification_images": {
+    "aws_cli": {
+      "image": "public.ecr.aws/aws-cli/aws-cli@sha256:d557b3524475d70dd3104cf44d96568ee3188897b73a6ece2b37aa50e1af362f",
+      "cli_version": "2.39.3",
+      "platform": "linux/amd64",
+      "verification": "Digest pulled from the official public ECR repository; actual binary version and architecture checked",
+      "source": "https://docs.aws.amazon.com/cli/latest/userguide/getting-started-docker.html"
+    }
+  },
+  "charts": {
+    "cert-manager": {
+      "version": "v1.21.3",
+      "oci": "oci://quay.io/jetstack/charts/cert-manager@sha256:e482675aec32862d323a9218293ff7de81192337998615e4378c56498473f240",
+      "file": "cert-manager-v1.21.3.tgz",
+      "sha256": "9ec67938b2981d8b333af61b3fcf53e26b4f6f5deb7ccda3de4ea116bb373a17"
+    },
+    "aws-efs-csi-driver": {
+      "version": "4.5.4",
+      "url": "https://github.com/kubernetes-sigs/aws-efs-csi-driver/releases/download/helm-chart-aws-efs-csi-driver-4.5.4/aws-efs-csi-driver-4.5.4.tgz",
+      "file": "aws-efs-csi-driver-4.5.4.tgz",
+      "sha256": "c729759ad46c51459eff0d4a99c66cc43a68f4b574db55b63d6eec1f0b3a1ce7"
+    },
+    "aws-ebs-csi-driver": {
+      "version": "2.67.2",
+      "url": "https://github.com/kubernetes-sigs/aws-ebs-csi-driver/releases/download/helm-chart-aws-ebs-csi-driver-2.67.2/aws-ebs-csi-driver-2.67.2.tgz",
+      "file": "aws-ebs-csi-driver-2.67.2.tgz",
+      "sha256": "514ed77d8c1450e64db0c18182a537ecb6fd88e96154c1ea7652205b29d5c6ae"
+    },
+    "cloudnative-pg": {
+      "version": "0.29.1",
+      "file": "cloudnative-pg-0.29.1.tgz",
+      "url": "https://github.com/cloudnative-pg/charts/releases/download/cloudnative-pg-v0.29.1/cloudnative-pg-0.29.1.tgz",
+      "sha256": "b53d3991fe84bcf38767e7702cae78666265427a127a26fff168ab4207d2b1df"
+    },
+    "plugin-barman-cloud": {
+      "version": "0.8.1",
+      "file": "plugin-barman-cloud-0.8.1.tgz",
+      "url": "https://github.com/cloudnative-pg/charts/releases/download/plugin-barman-cloud-v0.8.1/plugin-barman-cloud-0.8.1.tgz",
+      "sha256": "9ad0b9e56da2777a1a0269feaf7215e18297e9c8b5730e04acb27b5d462e9456"
+    }
+  },
+  "images": {
+    "public.ecr.aws/csi-components/csi-node-driver-registrar:v2.18.0-eksbuild.4": {
+      "digest": "sha256:8e2963eb049ce7a8a5526e1ff4043f6f10d7a5b430ad12b4c12e192bbbab48dc",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/livenessprobe:v2.20.0-eksbuild.4": {
+      "digest": "sha256:f93b5659a585096828647f5604cc2983eb8c0149743ac102dc8d07c7d77b2bbb",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/efs-csi-driver/amazon/aws-efs-csi-driver:v3.5.4": {
+      "digest": "sha256:97762ca60697c6f1eda0e7f62183659a74260f9997462467bea7e5aa3aa82832",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/eks/amazon-eks-pod-identity-webhook:v0.6.19": {
+      "digest": "sha256:160ec19c2222016fa28db5e5269b233368ac788ed2d76479a2730cabff3cf693",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-acmesolver:v1.21.3": {
+      "digest": "sha256:c8c1225bb2fe8ab37a330b77f0d8c2ee6a41210fcb54fc07ca606ab9a022b8b7",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-cainjector:v1.21.3": {
+      "digest": "sha256:083d0e906f8eb44e255fe4ff817ae54e49f9ed82e22f1011bb4e9e4f4b8a641f",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-controller:v1.21.3": {
+      "digest": "sha256:9f4f96a33c7774cef24466fcd85031997531a03a8d117f151126baa8d1290dcc",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-startupapicheck:v1.21.3": {
+      "digest": "sha256:1c519d4afca1413d1e4ccd78bdc756184418ab55a34569a3b3de39d32f9974e1",
+      "platform": "linux/amd64"
+    },
+    "quay.io/jetstack/cert-manager-webhook:v1.21.3": {
+      "digest": "sha256:055ac8e9de6a0ba6763794838fe38944acc650f68ebe1b01dd8be079e580f458",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/ebs-csi-driver/aws-ebs-csi-driver:v1.67.2": {
+      "digest": "sha256:4c945a47fcbd98075a2a36542a22ff41414ec4926ecd37e2bd9193151ce43ddc",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/csi-provisioner:v6.4.0-eksbuild.3": {
+      "digest": "sha256:9cd4d73fdc594ef606a62d52e3762c1c67e6c8f4cf3d3e22cbeadd5478fdc546",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/csi-attacher:v4.13.0-eksbuild.3": {
+      "digest": "sha256:3fd84dc6072ebd434736904469011830099308eff6b2c635b9332ba1215e3c46",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/csi-snapshotter:v8.7.0-eksbuild.2": {
+      "digest": "sha256:ffabbc5d667d99180df5c508fe1e3a1ff9239fce3ffb035f04b7527389d2937d",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/livenessprobe:v2.20.0-eksbuild.3": {
+      "digest": "sha256:7a54d13d8c333c7526f4c2a739110d7a2edbed483b7d5b8dd2ee522d323d102b",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/csi-resizer:v2.3.0-eksbuild.3": {
+      "digest": "sha256:ebce11b1b8ec837c142bc9c13e3a9c6f85bd592aae31934af811afa7dd118516",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/csi-components/csi-node-driver-registrar:v2.18.0-eksbuild.3": {
+      "digest": "sha256:c7bfbb33772683c5da86428278baf6f97930aab70cd8e21b3fc2983d796c99e7",
+      "platform": "linux/amd64"
+    },
+    "public.ecr.aws/ebs-csi-driver/volume-modifier-for-k8s:v0.9.6-eksbuild.4": {
+      "digest": "sha256:3f4d177de43556359644e064e31fe696e0aaf24bed7ed6333140b6d1721cb25c",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/cloudnative-pg:1.30.1": {
+      "digest": "sha256:923c267ec29636db3bee20f993d0ec4973fa22998e1adad37da79e4d32b5bc07",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/plugin-barman-cloud:v0.15.1": {
+      "digest": "sha256:c75acad19a36e8176cfe2885761ff1b836c6ef977d7257e298c99a28b5c302ef",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/plugin-barman-cloud-sidecar:v0.15.1": {
+      "digest": "sha256:2287a793a804db751edd0d07d44cd549e357677e98a800eb12e2cf7c0d53f9b0",
+      "platform": "linux/amd64"
+    },
+    "ghcr.io/cloudnative-pg/postgresql:18.6-standard-trixie": {
+      "digest": "sha256:5bf4a23aa13fb560903fba932676773ba4ba2729c162e587b09bf539a2e3df56",
+      "platform": "linux/amd64"
+    }
+  }
+}

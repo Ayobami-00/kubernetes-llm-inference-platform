@@ -1294,6 +1294,7 @@ source = { virtual = "." }
 
 [package.dev-dependencies]
 dev = [
+    { name = "cryptography" },
     { name = "jsonschema" },
     { name = "pytest" },
     { name = "ruff" },
@@ -1301,6 +1302,7 @@ dev = [
 infrastructure = [
     { name = "ansible-core" },
     { name = "ansible-lint" },
+    { name = "cryptography" },
     { name = "platform-contracts" },
 ]
 
@@ -1308,6 +1310,7 @@ infrastructure = [
 
 [package.metadata.requires-dev]
 dev = [
+    { name = "cryptography", specifier = ">=50,<51" },
     { name = "jsonschema", specifier = ">=4,<5" },
     { name = "pytest", specifier = ">=8,<10" },
     { name = "ruff", specifier = ">=0.9,<1" },
@@ -1315,6 +1318,7 @@ dev = [
 infrastructure = [
     { name = "ansible-core", specifier = "==2.21.6" },
     { name = "ansible-lint", specifier = "==26.10.1" },
+    { name = "cryptography", specifier = ">=50,<51" },
     { name = "platform-contracts", editable = "packages/platform-contracts" },
 ]
 

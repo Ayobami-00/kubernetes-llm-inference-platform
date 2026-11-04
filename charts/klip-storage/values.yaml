@@ -1,0 +1,4 @@
+fileSystemId: ""
+accessPointId: ""
+# Kubernetes requires a capacity value. EFS does not enforce it as a quota.
+advertisedCapacity: 100Gi

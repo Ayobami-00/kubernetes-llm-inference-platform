@@ -1,0 +1,28 @@
+{{- if .Values.availability.enabled }}
+{{- if and (not .Values.localDevelopment) (or (not .Values.database.requireTLS) (not .Values.database.caSecret)) }}
+{{- fail "Production HA requires database.requireTLS and database.caSecret" }}
+{{- end }}
+{{- if not .Values.localDevelopment }}
+{{- range $image := list .Values.backend.image .Values.web.image }}
+{{- if not (regexMatch "^[^[:space:]@]+@sha256:[a-f0-9]{64}$" $image) }}
+{{- fail "Production HA requires digest-pinned backend and web images" }}
+{{- end }}
+{{- end }}
+{{- end }}
+{{- range $role := list "api" "worker" "web" }}
+{{- if or (lt (int $.Values.availability.minAvailable) 1) (ge (int $.Values.availability.minAvailable) (int (index $.Values.replicas $role))) }}
+{{- fail (printf "HA minAvailable must preserve service and permit disruption for %s" $role) }}
+{{- end }}
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: {{ $.Release.Name }}-{{ $role }}
+spec:
+  minAvailable: {{ $.Values.availability.minAvailable }}
+  selector:
+    matchLabels:
+      app.kubernetes.io/name: {{ $.Release.Name }}
+      app.kubernetes.io/component: {{ $role }}
+{{- end }}
+{{- end }}

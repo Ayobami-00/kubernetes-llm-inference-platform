@@ -5,14 +5,26 @@ kind: Deployment
 metadata: {name: {{ $.Release.Name }}-{{ $role }}}
 spec:
   replicas: {{ index $.Values.replicas $role }}
+  {{- if $.Values.availability.enabled }}
+  strategy:
+    type: RollingUpdate
+    # Required host anti-affinity must not require an extra host during updates.
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  {{- end }}
   selector:
     matchLabels: {app.kubernetes.io/name: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
   template:
     metadata:
       labels: {app.kubernetes.io/name: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
+      {{- if $.Values.lifecycle.enabled }}
+      annotations:
+        klip.dev/lifecycle-policy-sha256: {{ $.Values.lifecycle.policy | toJson | sha256sum | quote }}
+      {{- end }}
     spec:
       serviceAccountName: {{ $.Release.Name }}-{{ $role }}
-      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001}
+      terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}
+      {{- include "klip.availability" (dict "root" $ "role" $role) | nindent 6 }}
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, fsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       nodeSelector: {{ toYaml $.Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml $.Values.tolerations | nindent 8 }}
       {{- with $.Values.imagePullSecrets }}
@@ -24,7 +36,7 @@ spec:
           {{- if eq $role "worker" }}
           command: [management-worker]
           {{- else }}
-          command: [uvicorn, platform_management.api.app:app, --host, 0.0.0.0, --port, "8000"]
+          command: [uvicorn, platform_management.api.app:app, --host, 0.0.0.0, --port, "8000", --proxy-headers, --forwarded-allow-ips, {{ join "," $.Values.api.trustedProxyCIDRs | quote }}]
           ports: [{containerPort: 8000, name: http}]
           {{- end }}
           env: {{ include "klip.env" $ | nindent 12 }}
@@ -58,6 +70,11 @@ kind: Deployment
 metadata: {name: {{ .Release.Name }}-web}
 spec:
   replicas: {{ .Values.replicas.web }}
+  {{- if .Values.availability.enabled }}
+  strategy:
+    type: RollingUpdate
+    rollingUpdate: {maxSurge: 0, maxUnavailable: 1}
+  {{- end }}
   selector:
     matchLabels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
   template:
@@ -65,7 +82,10 @@ spec:
       labels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
     spec:
       automountServiceAccountToken: false
-      securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, fsGroup: 101}
+      serviceAccountName: {{ .Release.Name }}-web
+      terminationGracePeriodSeconds: {{ .Values.terminationGracePeriodSeconds }}
+      {{- include "klip.availability" (dict "root" . "role" "web") | nindent 6 }}
+      securityContext: {runAsNonRoot: true, runAsUser: 101, runAsGroup: 101, fsGroup: 101, seccompProfile: {type: RuntimeDefault}}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -74,18 +94,32 @@ spec:
       containers:
         - name: web
           image: {{ required "web.image is required (use a release digest)" .Values.web.image | quote }}
+          {{- if .Values.web.tls.enabled }}
+          ports: [{name: http, containerPort: 8080}, {name: https, containerPort: 8443}]
+          {{- else }}
           ports: [{name: http, containerPort: 8080}]
+          {{- end }}
           env: [{name: API_UPSTREAM, value: "{{ .Release.Name }}-api:8000"}]
           resources: {{ toYaml .Values.resources.web | nindent 12 }}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
           volumeMounts:
             - {name: tmp, mountPath: /tmp}
             - {name: nginx-config, mountPath: /etc/nginx/conf.d}
+            {{- if .Values.web.tls.enabled }}
+            - {name: web-tls, mountPath: /run/secrets/web-tls, readOnly: true}
+            - {name: tls-config, mountPath: /etc/nginx/tls, readOnly: true}
+            {{- end }}
           readinessProbe: {httpGet: {path: /health/ready, port: http}, periodSeconds: 5}
           livenessProbe: {httpGet: {path: /health/live, port: http}, periodSeconds: 15}
       volumes:
         - {name: tmp, emptyDir: {}}
         - {name: nginx-config, emptyDir: {}}
+        {{- if .Values.web.tls.enabled }}
+        - name: web-tls
+          secret: {secretName: {{ .Values.web.tls.existingSecret }}, defaultMode: 0440}
+        - name: tls-config
+          configMap: {name: {{ .Release.Name }}-web-tls}
+        {{- end }}
 ---
 apiVersion: v1
 kind: Service
@@ -94,8 +128,13 @@ spec:
   type: {{ .Values.web.serviceType }}
   selector: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: web}
   ports:
+    {{- if .Values.web.tls.enabled }}
+    - port: 8443
+      targetPort: https
+    {{- else }}
     - port: 8080
       targetPort: http
+    {{- end }}
       {{- if and (eq .Values.web.serviceType "NodePort") .Values.web.nodePort }}
       nodePort: {{ .Values.web.nodePort }}
       {{- end }}

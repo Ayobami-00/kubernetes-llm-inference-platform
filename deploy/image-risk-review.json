@@ -1,0 +1,19 @@
+{
+  "schema_version": "klip-runtime-image-review.v1",
+  "reviewed_at": "2026-11-03",
+  "expires_at": "2026-12-03",
+  "scope": "Declared cluster application/runner paths only; excludes arbitrary scripts, host execution and public-data preparation on an operator workstation.",
+  "conditions": {
+    "util-linux": "No privileged mount or block-device probing path; non-root, all capabilities dropped, no privilege escalation, RuntimeDefault seccomp, no host/device mounts.",
+    "sqlite3": "Management uses verified PostgreSQL; stub and pinned AIPerf/runner paths do not accept SQLite databases, SQL, FTS tables or changesets.",
+    "glibc": "C locale is explicitly frozen; request/configuration content cannot set process locale variables or supply message catalogs.",
+    "zlib": "No non-blocking gzwrite/gzprintf/gzvprintf path. Python compression and Nginx's HTTP compression do not invoke that API sequence."
+  },
+  "findings": [
+    {"ids": ["CVE-2026-78410", "CVE-2026-53613", "CVE-2026-53615"], "package": "util-linux", "versions": ["2.38.1-5+deb12u3"], "components": ["backend", "runner", "stub"]},
+    {"ids": ["CVE-2026-119373", "CVE-2026-119374", "CVE-2026-119379"], "package": "sqlite3", "versions": ["3.40.1-2+deb12u2"], "components": ["backend", "runner", "stub"]},
+    {"ids": ["CVE-2026-84243"], "package": "glibc", "versions": ["2.36-9+deb12u14"], "components": ["backend", "runner", "stub"]},
+    {"ids": ["CVE-2026-85091"], "package": "zlib", "versions": ["1.2.13.dfsg-1"], "components": ["backend", "runner", "stub"]},
+    {"ids": ["CVE-2026-85091"], "package": "zlib", "versions": ["1.3.2-r0"], "components": ["web"]}
+  ]
+}

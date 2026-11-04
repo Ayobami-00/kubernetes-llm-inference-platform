@@ -29,6 +29,14 @@ def write_report(run, directory):
             "| Customer | Offered | Eligible | Completed | Quality |",
             "|---|---:|---:|---:|---|",
         ]
+        for ref, counts in result.customer_requests.items():
+            quality = next(
+                (q.status for q in result.quality if q.customer_ref == ref), "not_evaluated"
+            )
+            lines.append(
+                f"| {ref} | {counts.offered} | {counts.eligible_for_slo} | "
+                f"{counts.completed} | {quality} |"
+            )
         requests = list(read_jsonl(directory / "requests.jsonl"))
         due = [r for r in requests if r["turn_index"] == 0]
         lags = [
@@ -36,11 +44,12 @@ def write_report(run, directory):
             for r in due
             if r["actual_send_offset_ms"] is not None
         ]
+        lag_text = f"{max(lags):.3f} ms" if lags else "unavailable"
         lines += [
             "",
             f"Delivery: {len(due)} planned admissions; "
             f"{sum(r['outcome'] == 'not_sent' for r in due)} missed; "
-            f"{max(lags, default=0):.3f} ms maximum dispatch lag.",
+            f"{lag_text} maximum dispatch lag.",
             f"Delivery policy: lag ≤ {run.snapshot.delivery_policy.max_scheduling_lag_ms} ms "
             f"for at least {(1 - run.snapshot.delivery_policy.max_late_fraction) * 100:g}% "
             "of due admissions; no missed admissions.",
@@ -51,25 +60,18 @@ def write_report(run, directory):
                 "",
                 "Common timeline origin: `" + json.dumps(json.loads(clock.read_text())) + "`",
             ]
+        lines += ["", "Session outcomes:", ""]
         for ref, counts in result.customer_sessions.items():
             lines.append(
                 f"- {ref}: {counts.started} sessions started; {counts.completed} completed, "
                 f"{counts.failed} failed, {counts.cancelled} cancelled, {counts.cutoff} cut off."
             )
-        lines += ["", "Preparation and proxy limitations:"]
+        lines += ["", "Preparation and proxy limitations:", ""]
         for prep in run.snapshot.preparation:
             lines.append(
                 f"- {prep.customer_ref}: {prep.data_kind}; {prep.entry_count} selected, "
                 f"{prep.warmup_count} warmup. Exclusions: {dict(prep.exclusions)}. "
                 f"Adaptations: {dict(prep.adaptations)}. Licenses: {dict(prep.licenses)}."
-            )
-        for ref, counts in result.customer_requests.items():
-            quality = next(
-                (q.status for q in result.quality if q.customer_ref == ref), "not_evaluated"
-            )
-            lines.append(
-                f"| {ref} | {counts.offered} | {counts.eligible_for_slo} | "
-                f"{counts.completed} | {quality} |"
             )
         lines += [
             "",
@@ -92,7 +94,7 @@ def write_report(run, directory):
                         f"{window.offset_s + window.duration_s} | "
                         f"{window.good_requests} / {window.eligible_requests} | {window.verdict} |"
                     )
-        lines += ["", "Quality scores (coverage and unscorable outputs are in `quality.json`):"]
+        lines += ["", "Quality scores (coverage and unscorable outputs are in `quality.json`):", ""]
         for quality in result.quality:
             text = ", ".join(f"{name}={value:.4f}" for name, value in quality.scores.items())
             lines.append(f"- {quality.customer_ref}: {text or quality.status}. {quality.notes}")

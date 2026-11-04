@@ -1,4 +1,28 @@
 ---
+- name: Require explicit firewall ownership for every new worker
+  ansible.builtin.assert:
+    that:
+      - >-
+        klip_firewall_file is defined or
+        (inventory_hostname in ['cp-01', 'cp-02', 'cp-03', 'platform-01', 'platform-02', 'platform-03']
+        and klip_node.provider == 'aws')
+    fail_msg: New workers require their scoped firewall input; only retained CPU firewalls may be preserved
+- name: Inspect retained CPU firewall without changing it
+  when: klip_firewall_file is not defined
+  ansible.builtin.stat:
+    path: /etc/klip/firewall.rules
+    follow: false
+  register: klip_wireguard_retained_firewall
+- name: Require a protected retained CPU firewall
+  when: klip_firewall_file is not defined
+  ansible.builtin.assert:
+    that:
+      - klip_wireguard_retained_firewall.stat.exists
+      - klip_wireguard_retained_firewall.stat.isreg | default(false)
+      - klip_wireguard_retained_firewall.stat.uid | default(-1) == 0
+      - klip_wireguard_retained_firewall.stat.gid | default(-1) == 0
+      - klip_wireguard_retained_firewall.stat.mode | default('') == '0600'
+    fail_msg: The CPU peer-only handoff requires its existing root-owned firewall
 - name: Write versioned public peer registry
   ansible.builtin.copy:
     src: '{{ klip_peer_registry }}'
@@ -12,11 +36,13 @@
     name: wg-quick@wg0
     enabled: true
 - name: Install scoped firewall rules
+  when: klip_firewall_file is defined
   ansible.builtin.copy:
     src: '{{ klip_firewall_file }}'
     dest: /etc/klip/firewall.rules
     mode: '0600'
 - name: Install firewall service
+  when: klip_firewall_file is defined
   ansible.builtin.copy:
     dest: /etc/systemd/system/klip-firewall.service
     mode: '0644'
@@ -32,6 +58,7 @@
       [Install]
       WantedBy=multi-user.target
 - name: Apply dedicated firewall chains
+  when: klip_firewall_file is defined
   ansible.builtin.systemd_service:
     name: klip-firewall
     state: restarted

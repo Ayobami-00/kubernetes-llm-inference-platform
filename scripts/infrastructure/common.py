@@ -21,6 +21,13 @@ ROOTS = {
     "dns": TERRAFORM / "environments/inference-dns",
     "backups": TERRAFORM / "environments/cluster-backups",
     "probe": TERRAFORM / "environments/network-probe",
+    "platform": TERRAFORM / "environments/platform-workers",
+    "identity": TERRAFORM / "environments/workload-identity",
+    "storage": TERRAFORM / "environments/platform-storage",
+    "storage-access": TERRAFORM / "environments/platform-storage-access",
+    "registry": TERRAFORM / "environments/platform-registry",
+    "frontend": TERRAFORM / "environments/platform-frontend",
+    "observability": TERRAFORM / "environments/platform-observability",
 }
 STATE_KEYS = {
     "bootstrap": "state-bootstrap/terraform.tfstate",
@@ -28,6 +35,13 @@ STATE_KEYS = {
     "dns": "inference-dns/terraform.tfstate",
     "backups": "cluster-backups/terraform.tfstate",
     "probe": "network-probe/terraform.tfstate",
+    "platform": "platform-workers/terraform.tfstate",
+    "identity": "workload-identity/terraform.tfstate",
+    "storage": "platform-storage/terraform.tfstate",
+    "storage-access": "platform-storage-access/terraform.tfstate",
+    "registry": "platform-registry/terraform.tfstate",
+    "frontend": "platform-frontend/terraform.tfstate",
+    "observability": "platform-observability/terraform.tfstate",
 }
 PROFILES = {
     "bootstrap": "kubernetes-llm-bootstrap",
@@ -35,6 +49,13 @@ PROFILES = {
     "dns": "kubernetes-llm-dns",
     "backups": "kubernetes-llm-foundation",
     "probe": "kubernetes-llm-foundation",
+    "platform": "kubernetes-llm-foundation",
+    "identity": "kubernetes-llm-bootstrap",
+    "storage": "kubernetes-llm-bootstrap",
+    "storage-access": "kubernetes-llm-bootstrap",
+    "registry": "kubernetes-llm-bootstrap",
+    "frontend": "kubernetes-llm-bootstrap",
+    "observability": "kubernetes-llm-bootstrap",
 }
 
 
@@ -157,13 +178,21 @@ class Aws:
         identity = self.call("sts", "get-caller-identity")
         if identity["Account"] != CONFIG["account_id"]:
             raise ValueError("Wrong AWS account; refusing to proceed")
-        if root == "bootstrap":
+        if root in {
+            "bootstrap",
+            "identity",
+            "storage",
+            "storage-access",
+            "registry",
+            "frontend",
+            "observability",
+        }:
             expected = f"arn:aws:iam::{CONFIG['account_id']}:user/{CONFIG['source_user']}"
             valid = identity["Arn"] == expected
         else:
             name = (
                 "kubernetes-llm-foundation-deployer"
-                if root in {"foundation", "backups", "probe"}
+                if root in {"foundation", "backups", "probe", "platform"}
                 else "kubernetes-llm-inference-dns-deployer"
             )
             valid = identity["Arn"].startswith(
@@ -198,8 +227,17 @@ def source_digest() -> str:
         and (path.suffix in {".tf", ".json"} or path.name == ".terraform.lock.hcl")
     )
     paths += sorted((ROOT / "scripts/infrastructure").glob("*.py"))
-    for folder in (ROOT / "infra/ansible", ROOT / "deploy"):
-        paths += sorted(path for path in folder.rglob("*") if path.is_file())
+    for folder in (
+        ROOT / "infra/ansible",
+        ROOT / "deploy",
+        ROOT / "charts",
+        ROOT / "observability",
+    ):
+        paths += sorted(
+            path
+            for path in folder.rglob("*")
+            if path.is_file() and "__pycache__" not in path.parts and path.suffix != ".pyc"
+        )
     digest = hashlib.sha256()
     for path in paths:
         digest.update(str(path.relative_to(ROOT)).encode())

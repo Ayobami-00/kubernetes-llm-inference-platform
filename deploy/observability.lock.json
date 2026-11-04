@@ -1,0 +1,113 @@
+{
+  "schema_version": "klip-observability-releases.v1",
+  "reviewed_at": "2026-11-03",
+  "kubernetes": "1.36.5",
+  "charts": {
+    "kube-prometheus-stack": {
+      "version": "92.17.1",
+      "app_version": "v0.94.2",
+      "url": "https://github.com/prometheus-community/helm-charts/releases/download/kube-prometheus-stack-92.17.1/kube-prometheus-stack-92.17.1.tgz",
+      "sha256": "fc8fe107f94a3009c04af63a03fb811393970db0eb973a9c513941acfce565c1",
+      "file": "kube-prometheus-stack-92.17.1.tgz"
+    },
+    "prometheus-blackbox-exporter": {
+      "version": "11.20.2",
+      "app_version": "v0.29.1",
+      "url": "https://github.com/prometheus-community/helm-charts/releases/download/prometheus-blackbox-exporter-11.20.2/prometheus-blackbox-exporter-11.20.2.tgz",
+      "sha256": "b5116657063fe1776a04dd6ec0922066cee3a2c6860cd575811400f146f706b1",
+      "file": "prometheus-blackbox-exporter-11.20.2.tgz"
+    },
+    "grafana": {
+      "version": "14.3.1",
+      "app_version": "13.3.0",
+      "url": "https://github.com/grafana-community/helm-charts/releases/download/grafana-14.3.1/grafana-14.3.1.tgz",
+      "sha256": "f49f848a9d6b4ab626610c0726b7e2a057f6c10e662a090bf7b30452d42f7bd5",
+      "file": "grafana-14.3.1.tgz"
+    },
+    "loki": {
+      "version": "20.2.2",
+      "app_version": "3.7.9",
+      "url": "https://github.com/grafana-community/helm-charts/releases/download/loki-20.2.2/loki-20.2.2.tgz",
+      "sha256": "1a7272056b5783a2a08794361a4302f32529769baffcc4805283bc31471e135f",
+      "file": "loki-20.2.2.tgz"
+    },
+    "opentelemetry-collector": {
+      "version": "0.178.2",
+      "app_version": "0.163.2",
+      "url": "https://github.com/open-telemetry/opentelemetry-helm-charts/releases/download/opentelemetry-collector-0.178.2/opentelemetry-collector-0.178.2.tgz",
+      "sha256": "4c9732611ab301e1d5532f62fa0c715c2c89765ee74f88ec1825601b3f172324",
+      "file": "opentelemetry-collector-0.178.2.tgz"
+    },
+    "thanos": {
+      "version": "0.48.0",
+      "app_version": "v0.42.4",
+      "url": "https://github.com/thanos-community/helm-charts/releases/download/thanos-0.48.0/thanos-0.48.0.tgz",
+      "sha256": "df6bd7959bf5570ea01b2dafee97ca24056140526e6352c0f2974934825bed79",
+      "file": "thanos-0.48.0.tgz"
+    },
+    "tempo": {
+      "version": "3.2.1",
+      "app_version": "3.1.1",
+      "url": "https://github.com/grafana-community/helm-charts/releases/download/tempo-3.2.1/tempo-3.2.1.tgz",
+      "sha256": "3389c896bd3c8f2a54f054ac00eb1881c34eff2b8e53053e3ad42c9f394925c3",
+      "file": "tempo-3.2.1.tgz"
+    }
+  },
+  "images": {
+    "quay.io/prometheus-operator/prometheus-operator:v0.94.2": {
+      "digest": "sha256:051606fe50e8c4bf6a433f0972bc3dcf3b90a62bc712f55692a9c4be83fe6f46",
+      "platform": "linux/amd64"
+    },
+    "quay.io/prometheus-operator/prometheus-config-reloader:v0.94.2": {
+      "digest": "sha256:e825978c71333cc8e140400506da8fa4972c7087f62805b378a1b93259924fdb",
+      "platform": "linux/amd64"
+    },
+    "quay.io/prometheus/alertmanager:v0.34.2": {
+      "digest": "sha256:7619e9399e623c9f99a40cb199c2bceb972cbf725598a51dcbde69d51dcaaedf",
+      "platform": "linux/amd64"
+    },
+    "quay.io/prometheus/prometheus:v3.15.1-distroless": {
+      "digest": "sha256:654d8f0008e660c00203e0b94938ec7b804e35b5772641d6416c20fff7684ee9",
+      "platform": "linux/amd64"
+    },
+    "quay.io/prometheus/node-exporter:v1.12.1-distroless": {
+      "digest": "sha256:bbfbd533202cfef891c70383ddf6f0c32acece66400ad8091a18bed7aad5db6f",
+      "platform": "linux/amd64"
+    },
+    "registry.k8s.io/kube-state-metrics/kube-state-metrics:v2.20.0": {
+      "digest": "sha256:01171220c7c059afc85034ffe687bfe7249e41c0cc46fbe9a5128503ceee3016",
+      "platform": "linux/amd64"
+    },
+    "quay.io/thanos/thanos:v0.42.5": {
+      "digest": "sha256:a13aade5af3866e40d0f01c17750ad4decbb500fdb6a37a54b8348d4dfa09f49",
+      "platform": "linux/amd64"
+    }
+  },
+  "limitations": [
+    "The Thanos runtime overrides chart 0.48.0 appVersion with patch 0.42.5; chart archives are unchanged.",
+    "Immutable image identity alone is not rollout authorization; each component requires its runtime review and live preconditions.",
+    "Rendered requirements do not establish live performance, retention or recovery."
+  ],
+  "telemetry_images": {
+    "docker.io/grafana/grafana:13.3.0-distroless": {
+      "digest": "sha256:ffa50e781972f7862410639eed96e0a9ad96c94ebeccd43e634141f3d9605a99",
+      "platform": "linux/amd64"
+    },
+    "docker.io/grafana/loki:3.7.9": {
+      "digest": "sha256:569e5cab050b7705eb82080335ff9a8bd329650b358bb0d42131e3ced8d9492e",
+      "platform": "linux/amd64"
+    },
+    "docker.io/grafana/tempo:3.1.1": {
+      "digest": "sha256:24ded48437b982348fdb52d6353d6e0a6ea519e57b0517d6065d419112d4032c",
+      "platform": "linux/amd64"
+    },
+    "docker.io/otel/opentelemetry-collector-contrib:0.163.2": {
+      "digest": "sha256:989669581ee1f89184f3fd9dd5adfc6615ed6c9692c026aaea89e07a20dfb177",
+      "platform": "linux/amd64"
+    },
+    "quay.io/prometheus/blackbox-exporter:v0.29.1": {
+      "digest": "sha256:66eae352a79e6f677aeddd8c25a9bdb017586dc5fbd230f22329213d891f94bd",
+      "platform": "linux/amd64"
+    }
+  }
+}

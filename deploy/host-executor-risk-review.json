@@ -1,0 +1,468 @@
+{
+  "schema_version": "klip-host-risk-review.v1",
+  "reviewed_at": "2026-11-04",
+  "expires_at": "2026-11-11",
+  "source_commit": "d0ebb4c23f615c5a960c22d9d1952f062c88e5c1",
+  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:94f80588b133257062e66370b770ee11ceff243b8cb0a6873dcc95127f4cdad4",
+  "scope": "Restricted CPU executor only; not a general platform or GPU-runtime security approval.",
+  "critical_policy": "Any Critical finding blocks deployment. No suppressed findings.",
+  "conditions": [
+    "Dedicated platform-ops namespace with restricted Pod admission.",
+    "Mutual TLS only; fixed typed API; no submitted commands or credential paths.",
+    "UID/GID 20002; no capabilities, escalation, host namespaces/devices or writable root.",
+    "Private retained EFS access point; SSH and workload credentials excluded from management Pods.",
+    "Exact six-host SSM start scope and own-session transport/termination only.",
+    "One non-retrying Job per task; trusted SSH host keys and expected Kubernetes UID.",
+    "No SQLite, Perl-tar, infocmp, privileged local ACL/mount or Go HTTP server workload.",
+    "Review expires within seven days and must be renewed for new image, findings or exposure."
+  ],
+  "high_findings": [
+    {
+      "finding": [
+        "CVE-2025-69720",
+        "libncursesw6",
+        "6.5+20250216-2"
+      ],
+      "rationale": "The reported entry point is infocmp terminfo analysis. The fixed typed API and worker commands do not invoke infocmp or accept terminfo inputs; locale is fixed. The distribution packages remain affected; terminal/tool exposure changes require a new review."
+    },
+    {
+      "finding": [
+        "CVE-2025-69720",
+        "libtinfo6",
+        "6.5+20250216-2"
+      ],
+      "rationale": "The reported entry point is infocmp terminfo analysis. The fixed typed API and worker commands do not invoke infocmp or accept terminfo inputs; locale is fixed. The distribution packages remain affected; terminal/tool exposure changes require a new review."
+    },
+    {
+      "finding": [
+        "CVE-2025-69720",
+        "ncurses-base",
+        "6.5+20250216-2"
+      ],
+      "rationale": "The reported entry point is infocmp terminfo analysis. The fixed typed API and worker commands do not invoke infocmp or accept terminfo inputs; locale is fixed. The distribution packages remain affected; terminal/tool exposure changes require a new review."
+    },
+    {
+      "finding": [
+        "CVE-2025-69720",
+        "ncurses-bin",
+        "6.5+20250216-2"
+      ],
+      "rationale": "The reported entry point is infocmp terminfo analysis. The fixed typed API and worker commands do not invoke infocmp or accept terminfo inputs; locale is fixed. The distribution packages remain affected; terminal/tool exposure changes require a new review."
+    },
+    {
+      "finding": [
+        "CVE-2026-111943",
+        "stdlib",
+        "v1.26.7"
+      ],
+      "rationale": "The locked SSM plugin is currently the latest official release and retains an older Go verifier. Its only authorized outbound peer is the fixed AWS SSM endpoint; scoped IAM, TLS verification and URL validation narrow exposure. Untrusted-intermediate handling remains a residual dependency risk. Rebuild/upgrade and rescan when a supported patched release is available; the retained runc artifact is not executed locally."
+    },
+    {
+      "finding": [
+        "CVE-2026-111943",
+        "stdlib",
+        "v1.26.8"
+      ],
+      "rationale": "The locked SSM plugin is currently the latest official release and retains an older Go verifier. Its only authorized outbound peer is the fixed AWS SSM endpoint; scoped IAM, TLS verification and URL validation narrow exposure. Untrusted-intermediate handling remains a residual dependency risk. Rebuild/upgrade and rescan when a supported patched release is available; the retained runc artifact is not executed locally."
+    },
+    {
+      "finding": [
+        "CVE-2026-119373",
+        "libsqlite3-0",
+        "3.46.1-7+deb13u2"
+      ],
+      "rationale": "Executor state uses typed JSON files; it does not execute caller SQL or open submitted SQLite/FTS5 databases. Management persistence is PostgreSQL outside this service. SQLite remains affected and no general SQL/file-processing API is authorized by this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-16742",
+        "libsystemd0",
+        "257.13-1~deb13u1"
+      ],
+      "rationale": "Only systemd/udev libraries are listed in this runtime scan, not a running systemd-homed service. PID 1 is the Python service or fixed worker, with no host/systemd socket mounts or local root. The library finding is retained rather than declared fixed."
+    },
+    {
+      "finding": [
+        "CVE-2026-16742",
+        "libudev1",
+        "257.13-1~deb13u1"
+      ],
+      "rationale": "Only systemd/udev libraries are listed in this runtime scan, not a running systemd-homed service. PID 1 is the Python service or fixed worker, with no host/systemd socket mounts or local root. The library finding is retained rather than declared fixed."
+    },
+    {
+      "finding": [
+        "CVE-2026-46600",
+        "golang.org/x/net",
+        "v0.55.0"
+      ],
+      "rationale": "The affected x/net DNS parser is reported in the retained runc artifact. That binary is copied to a GPU host by a separate runtime procedure and is not executed by the CPU executor. This review does not authorize unrestricted or live GPU-runtime use of the affected code; GPU runtime compatibility/security requires its own gate."
+    },
+    {
+      "finding": [
+        "CVE-2026-54369",
+        "libacl1",
+        "2.3.2-2+b1"
+      ],
+      "rationale": "Path-based privileged ACL manipulation is outside the authored executor commands. The process has no local root or DAC capabilities, no host mounts and a private retained UID-20002 access point. The vulnerable library remains installed; privileged/local ACL usage requires a new review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "bsdutils",
+        "1:2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "libblkid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "liblastlog2-2",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "libmount1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "libsmartcols1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "libuuid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "login",
+        "1:4.16.0-2+really2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "mount",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-76642",
+        "util-linux",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "bsdutils",
+        "1:2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "libblkid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "liblastlog2-2",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "libmount1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "libsmartcols1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "libuuid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "login",
+        "1:4.16.0-2+really2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "mount",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78408",
+        "util-linux",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "bsdutils",
+        "1:2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "libblkid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "liblastlog2-2",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "libmount1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "libsmartcols1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "libuuid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "login",
+        "1:4.16.0-2+really2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "mount",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78409",
+        "util-linux",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "bsdutils",
+        "1:2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "libblkid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "liblastlog2-2",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "libmount1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "libsmartcols1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "libuuid1",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "login",
+        "1:4.16.0-2+really2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "mount",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78410",
+        "util-linux",
+        "2.41.5-0+deb13u1"
+      ],
+      "rationale": "Local mount/nsenter privilege paths remain present in distribution packages. Executor runs as UID 20002 with all capabilities dropped, no privilege escalation, no host namespaces/devices and a read-only root. Authored operations never invoke these local mount helpers. The vulnerability is not fixed; changing those boundaries invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78667",
+        "stdlib",
+        "v1.26.7"
+      ],
+      "rationale": "This Go HTTP file-serving path is reported in retained runc/SSM components; the authored executor exposes no Go FileServer, ServeFile or ServeContent endpoint. SSM is an outbound client to AWS. Keep the finding retained; a public or general-purpose Go HTTP endpoint invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78667",
+        "stdlib",
+        "v1.26.8"
+      ],
+      "rationale": "This Go HTTP file-serving path is reported in retained runc/SSM components; the authored executor exposes no Go FileServer, ServeFile or ServeContent endpoint. SSM is an outbound client to AWS. Keep the finding retained; a public or general-purpose Go HTTP endpoint invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-78669",
+        "golang.org/x/net",
+        "v0.55.0"
+      ],
+      "rationale": "Retained runc is not executed locally; SSM outbound connections are limited to the authenticated AWS service endpoint and the locked plugin release validates stream URLs. Adversarial HTTP/2 peers remain a residual risk, not a fixed dependency. No general network proxy/server input is exposed."
+    },
+    {
+      "finding": [
+        "CVE-2026-78669",
+        "stdlib",
+        "v1.26.7"
+      ],
+      "rationale": "Retained runc is not executed locally; SSM outbound connections are limited to the authenticated AWS service endpoint and the locked plugin release validates stream URLs. Adversarial HTTP/2 peers remain a residual risk, not a fixed dependency. No general network proxy/server input is exposed."
+    },
+    {
+      "finding": [
+        "CVE-2026-78669",
+        "stdlib",
+        "v1.26.8"
+      ],
+      "rationale": "Retained runc is not executed locally; SSM outbound connections are limited to the authenticated AWS service endpoint and the locked plugin release validates stream URLs. Adversarial HTTP/2 peers remain a residual risk, not a fixed dependency. No general network proxy/server input is exposed."
+    },
+    {
+      "finding": [
+        "CVE-2026-9538",
+        "perl-base",
+        "5.40.1-6+deb13u1"
+      ],
+      "rationale": "The reported Perl Archive::Tar path is not used by this runtime. Source/runtime archives use bounded checksum-verified Python tarfile paths, and tasks cannot submit archive bytes or commands. Perl packages remain affected; enabling Perl archive processing invalidates this review."
+    },
+    {
+      "finding": [
+        "CVE-2026-97031",
+        "stdlib",
+        "v1.26.7"
+      ],
+      "rationale": "The Go TLS server ECH parser is not used by the outbound-only SSM client or by the unexecuted runc artifact in this CPU executor. The mTLS listener is Python/OpenSSL. The affected components remain present; this does not establish GPU-host runtime safety."
+    },
+    {
+      "finding": [
+        "CVE-2026-97031",
+        "stdlib",
+        "v1.26.8"
+      ],
+      "rationale": "The Go TLS server ECH parser is not used by the outbound-only SSM client or by the unexecuted runc artifact in this CPU executor. The mTLS listener is Python/OpenSSL. The affected components remain present; this does not establish GPU-host runtime safety."
+    }
+  ],
+  "runtime_revision_note": "CPU executor custody and network boundary are unchanged. The image now contains the separate, exact single-A10 bootstrap review and verifies retained assessment bytes. This CPU review does not approve serving images or establish GPU readiness.",
+  "evidence": {
+    "workflow_run_id": "41806434789",
+    "scan_report_sha256": "d2e3aff93e36e83370ed11e01533f57068034096e145a9b82b36aa08ba394db1",
+    "previous_review_sha256": "0efd00840030dc1878a0f6fa93467fdcb283d32475325dae7f1cc2e163b8e14e",
+    "review_basis": "All 55 exact High tuples and runtime rationales are unchanged; native Critical count is zero. Existing expiry and CPU custody/network restrictions are retained. GPU admission has its own assessment and live checks."
+  }
+}

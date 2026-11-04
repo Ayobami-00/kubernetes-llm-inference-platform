@@ -35,6 +35,28 @@ implements Kubernetes control in two stages: persist intent, then create/adopt t
 Repeated API idempotency keys return the original attempt, including terminal attempts. Do not use
 `LocalRunnerAdapter` across Pods: it is only for local commands sharing one filesystem/PID namespace.
 
+For actual runner Jobs, terminal acceptance requires the saved completed observation,
+its result and the original timeline timestamp to agree. Atomic file replacement on
+shared storage can briefly expose different file generations to different Pods.
+Management observes `finalizing` for up to 120 seconds after the original Job's
+completion time, then fails inconsistent artifacts. The allowance is frozen with
+the execution binding and cannot reset when a management worker restarts. The
+dedicated contract-fixture adapter remains compatible with its simpler result protocol.
+
+The native HTTP adapter queues diagnostic records for a background writer instead
+of locking/flushing EFS on the request coroutine. Each process has a 32 MiB /
+4,096-event bound, including in-flight writes, and batches for up to 25 ms before
+an append/fsync. Immutable clock/context data are cached; session suppression uses
+attempt-local scratch shared by AIPerf processes. The native HTTP/SSE implementation,
+single timeline, timeouts and per-customer concurrency remain in use.
+
+Every writer must produce a healthy final receipt with matching accepted/written
+counts before evaluation. Overflow, storage failure, missing receipts or an
+undrained writer fail the attempt and cannot produce a passing result. The
+checksummed `journal-status.json` documents this policy. A hard Pod loss can lose
+pending events from local memory; previously flushed partial records remain on
+EFS, the attempt fails, and execution never restarts automatically.
+
 ## Artifacts, credentials and resources
 
 Use the same `/artifacts` mount in preparation, management API/worker Pods and runner Jobs. Stage

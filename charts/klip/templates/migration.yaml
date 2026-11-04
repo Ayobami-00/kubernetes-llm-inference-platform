@@ -10,10 +10,13 @@ spec:
   backoffLimit: 2
   activeDeadlineSeconds: 300
   template:
+    metadata:
+      labels: {app.kubernetes.io/name: {{ .Release.Name }}, app.kubernetes.io/component: migrate}
     spec:
       restartPolicy: Never
       automountServiceAccountToken: false
-      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001}
+      serviceAccountName: {{ .Release.Name }}-migrate
+      securityContext: {runAsNonRoot: true, runAsUser: 10001, runAsGroup: 10001, seccompProfile: {type: RuntimeDefault}}
       nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
       tolerations: {{ toYaml .Values.tolerations | nindent 8 }}
       {{- with .Values.imagePullSecrets }}
@@ -24,9 +27,28 @@ spec:
           image: {{ required "backend.image is required" .Values.backend.image | quote }}
           command: [sh, -c, "alembic -c apps/management/backend/alembic.ini upgrade head && management-init"]
           env:
+            - {name: LANG, value: C.UTF-8}
+            - {name: LC_ALL, value: C.UTF-8}
+            - {name: LANGUAGE, value: C}
             - name: MANAGEMENT_DATABASE_URL
               valueFrom:
                 secretKeyRef:
                   name: {{ required "database.existingSecret is required" .Values.database.existingSecret }}
                   key: {{ .Values.database.urlKey }}
-          securityContext: {allowPrivilegeEscalation: false, capabilities: {drop: [ALL]}}
+            - name: MANAGEMENT_DATABASE_REQUIRE_TLS
+              value: {{ .Values.database.requireTLS | quote }}
+            {{- if .Values.database.caSecret }}
+            - name: MANAGEMENT_DATABASE_CA_FILE
+              value: /run/secrets/database/ca.crt
+          volumeMounts:
+            - {name: database-ca, mountPath: /run/secrets/database, readOnly: true}
+            {{- end }}
+          securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
+          resources: {requests: {cpu: 100m, memory: 256Mi}, limits: {cpu: "1", memory: 512Mi}}
+      {{- if .Values.database.caSecret }}
+      volumes:
+        - name: database-ca
+          secret:
+            secretName: {{ .Values.database.caSecret }}
+            items: [{key: {{ .Values.database.caKey }}, path: ca.crt}]
+      {{- end }}

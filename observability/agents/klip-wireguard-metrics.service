@@ -1,0 +1,29 @@
+[Unit]
+Description=Publish local public WireGuard observations for node exporter
+After=wg-quick@wg0.service
+ConditionPathExists=/etc/wireguard/wg0.conf
+
+[Service]
+Type=oneshot
+ExecStart=/usr/bin/python3 /usr/local/lib/klip/wireguard_metrics.py
+User=root
+Group=root
+UMask=0022
+NoNewPrivileges=true
+CapabilityBoundingSet=CAP_NET_ADMIN
+ProtectSystem=strict
+ProtectHome=true
+PrivateTmp=true
+ProtectKernelTunables=true
+ProtectKernelModules=true
+ProtectKernelLogs=true
+ProtectControlGroups=true
+RestrictNamespaces=true
+RestrictAddressFamilies=AF_UNIX AF_NETLINK
+IPAddressDeny=any
+ReadWritePaths=/var/lib/node_exporter/klip
+LockPersonality=true
+MemoryDenyWriteExecute=true
+MemoryMax=64M
+TasksMax=8
+TimeoutStartSec=15s

@@ -1,0 +1,91 @@
+name: Inference image security
+
+on:
+  workflow_dispatch:
+    inputs:
+      component:
+        description: Scan all serving components or only the current vLLM candidate
+        type: choice
+        default: all
+        options: [all, vllm]
+  push:
+    branches: [codex/end-to-end-platform]
+    paths:
+      - 'deploy/inference.lock.json'
+      - '.github/workflows/inference-security.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-security-${{ github.ref }}-${{ inputs.component || 'all' }}
+  cancel-in-progress: false
+
+jobs:
+  identity:
+    runs-on: ubuntu-latest
+    outputs:
+      components: ${{ steps.matrix.outputs.components }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - id: matrix
+        env:
+          SELECTED_COMPONENT: ${{ inputs.component || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          lock = json.loads(Path('deploy/inference.lock.json').read_text())
+          selected = os.environ['SELECTED_COMPONENT']
+          if selected not in {'all', 'vllm'}:
+              raise ValueError('Unknown image selection')
+          rows = [{'name': k, 'reference': v} for k, v in lock['scan_components'].items()
+                  if selected == 'all' or k == selected]
+          if not rows or any(row['reference'] not in lock['images'] for row in rows):
+              raise ValueError('Image selection differs from the immutable lock')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('components=' + json.dumps(rows) + '\n')
+          PY
+  scan:
+    needs: identity
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include: ${{ fromJSON(needs.identity.outputs.components) }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - name: Reclaim unused tools on the disposable scanner runner
+        if: matrix.name == 'vllm'
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+      - name: Install checksum-verified scanner
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/klip-inference-trivy"
+          mkdir -p "$scanner_dir"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_dir/trivy.tar.gz"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_dir/trivy.tar.gz" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_dir/trivy.tar.gz" --directory "$scanner_dir" trivy
+          printf '%s\n' "$scanner_dir" >> "$GITHUB_PATH"
+      - name: Retain complete immutable-image findings
+        env:
+          INFERENCE_REFERENCE: ${{ matrix.reference }}
+        run: >-
+          python3 scripts/infrastructure/gpu_runtime_scan.py
+          --source inference --reference "$INFERENCE_REFERENCE"
+          --directory artifacts/security/inference
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: inference-${{ matrix.name }}-${{ github.sha }}
+          path: |
+            artifacts/security/inference/scan.json
+            artifacts/security/inference/summary.json
+          if-no-files-found: error
+          retention-days: 90

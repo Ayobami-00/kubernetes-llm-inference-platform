@@ -10,7 +10,13 @@ from pathlib import Path
 
 import yaml
 from cluster_config import firewall, kubeadm_documents, node_configuration
-from cluster_models import PeerRegistry, WorkerRequest, assert_node_identity
+from cluster_models import (
+    GPUWorkerRequest,
+    PeerRegistry,
+    WorkerRequest,
+    assert_node_identity,
+    worker_request,
+)
 from common import CONFIG, PROFILES, ROOT, Aws, state_home, tf, utc_now, write_private
 
 
@@ -189,6 +195,9 @@ with tempfile.TemporaryDirectory() as folder:
 
 
 def operate_worker(action: str, request_path: Path | None) -> dict:
+    from cluster import assert_peer_writer
+
+    assert_peer_writer()
     from cluster import FOLDER, Host, ansible, kubectl, load_hosts
 
     if action == "probe-register":
@@ -205,7 +214,7 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
         return {"peers_revoked": True, "terraform_probe_destroy_required": True}
     if not request_path:
         raise ValueError("A versioned --request is required")
-    request = WorkerRequest.model_validate_json(request_path.read_text())
+    request = worker_request(request_path.read_text())
     operation = FOLDER / "operations" / f"{request.operation_id}.json"
     digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
     if operation.exists():
@@ -245,7 +254,13 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
     write_private(operation, result)
     import cluster
 
+    previous_deadline = cluster.OPERATION_DEADLINE
     cluster.OPERATION_DEADLINE = request.deadline.timestamp()
+
+    def stage(name: str) -> None:
+        result["stages"].append(name)
+        write_private(operation, result)
+
     try:
         if action == "worker-prepare":
             if request.provider == "lambda" and not request.ssh_source_cidrs:
@@ -262,12 +277,24 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                 "private_ip": str(request.private_ip),
                 "wireguard_ip": str(request.wireguard_ip),
             }
+            if request.availability_zone is not None:
+                node["availability_zone"] = request.availability_zone
             fields["klip_node"] = node_configuration(
                 request.node_name, allocation, node, role="worker", provider=request.provider
             )
             fields["klip_node"]["ssh_source_cidrs"] = [
                 str(network) for network in request.ssh_source_cidrs
             ]
+            fields["klip_node"]["quarantine"] = request.quarantine
+            if isinstance(request, GPUWorkerRequest):
+                from gpu_runtime import install_artifact, settings
+
+                install_artifact()  # Checksum and size validation precede host changes.
+                fields["klip_node"].update(
+                    containerd_version=settings()["containerd_version"],
+                    runtime_profile=request.runtime_profile,
+                    gpu_kernel=settings()["kernel"],
+                )
             rules = FOLDER / f"firewall-{request.node_name}.rules"
             write_private(rules, firewall(fields["klip_node"]))
             fields["klip_firewall_file"] = str(rules)
@@ -280,8 +307,12 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
             }
             path = FOLDER / f"prepare-{request.node_name}.yaml"
             write_private(path, yaml.safe_dump(single))
-            ansible("prepare", inventory=path)
-            result["stages"].append("host_prepared")
+            ansible(
+                "prepare",
+                inventory=path,
+                log_path=FOLDER / "operations" / f"{request.operation_id}-prepare.log",
+            )
+            stage("host_prepared")
             result["public_key"] = Host(fields).agent("wg-key")["public_key"]
             result["readiness"]["host"] = True
         else:
@@ -305,8 +336,12 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                     or str(peer.wireguard_ip) != str(request.wireguard_ip)
                 ):
                     raise ValueError("Reconcile this worker's direct peers before join")
-                ansible("mesh", extra={"klip_ca_bundle": str(FOLDER / "ca.crt")})
-                result["stages"].append("mesh_reconciled")
+                ansible(
+                    "mesh",
+                    extra={"klip_ca_bundle": str(FOLDER / "ca.crt")},
+                    log_path=FOLDER / "operations" / f"{request.operation_id}-mesh.log",
+                )
+                stage("mesh_reconciled")
                 host.agent("route")
                 current = kubectl(
                     "get", "node", request.node_name, "--ignore-not-found", "-o", "json"
@@ -395,7 +430,7 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                         if attempt == 29:
                             raise
                         time.sleep(1)
-                result["stages"].append("serving_certificate_verified")
+                stage("serving_certificate_verified")
                 kubectl(
                     "-n",
                     "kube-system",
@@ -447,11 +482,15 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                 result["registry_revision"] = updated["revision"]
                 write_private(operation, result)
                 remove_host(request.node_name)
-                ansible("mesh", extra={"klip_ca_bundle": str(FOLDER / "ca.crt")})
-                result["stages"].append("peers_revoked")
+                ansible(
+                    "mesh",
+                    extra={"klip_ca_bundle": str(FOLDER / "ca.crt")},
+                    log_path=FOLDER / "operations" / f"{request.operation_id}-mesh.log",
+                )
+                stage("peers_revoked")
                 if current.strip():
                     delete_node(request)
-                result["stages"].append("node_removed")
+                stage("node_removed")
                 result["provider_termination_required"] = True
         result.update(
             status="completed",
@@ -467,6 +506,6 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
         write_private(operation, result)
         raise WorkerOperationFailed(result) from error
     finally:
-        cluster.OPERATION_DEADLINE = None
+        cluster.OPERATION_DEADLINE = previous_deadline
     write_private(operation, result)
     return result

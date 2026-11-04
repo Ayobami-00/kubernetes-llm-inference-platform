@@ -10,6 +10,10 @@ encryption:
 envoy:
   enabled: false
 l7Proxy: false
+updateStrategy:
+  type: RollingUpdate
+  rollingUpdate:
+    maxUnavailable: 1
 certgen:
   nodeSelector:
     node-role.kubernetes.io/control-plane: ''
@@ -45,6 +49,9 @@ tolerations:
   - key: node.cilium.io/agent-not-ready
     operator: Exists
   - key: klip.io/acceptance-only
+    operator: Exists
+    effect: NoSchedule
+  - key: klip.dev/bootstrap
     operator: Exists
     effect: NoSchedule
 resources:

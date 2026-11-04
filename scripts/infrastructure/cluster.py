@@ -16,6 +16,7 @@ import subprocess
 import sys
 import time
 from pathlib import Path
+from urllib.parse import urlparse
 
 import yaml
 from cluster_config import kubeadm_documents, write_ansible_inputs
@@ -47,6 +48,13 @@ def operation_timeout(default: int) -> int:
     return min(default, remaining)
 
 
+class CommandFailure(RuntimeError):
+    def __init__(self, message: str, program: str, returncode: int):
+        self.program = program
+        self.returncode = returncode
+        super().__init__(message or f"{program} exited {returncode}; no diagnostic output")
+
+
 def checked(
     arguments: list[str], *, data: str | None = None, timeout: int = 600, secret: bool = False
 ) -> str:
@@ -61,8 +69,14 @@ def checked(
     )
     if result.returncode:
         if secret:
-            raise RuntimeError(f"{Path(arguments[0]).name} failed; secret-bearing output withheld")
-        raise RuntimeError((result.stderr or result.stdout).strip())
+            raise CommandFailure(
+                f"{Path(arguments[0]).name} failed; secret-bearing output withheld",
+                Path(arguments[0]).name,
+                result.returncode,
+            )
+        raise CommandFailure(
+            (result.stderr or result.stdout).strip(), Path(arguments[0]).name, result.returncode
+        )
     return result.stdout
 
 
@@ -70,14 +84,7 @@ class Host:
     def __init__(self, fields: dict):
         self.fields = fields
 
-    def run(
-        self,
-        arguments: list[str],
-        *,
-        data: str | None = None,
-        timeout: int = 600,
-        secret: bool = False,
-    ) -> str:
+    def ssh_arguments(self, *, reuse: bool = True) -> list[str]:
         fields = self.fields
         if not re.fullmatch(r"[A-Za-z0-9_.-]+", fields["ansible_host"]) or not re.fullmatch(
             r"[a-z_][a-z0-9_-]*", fields["ansible_user"]
@@ -86,36 +93,54 @@ class Host:
         # Reuse the authenticated SSM tunnel across short reconciliation commands.
         # Include pins/key/proxy settings in the socket identity, so changed access
         # configuration cannot silently reuse a session authenticated differently.
-        identity = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:16]
-        control_path = private_dir(state_home() / "ssh") / identity
-        # OpenSSH appends a temporary suffix when creating the master socket.
-        if len(str(control_path).encode()) > 85:
-            raise ValueError("Operator state path is too long for an SSH control socket")
-        return checked(
-            [
-                "ssh",
-                "-o",
-                "BatchMode=yes",
-                "-o",
-                "ConnectTimeout=45",
+        multiplex = ["-o", "ControlMaster=no", "-o", "ControlPath=none"]
+        if reuse:
+            identity = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:16]
+            socket_home = Path(os.environ.get("KLIP_SSH_SOCKET_HOME", state_home() / "ssh"))
+            if not socket_home.is_absolute():
+                raise ValueError("SSH control sockets require an absolute private directory")
+            control_path = private_dir(socket_home) / identity
+            # OpenSSH appends a temporary suffix when creating the master socket.
+            if len(str(control_path).encode()) > 85:
+                raise ValueError("Operator state path is too long for an SSH control socket")
+            multiplex = [
                 "-o",
                 "ControlMaster=auto",
                 "-o",
                 "ControlPersist=60",
                 "-o",
                 f"ControlPath={control_path}",
-                "-o",
-                "ServerAliveInterval=15",
-                "-o",
-                "ServerAliveCountMax=2",
-                "-o",
-                "StrictHostKeyChecking=yes",
-                "-i",
-                fields["ansible_ssh_private_key_file"],
-                *shlex.split(fields.get("ansible_ssh_common_args", "")),
-                fields["ansible_user"] + "@" + fields["ansible_host"],
-                shlex.join(arguments),
-            ],
+            ]
+        return [
+            "ssh",
+            "-o",
+            "BatchMode=yes",
+            "-o",
+            "ConnectTimeout=45",
+            *multiplex,
+            "-o",
+            "ServerAliveInterval=15",
+            "-o",
+            "ServerAliveCountMax=2",
+            "-o",
+            "StrictHostKeyChecking=yes",
+            "-i",
+            fields["ansible_ssh_private_key_file"],
+            *shlex.split(fields.get("ansible_ssh_common_args", "")),
+            fields["ansible_user"] + "@" + fields["ansible_host"],
+        ]
+
+    def run(
+        self,
+        arguments: list[str],
+        *,
+        data: str | None = None,
+        timeout: int = 600,
+        secret: bool = False,
+        reuse: bool = True,
+    ) -> str:
+        return checked(
+            [*self.ssh_arguments(reuse=reuse), shlex.join(arguments)],
             data=data,
             timeout=timeout,
             secret=secret,
@@ -128,16 +153,81 @@ from pathlib import Path
 import os, sys, tempfile
 p = Path(sys.argv[1])
 p.parent.mkdir(parents=True, exist_ok=True)
-fd, temporary = tempfile.mkstemp(dir=p.parent)
-with os.fdopen(fd, 'w') as stream:
-    stream.write(sys.stdin.read())
-os.chmod(temporary, 0o600)
-os.replace(temporary, p)
+fd, temporary = tempfile.mkstemp(prefix='.' + p.name + '.', dir=p.parent)
+try:
+    with os.fdopen(fd, 'w') as stream:
+        stream.write(sys.stdin.read())
+        stream.flush()
+        os.fsync(stream.fileno())
+    os.chmod(temporary, 0o600)
+    os.replace(temporary, p)
+    directory = os.open(p.parent, os.O_DIRECTORY)
+    try:
+        os.fsync(directory)
+    finally:
+        os.close(directory)
+finally:
+    Path(temporary).unlink(missing_ok=True)
 """
         self.run(["sudo", "python3", "-c", program, path], data=data, secret=True)
 
-    def agent(self, action: str) -> dict:
-        return json.loads(self.run(["sudo", "python3", "/usr/local/sbin/klip-node", action]))
+    def agent(self, action: str, *, pod_uid: str | None = None) -> dict:
+        arguments = ["sudo", "python3", "/usr/local/sbin/klip-node", action]
+        if pod_uid is not None:
+            if action != "pod-network" or not re.fullmatch(r"[a-f0-9-]{36}", pod_uid):
+                raise ValueError("A Pod UID is accepted only for Pod-network inspection")
+            arguments += ["--pod-uid", pod_uid]
+        return json.loads(self.run(arguments))
+
+
+def delete_owned_resource(path: str, uid: str, *, host=None) -> None:
+    """Delete an allowlisted test resource with an API-side UID precondition."""
+    if not re.fullmatch(
+        r"/(?:api/v1/namespaces/[a-z0-9-]+|apis/batch/v1/namespaces/[a-z0-9-]+/jobs/[a-z0-9-]+"
+        r"|api/v1/namespaces/klip/pods/klip-api-[a-z0-9]+-[a-z0-9]+"
+        r"|api/v1/namespaces/platform-data/pods/klip-db-[0-9]+"
+        r"|api/v1/namespaces/(?:klip-acceptance|gpu-system)/(?:pods|services)/"
+        r"smoke-host-[a-f0-9]{24}(?:-(?:cp-0[1-3]|platform-0[1-3]|gpu|cuda))?"
+        r"|apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db-restore)",
+        path,
+    ) or not re.fullmatch(r"[a-f0-9-]{36}", uid):
+        raise ValueError("Invalid UID-guarded cleanup target")
+    program = r"""
+import base64, http.client, json, ssl, subprocess, sys, tempfile
+from pathlib import Path
+from urllib.parse import urlsplit
+request = json.loads(sys.stdin.read())
+config = json.loads(subprocess.check_output([
+    'kubectl', '--kubeconfig=/etc/kubernetes/admin.conf', 'config', 'view', '--raw', '-o', 'json'
+]))
+with tempfile.TemporaryDirectory() as folder:
+    root = Path(folder)
+    cluster = config['clusters'][0]['cluster']
+    user = config['users'][0]['user']
+    for key, field in [('ca', 'certificate-authority-data'),
+                       ('cert', 'client-certificate-data'), ('key', 'client-key-data')]:
+        (root/key).write_bytes(base64.b64decode((cluster if key == 'ca' else user)[field]))
+    context = ssl.create_default_context(cafile=str(root/'ca'))
+    context.load_cert_chain(str(root/'cert'), str(root/'key'))
+    endpoint = urlsplit(cluster['server'])
+    if endpoint.scheme != 'https' or endpoint.username or endpoint.password:
+        raise ValueError('Invalid API endpoint')
+    connection = http.client.HTTPSConnection(
+        endpoint.hostname, endpoint.port or 443, context=context, timeout=10
+    )
+    body = {'apiVersion': 'v1', 'kind': 'DeleteOptions', 'propagationPolicy': 'Foreground',
+            'preconditions': {'uid': request['uid']}}
+    connection.request('DELETE', request['path'], json.dumps(body),
+                       {'Content-Type': 'application/json'})
+    response = connection.getresponse()
+    response.read()
+    if response.status not in (200, 202, 404):
+        raise RuntimeError('UID-guarded cleanup failed: ' + str(response.status))
+"""
+    target = host or Host(load_hosts()["cp-01"])
+    target.run(
+        ["sudo", "python3", "-c", program], data=json.dumps({"path": path, "uid": uid}), secret=True
+    )
 
 
 def load_hosts() -> dict[str, dict]:
@@ -148,13 +238,32 @@ def load_hosts() -> dict[str, dict]:
     return result
 
 
+def assert_peer_writer() -> None:
+    """A handed-off operator checkout cannot write an independent mesh registry."""
+    marker = FOLDER / "peer-owner.json"
+    if marker.exists():
+        value = json.loads(marker.read_text())
+        if (
+            value.get("schema_version") != "klip-peer-owner.v1"
+            or value.get("owner") != "host-executor"
+            or value.get("writer_root") != str(FOLDER)
+        ):
+            raise ValueError(
+                "Peer registry belongs to the isolated executor; recover authoritative state "
+                "before an explicit operator ownership transfer"
+            )
+
+
 def ansible(
     playbook: str,
     *,
     inventory: Path | None = None,
     extra: dict | None = None,
     limit: str | None = None,
+    log_path: Path | None = None,
 ) -> None:
+    if playbook == "mesh":
+        assert_peer_writer()
     arguments = [
         str(ROOT / ".venv/bin/ansible-playbook"),
         "-i",
@@ -169,18 +278,29 @@ def ansible(
         arguments += ["--extra-vars", "@" + str(extra_file)]
     env = environment(PROFILES["foundation"])
     env["ANSIBLE_CONFIG"] = str(ROOT / "infra/ansible/ansible.cfg")
-    result = subprocess.run(
-        arguments,
-        cwd=ROOT / "infra/ansible",
-        env=env,
-        capture_output=True,
-        text=True,
-        check=False,
-        timeout=operation_timeout(1200),
-    )
-    write_private(FOLDER / f"{playbook}.log", result.stdout + result.stderr)
+    destination = log_path or FOLDER / f"{playbook}.log"
+    try:
+        result = subprocess.run(
+            arguments,
+            cwd=ROOT / "infra/ansible",
+            env=env,
+            capture_output=True,
+            text=True,
+            check=False,
+            timeout=operation_timeout(1200),
+        )
+    except subprocess.TimeoutExpired as error:
+
+        def decoded(value):
+            return value.decode(errors="replace") if isinstance(value, bytes) else value or ""
+
+        write_private(destination, decoded(error.stdout) + decoded(error.stderr))
+        raise RuntimeError(
+            f"Ansible {playbook} timed out; inspect private log {destination}"
+        ) from None
+    write_private(destination, result.stdout + result.stderr)
     if result.returncode:
-        raise RuntimeError(f"Ansible {playbook} failed; inspect private cluster/{playbook}.log")
+        raise RuntimeError(f"Ansible {playbook} failed; inspect private log {destination}")
 
 
 def preflight() -> dict:
@@ -217,6 +337,7 @@ def preflight() -> dict:
 
 
 def collect_peers() -> dict:
+    assert_peer_writer()
     old_path = FOLDER / "peers.json"
     previous = (
         json.loads(old_path.read_text()) if old_path.exists() else {"revision": 0, "peers": {}}
@@ -257,9 +378,20 @@ def kubeconfigs() -> None:
 
 
 def kubectl(*arguments: str, host: str = "cp-01") -> str:
-    return Host(load_hosts()[host]).run(
-        ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", *arguments]
+    readonly = bool(arguments) and (
+        arguments[0] == "get"
+        or (len(arguments) >= 3 and arguments[0] in {"-n", "--namespace"} and arguments[2] == "get")
     )
+    target = Host(load_hosts()[host])
+    command = ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf", *arguments]
+    try:
+        return target.run(command)
+    except CommandFailure as error:
+        if not readonly or error.program != "ssh" or error.returncode not in {255, -13}:
+            raise
+        # A GET can be repeated after a lost multiplexed session. A new SSH
+        # connection retains exactly the same key pins/proxy/identity settings.
+        return target.run(command, reuse=False)
 
 
 def bootstrap() -> dict:
@@ -433,19 +565,16 @@ def tunnel(host: str = "cp-01"):
     log_path = FOLDER / "tunnel.log"
     write_private(log_path, "")
     with log_path.open("a") as log:
+        transport = Host(hosts[host]).ssh_arguments(reuse=False)
         process = subprocess.Popen(
             [
-                Aws(PROFILES["foundation"]).executable,
-                "ssm",
-                "start-session",
-                "--target",
-                node["instance_id"],
-                "--document-name",
-                "AWS-StartPortForwardingSessionToRemoteHost",
-                "--parameters",
-                json.dumps(
-                    {"host": [hostname], "portNumber": ["6443"], "localPortNumber": ["16443"]}
-                ),
+                *transport[:-1],
+                "-o",
+                "ExitOnForwardFailure=yes",
+                "-N",
+                "-L",
+                f"127.0.0.1:16443:{hostname}:6443",
+                transport[-1],
             ],
             env=environment(PROFILES["foundation"]),
             stdout=log,
@@ -470,6 +599,28 @@ def tunnel(host: str = "cp-01"):
                 process.wait(timeout=10)
             except subprocess.TimeoutExpired:
                 process.kill()
+                process.wait(timeout=10)
+
+
+def release_arguments(release: str) -> str:
+    arguments = "--skip-crds"
+    if release == "cilium":
+        observation = FoundationObservation.model_validate_json(
+            (state_home() / "reports/foundation.json").read_text()
+        )
+        api = observation.allocation.api
+        endpoint = urlparse(str(api.endpoint))
+        if (
+            endpoint.scheme != "https"
+            or endpoint.port != 6443
+            or endpoint.hostname != api.dns_name
+            or endpoint.username
+            or endpoint.password
+            or not re.fullmatch(r"[a-z0-9.-]+", endpoint.hostname or "")
+        ):
+            raise ValueError("Cilium requires the verified private foundation API endpoint")
+        arguments += f" --set-string=k8sServiceHost={endpoint.hostname} --set=k8sServicePort=6443"
+    return arguments
 
 
 def deploy() -> dict:
@@ -512,7 +663,7 @@ def deploy() -> dict:
                     "name=" + release,
                     "sync",
                     "--args",
-                    "--skip-crds",
+                    release_arguments(release),
                 ],
                 timeout=900,
             )
@@ -553,6 +704,29 @@ def deploy() -> dict:
         ),
     )
     return {"deployed": True}
+
+
+def sync_release(release: str) -> dict:
+    if release not in {"cilium", "metadata-guard", "metrics-server"}:
+        raise ValueError("Only a reviewed static platform release can be reconciled")
+    kubeconfigs()
+    with tunnel():
+        checked(
+            [
+                tool("helmfile"),
+                "--file",
+                str(ROOT / "deploy/helmfile.yaml"),
+                "--kubeconfig",
+                str(FOLDER / "operator.conf"),
+                "--selector",
+                "name=" + release,
+                "sync",
+                "--args",
+                release_arguments(release),
+            ],
+            timeout=900,
+        )
+    return {"release": release, "reconciled": True}
 
 
 def approve_serving_csrs() -> dict:
@@ -714,10 +888,20 @@ def main() -> None:
             "worker-remove",
             "probe-register",
             "probe-cleanup",
+            "platform-join",
+            "platform-protect",
+            "sync-release",
+            "verify-platform",
+            "activate-identity",
+            "verify-federation",
+            "verify-injection",
+            "verify-storage",
+            "verify-ebs",
         ],
     )
     parser.add_argument("--registry", type=Path)
     parser.add_argument("--request", type=Path)
+    parser.add_argument("--release", choices=["cilium", "metadata-guard", "metrics-server"])
     parser.add_argument("--copy", type=Path)
     parser.add_argument("--confirm-independent-custody", action="store_true")
     args = parser.parse_args()
@@ -766,6 +950,36 @@ def main() -> None:
         from cluster_acceptance import acceptance
 
         result = acceptance()
+    elif args.command == "platform-join":
+        from platform_workers import join_platform
+
+        result = join_platform()
+    elif args.command == "platform-protect":
+        from platform_workers import protect_platform
+
+        result = protect_platform()
+    elif args.command == "sync-release":
+        result = sync_release(args.release)
+    elif args.command == "verify-platform":
+        from platform_acceptance import verify_platform
+
+        result = verify_platform()
+    elif args.command == "activate-identity":
+        from issuer_transition import activate
+
+        result = activate()
+    elif args.command == "verify-ebs":
+        from ebs_acceptance import verify as verify_ebs
+
+        result = verify_ebs()
+    elif args.command == "verify-storage":
+        from storage_acceptance import verify as verify_storage
+
+        result = verify_storage()
+    elif args.command in {"verify-federation", "verify-injection"}:
+        from federation_probe import verify_federation
+
+        result = verify_federation(injected=args.command == "verify-injection")
     else:
         from cluster_workers import operate_worker
 

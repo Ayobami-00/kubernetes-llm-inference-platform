@@ -1,0 +1,191 @@
+{
+  "schema_version": "klip-telemetry-runtime-review.v1",
+  "reviewed_at": "2026-11-03T22:53:28.826006+00:00",
+  "expires_at": "2026-11-10T22:53:27.826010+00:00",
+  "scan_source_commit": "c79222079a9c6de5b28bd18d18ca59d43f967bfe",
+  "scan_workflow_run": 41731963265,
+  "configuration": {
+    "grafana": {
+      "values_sha256": "b318d0c56e957ba45699fb5a2b2c1420ee47768a8e34073febb814abbef0d7d3",
+      "boundary_sha256": "942f2fe39d03f2e260c4f27ed8fc0434c419d1c2faabcca0439b1da499f3dbaa"
+    },
+    "loki": {
+      "values_sha256": "9b56da91b5c4c672ea2f50bc49ff10638d58cb5d2b076c72c4af8f7a19ed8b5f",
+      "boundary_sha256": "942f2fe39d03f2e260c4f27ed8fc0434c419d1c2faabcca0439b1da499f3dbaa"
+    },
+    "tempo": {
+      "values_sha256": "73103e42ae35be3f4e07de5903ed321ca26a05ae675d90b34ea19bf056cd9f59",
+      "boundary_sha256": "942f2fe39d03f2e260c4f27ed8fc0434c419d1c2faabcca0439b1da499f3dbaa"
+    },
+    "otel": {
+      "values_sha256": "814cd9cd5f4d01a1110239a72703257a8df852fef74f9b1d52ebb54a16bfab04",
+      "boundary_sha256": "942f2fe39d03f2e260c4f27ed8fc0434c419d1c2faabcca0439b1da499f3dbaa"
+    }
+  },
+  "images": {
+    "docker.io/grafana/grafana:13.3.0-distroless@sha256:ffa50e781972f7862410639eed96e0a9ad96c94ebeccd43e634141f3d9605a99": {
+      "report_file": "image-07.json",
+      "report_sha256": "83acb3ff704c4ee63065e11c91c3452c9ef89574008663b8db5fb8c5c82c0ab6",
+      "high_findings": [
+        {
+          "id": "CVE-2026-78669",
+          "package": "golang.org/x/net",
+          "version": "v0.58.0",
+          "fixed_version": "0.60.0",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/cloudwatch/gpx_grafana_cloudwatch_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/grafana-postgresql-datasource/gpx_grafana_postgresql_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/influxdb/gpx_grafana_influxdb_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/jaeger/gpx_grafana-jaeger-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/loki/gpx_grafana-loki-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mssql/gpx_grafana-mssql-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mysql/gpx_grafana-mysql-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/opentsdb/gpx_grafana-opentsdb-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-111943",
+          "package": "stdlib",
+          "version": "v1.26.7",
+          "fixed_version": "1.26.10, 1.27.3",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/cloudwatch/gpx_grafana_cloudwatch_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/grafana-postgresql-datasource/gpx_grafana_postgresql_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/influxdb/gpx_grafana_influxdb_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/jaeger/gpx_grafana-jaeger-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/loki/gpx_grafana-loki-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mssql/gpx_grafana-mssql-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mysql/gpx_grafana-mysql-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-78667",
+          "package": "stdlib",
+          "version": "v1.26.7",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/cloudwatch/gpx_grafana_cloudwatch_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/grafana-postgresql-datasource/gpx_grafana_postgresql_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/influxdb/gpx_grafana_influxdb_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/jaeger/gpx_grafana-jaeger-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/loki/gpx_grafana-loki-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mssql/gpx_grafana-mssql-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mysql/gpx_grafana-mysql-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "stdlib",
+          "version": "v1.26.7",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/cloudwatch/gpx_grafana_cloudwatch_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/grafana-postgresql-datasource/gpx_grafana_postgresql_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/influxdb/gpx_grafana_influxdb_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/jaeger/gpx_grafana-jaeger-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/loki/gpx_grafana-loki-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mssql/gpx_grafana-mssql-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mysql/gpx_grafana-mysql-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-97031",
+          "package": "stdlib",
+          "version": "v1.26.7",
+          "fixed_version": "1.26.9, 1.27.2",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/cloudwatch/gpx_grafana_cloudwatch_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/grafana-postgresql-datasource/gpx_grafana_postgresql_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/influxdb/gpx_grafana_influxdb_datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/jaeger/gpx_grafana-jaeger-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/loki/gpx_grafana-loki-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mssql/gpx_grafana-mssql-datasource_linux_amd64",
+            "usr/share/grafana/data/plugins-bundled/mysql/gpx_grafana-mysql-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-78669",
+          "package": "golang.org/x/net",
+          "version": "v0.59.0",
+          "fixed_version": "0.60.0",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/grafana-pyroscope-datasource/gpx_grafana-pyroscope-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-21728",
+          "package": "github.com/grafana/tempo",
+          "version": "v1.5.1-0.20260910130453-bcfe9f230c1d",
+          "fixed_version": "2.8.4, 2.9.2, 2.10.2",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/tempo/gpx_grafana-tempo-datasource_linux_amd64"
+          ]
+        },
+        {
+          "id": "CVE-2026-28377",
+          "package": "github.com/grafana/tempo",
+          "version": "v1.5.1-0.20260910130453-bcfe9f230c1d",
+          "fixed_version": "2.10.3",
+          "condition": "grafana-fixed-backends",
+          "targets": [
+            "usr/share/grafana/data/plugins-bundled/tempo/gpx_grafana-tempo-datasource_linux_amd64"
+          ]
+        }
+      ]
+    },
+    "docker.io/grafana/loki:3.7.9@sha256:569e5cab050b7705eb82080335ff9a8bd329650b358bb0d42131e3ced8d9492e": {
+      "report_file": "image-08.json",
+      "report_sha256": "bb899031ab53272ec86435865a2f117417ee31507c7078e6d4c110654f339464",
+      "high_findings": []
+    },
+    "docker.io/grafana/tempo:3.1.1@sha256:24ded48437b982348fdb52d6353d6e0a6ea519e57b0517d6065d419112d4032c": {
+      "report_file": "image-09.json",
+      "report_sha256": "6aac5967733f144623a1ee696530fb9e3502f76d00fd8814cdb361d65675fd41",
+      "high_findings": [
+        {
+          "id": "CVE-2026-116587",
+          "package": "github.com/go-jose/go-jose/v4",
+          "version": "v4.1.4",
+          "fixed_version": "4.1.6",
+          "condition": "tempo-no-jwk",
+          "targets": [
+            "tempo"
+          ]
+        }
+      ]
+    },
+    "docker.io/otel/opentelemetry-collector-contrib:0.163.2@sha256:989669581ee1f89184f3fd9dd5adfc6615ed6c9692c026aaea89e07a20dfb177": {
+      "report_file": "image-10.json",
+      "report_sha256": "1693caf44622e3b58e6089798159885d1ad3277f3a0ed5a01e0bb3468f5076b3",
+      "high_findings": [
+        {
+          "id": "CVE-2026-116587",
+          "package": "github.com/go-jose/go-jose/v4",
+          "version": "v4.1.5",
+          "fixed_version": "4.1.6",
+          "condition": "collector-no-jwk",
+          "targets": [
+            "otelcol-contrib"
+          ]
+        }
+      ]
+    }
+  },
+  "conditions": {
+    "grafana-fixed-backends": "Admin-only provisioning, anonymous access/sign-up disabled, no public endpoint in this release. Fixed internal HTTP metrics/log/trace destinations and verified private-CA PostgreSQL TLS. No public egress or AWS/API token. Restricted non-root filesystem, CPU/memory/connections bounded. Bundled plugins remain vulnerable; unrelated datasource plugins disabled. No claim that dependency findings are fixed or unreachable.",
+    "tempo-no-jwk": "Private OTLP ingestion only from scoped Collectors; no JWT/OAuth/JWK authentication module configured. S3 SDK federation uses exact-subject AWS STS, not caller-supplied JWKs. Restricted non-root runtime and bounded ingestion/query resources. Dependency remains vulnerable.",
+    "collector-no-jwk": "Only OTLP receivers and health/file-storage extensions are enabled; no OAuth/JWT/JWK extension. Private ingestion from scoped platform Pods; fixed Loki/Tempo exports, no public egress or API/AWS token. Memory limiter, bounded persistent queues, retries and resource limits. Dependency remains vulnerable."
+  },
+  "limitations": [
+    "A bounded private deployment review, not production certification. Reassess before public dashboard exposure.",
+    "No Critical findings were reported; High/Medium/Unknown findings remain.",
+    "Grafana 13.3.0 is the latest official release at review time. Full raw scans retain target-specific repetitions."
+  ]
+}

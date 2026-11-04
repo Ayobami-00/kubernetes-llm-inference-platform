@@ -1,8 +1,10 @@
 """Durable Kubernetes Job transport for execute-only runner commands."""
 
+import copy
 import hashlib
 import json
 import os
+from datetime import UTC, datetime
 from pathlib import Path
 
 from platform_contracts import Run, RunResult, RunSnapshot
@@ -39,9 +41,9 @@ def frozen_file(path, content):
 
 class KubernetesJobRunner:
     def __init__(self, binding, run_id, outcome="passing", client=None):
-        self.binding, self.run_id, self.outcome = binding, run_id, outcome
-        self.root = Path(binding["artifact_root"]).resolve()
-        self.client = client or ClusterClient(binding)
+        self.binding, self.run_id, self.outcome = copy.deepcopy(binding), run_id, outcome
+        self.root = Path(self.binding["artifact_root"]).resolve()
+        self.client = client or ClusterClient(self.binding)
 
     def close(self):
         self.client.close()
@@ -129,7 +131,10 @@ class KubernetesJobRunner:
         return key
 
     def manifest(self, handle):
-        return json.loads((self.directory(handle) / "manifest.json").read_text())
+        manifest = json.loads((self.directory(handle) / "manifest.json").read_text())
+        if manifest["binding_sha256"] != digest(self.binding):
+            raise ValueError("Execution binding differs from the frozen attempt")
+        return manifest
 
     def labels(self, handle):
         return {
@@ -161,19 +166,27 @@ class KubernetesJobRunner:
                         "terminationGracePeriodSeconds": 40,
                         "serviceAccountName": self.binding.get("service_account", "klip-runner"),
                         "automountServiceAccountToken": False,
-                        "nodeSelector": {"node-role.kubernetes.io/control-plane": ""},
-                        "tolerations": [
-                            {
-                                "key": "node-role.kubernetes.io/control-plane",
-                                "operator": "Exists",
-                                "effect": "NoSchedule",
-                            }
-                        ],
+                        # Missing fields preserve historical execution bindings;
+                        # recovery never follows a new worker's settings.
+                        "nodeSelector": self.binding.get(
+                            "runner_node_selector", {"node-role.kubernetes.io/control-plane": ""}
+                        ),
+                        "tolerations": self.binding.get(
+                            "runner_tolerations",
+                            [
+                                {
+                                    "key": "node-role.kubernetes.io/control-plane",
+                                    "operator": "Exists",
+                                    "effect": "NoSchedule",
+                                }
+                            ],
+                        ),
                         "securityContext": {
                             "runAsNonRoot": True,
                             "runAsUser": 10001,
                             "runAsGroup": 10001,
                             "fsGroup": 10001,
+                            "seccompProfile": {"type": "RuntimeDefault"},
                         },
                         "containers": [
                             {
@@ -187,10 +200,13 @@ class KubernetesJobRunner:
                                     str(directory / "manifest.json"),
                                 ],
                                 "env": [
+                                    {"name": "LANG", "value": "C.UTF-8"},
+                                    {"name": "LC_ALL", "value": "C.UTF-8"},
+                                    {"name": "LANGUAGE", "value": "C"},
                                     {
                                         "name": "KLIP_POD_UID",
                                         "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}},
-                                    }
+                                    },
                                 ],
                                 "resources": self.binding.get("runner_resources")
                                 or {
@@ -230,7 +246,7 @@ class KubernetesJobRunner:
             pod["containers"][0]["volumeMounts"].append(
                 {"name": volume, "mountPath": "/run/secrets/runner/" + name, "readOnly": True}
             )
-        return job
+        return copy.deepcopy(job)
 
     def validate_job(self, job, handle, expected_uid=None):
         meta = job["metadata"]
@@ -275,13 +291,24 @@ class KubernetesJobRunner:
         }
         if "Failed" in conditions:
             partial = self.saved_observation(handle)
+            if (
+                self.binding["runner"] != "kubernetes-fixture:v1"
+                and (not partial or partial.status in {"queued", "running"})
+                and self.finalization_waiting(job)
+            ):
+                return RunnerObservation(status="running", stage="finalizing")
             if partial and partial.result:
-                self.validated_result(handle)
+                try:
+                    self.validated_result(handle)
+                except (ValueError, OSError):
+                    return self.finalization_observation(job)
             return RunnerObservation(
                 status="failed",
                 result=partial.result if partial else None,
                 timeline_origin_at=partial.timeline_origin_at if partial else None,
-                error={
+                error=partial.error
+                if partial and partial.error
+                else {
                     "code": "runner_failed",
                     "message": "Runner Job failed or exceeded its deadline",
                 },
@@ -294,15 +321,16 @@ class KubernetesJobRunner:
                 return RunnerObservation(status="running", stage="finalizing")
             try:
                 result = self.validated_result(handle)
+                saved = self.saved_observation(handle)
+                if self.binding["runner"] != "kubernetes-fixture:v1" and (
+                    not saved
+                    or saved.status != "completed"
+                    or saved.result != result
+                    or saved.timeline_origin_at is None
+                ):
+                    raise ValueError("Final observation is not yet consistent with the result")
             except (ValueError, OSError):
-                return RunnerObservation(
-                    status="failed",
-                    error={
-                        "code": "invalid_result",
-                        "message": "Completed Job has no valid shared RunResult",
-                    },
-                )
-            saved = self.saved_observation(handle)
+                return self.finalization_observation(job)
             return RunnerObservation(
                 status="completed",
                 result=result,
@@ -314,6 +342,37 @@ class KubernetesJobRunner:
             if observation.status == "running":
                 return observation
         return RunnerObservation(status="running", stage="preparing")
+
+    def finalization_observation(self, job):
+        # Separate Pods can briefly read different atomic-renamed files on RWX
+        # storage. Never commit a completed run from a stale queued observation.
+        # The recorded Job completion fixes the deadline across worker restarts.
+        if self.finalization_waiting(job):
+            return RunnerObservation(status="running", stage="finalizing")
+        return RunnerObservation(
+            status="failed",
+            error={
+                "code": "invalid_result",
+                "message": "Terminal Job has no consistent artifacts within its deadline",
+            },
+        )
+
+    def finalization_waiting(self, job):
+        status = job.get("status", {})
+        completed = status.get("completionTime") or next(
+            (
+                c.get("lastTransitionTime")
+                for c in status.get("conditions", [])
+                if c["type"] == "Failed" and c["status"] == "True"
+            ),
+            None,
+        )
+        if completed:
+            stamp = datetime.fromisoformat(completed.replace("Z", "+00:00"))
+            age = (datetime.now(UTC) - stamp).total_seconds()
+            if -5 <= age < self.binding.get("finalization_allowance_seconds", 120):
+                return True
+        return False
 
     def validated_result(self, handle):
         directory = self.directory(handle)

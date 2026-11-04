@@ -1,0 +1,145 @@
+# Pinned inference artifacts
+
+`deploy/inference.lock.json` records the base aggregated serving candidates:
+llm-d router 1.0.0, vLLM 0.32.0, Envoy Gateway 1.9.3, AI Gateway 1.2.0,
+Gateway API 1.6.2 and Inference Extension 1.6.2. AI Gateway's upstream project
+is now named Agent Router; its chart/image/API names remain unchanged.
+The newer gateway pair replaces the older llm-d guide's gateway example and
+still requires our own integration tests. No advanced serving optimization is
+enabled by these pins.
+
+Fetch and verify without installing anything:
+
+```sh
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/inference_artifacts.py fetch
+```
+
+The fetcher verifies all five chart archives and four source/CRD artifacts,
+including existing cached files. Only the v1 InferencePool CRD is selected;
+the experimental InferencePoolImport CRD is not needed. Helm receives an empty
+registry configuration rather than local AWS/GitHub/Docker credentials.
+Raw downloads remain under ignored `artifacts/platform/inference/`.
+
+The image resolver reads only anonymous public registry metadata. It verifies
+manifest/configuration bytes, architecture, descriptor sizes and digests,
+selects an unambiguous Linux AMD64 child and does not download container layers.
+Anonymous pull tokens are neither returned nor retained, and registry tokens
+are removed before permitted blob-CDN redirects.
+
+The opt-in **Inference image security** workflow scans all six exact manifests
+on disposable CPU runners and retains complete native findings. It neither
+approves deployment nor changes the GPU Operator review. A completed scan does
+not establish compatibility, payload protection, kernel security, serving
+readiness or measured inference behavior. Critical runtime findings remain a
+deployment blocker; High findings require exact applicability review.
+
+The model Helm chart is separate from gateway/controller foundations. Dynamic
+model-release ownership belongs to management; shared CRDs/controllers belong
+to static platform deployment. Do not give both owners the same release.
+
+The first vLLM 0.30.0 scan failed with 31 Critical tuples: 22 in kernel headers
+and nine in Python dependencies. It is retained as a superseded, unapproved
+candidate. Revision 2 selects upstream's newer stable 0.32.0 for a separate scan;
+that selection is not a finding waiver or a readiness claim. Both model candidate
+documents remain draft and retain the same Qwen/tokenizer pins.
+
+The upstream 0.32.0 scan retained 18 unique Critical tuples: 15 kernel-header
+findings and three CA/tooling findings. `dev/model-serving/` derives an image
+from that exact AMD64 digest and updates certifi, pip (including its vendored
+certifi) and uv, using checksum-locked PyPI wheels. It removes only the two
+orphaned newer telemetry extras listed in the patch lock, after checking that
+no remaining installed package declares a dependency on either, including
+optional requirements. It compares the complete Python distribution inventory before and
+after; CUDA, vLLM, Torch, NCCL, Transformers and Tokenizers remain unchanged.
+The build records `pip check` before and after and repeats verification as
+UID 10001. Runtime Python/Requests/curl CA settings
+point to the patched bundle. No compiler/header removal is attempted because
+upstream uses runtime JIT compilation.
+
+The first build failed its unconditional dependency check before publication.
+The pinned upstream image already contains an incompatible OpenTelemetry
+exporter-common 0.66b1 / SDK 1.40.0 combination. The correction preserves
+LMCache 0.5.6 and the complete active SDK/API/exporter family at their existing
+1.40.0 / semantic conventions 0.61b0 versions. The unrelated newer
+`opentelemetry-exporter-otlp-common` and `opentelemetry-exporter-http-transport`
+extras are removed only after their reverse-dependency check passes. Actual
+gRPC/HTTP/Prometheus exporter imports and an offline trace are checked. The remaining
+exact dependency-check exception is upstream's deliberate NCCL 2.30.7 override
+of Torch's 2.29.7 metadata pin, documented in the pinned upstream Dockerfile
+for DeepEPv2. It is retained in the receipt, not described as a clean
+`pip check`. Any additional conflict fails the build. CUDA inference still
+requires its separate hardware validation.
+
+The **Pinned model serving image** workflow builds on a disposable CPU runner,
+publishes an immutable source tag, extracts native patch/header inventories
+without starting serving, and retains a complete Trivy scan. Any Critical
+findings still fail its scan gate; neither the patch nor its inventories waive
+findings. Exact applicability review and hardware readiness remain separate.
+
+Terraform's retained `klip/model-serving` repository is private, encrypted,
+immutable and scans pushes. Tagged historical images survive rebuilds; only
+untagged images expire after 30 days. The applied plan was
+`825112c2124e13fb66de2b4f442e6c972a4fe1ed199452752c0f68a893a92af5`.
+It added the repository/retention and the exact
+`system:serviceaccount:llm-d:klip-model-release` read-only role, and extended
+the existing repository-bound CI publisher to this one repository. Existing
+application pull identities retain their original three-repository scope.
+The new role can read model and release-helper images, cannot publish, and
+does not give model Pods Kubernetes credentials. One approximately 9 GB image
+costs roughly $1/month in registry storage, excluding transfer and later images.
+
+The static controller foundation has its own saved-plan procedure:
+
+```sh
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/inference_platform.py prepare --scans <native-inference-scan-directory>
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/inference_platform.py deploy --approve-plan <printed-sha256>
+```
+
+It installs the locked Gateway/Inference APIs, Envoy/AI CRDs and two replicas of
+each controller on distinct protected CPU workers. It reuses the deployed
+cert-manager for webhook certificates. Image digests, resource reservations,
+anti-affinity, the private network boundary, cluster/Node/CRD identities and
+the exact native scan review are bound before deployment. Existing foreign
+CRDs cannot be adopted implicitly. Runtime Pod image IDs, readiness and host
+separation are checked after installation; replica counts alone are insufficient.
+
+The first install reached the upstream CRD chart but Helm rejected its release
+Secret because it exceeded Kubernetes' 1 MiB limit. No controller was installed
+by that failed attempt; its partial API/namespace/credential evidence is retained.
+CRDs and the exact upstream Gateway API upgrade safety policy therefore use
+server-side apply with field manager `klip-inference-foundation`, without forced
+ownership. Their complete rendered manifests and native identities stay in the
+saved plan. Controllers remain separate ordinary Helm releases. This also avoids
+storing large schemas in client-side last-applied annotations or Helm Secrets.
+
+This foundation deliberately creates no Gateway, inference pool, model or
+public Service. Its temporary seven-day review covers private controllers
+only and retains the exact High findings. Active serving requires a separate
+data-plane/model review and authenticated gateway configuration. Adding serving
+resources also prevents reusing this narrower controller installation plan.
+
+The AI chart's otherwise random MCP seed is supplied through a separate,
+high-entropy private file and existing Secret reference, so rendering is
+deterministic and never contains generated credentials. Deployment creates or
+verifies that exact Secret without replacing an existing value. The seed is
+retained under the operator's private state; encrypted external recovery must
+be completed before a retained-state rebuild. No MCP route is enabled.
+
+Envoy Gateway explicitly watches `llm-d` and `inference-gateway`; upstream also
+includes its own namespace. Its custom backend integration therefore receives
+only get/list/watch access to InferencePools in those three namespaces, with
+no write or Secret access added. The first native startup exposed that missing
+extension permission; the scoped reader is part of the boundary and its review.
+Secret observation retries one lost SSH GET with identical trust pins and a
+fresh transport; it never retries an uncertain Secret create.
+
+The large model build keeps ECR's status separately from its full native scan.
+Only the model workflow may retain an `IN_PROGRESS`/`PENDING` registry receipt
+so a slow registry scanner does not prevent Trivy from examining the actual
+image. Such a receipt explicitly says pending, not passing; unsupported or
+failed scans still fail, and other component receipts keep their completed-scan
+requirement. Neither receipt authorizes serving without the complete native
+scan and exact runtime review.

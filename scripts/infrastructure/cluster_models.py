@@ -4,6 +4,7 @@ from __future__ import annotations
 
 import base64
 import ipaddress
+import json
 from datetime import UTC, datetime
 from typing import Literal, Self
 
@@ -68,6 +69,8 @@ class WorkerRequest(ContractModel):
     operation_id: Slug
     deadline: Timestamp
     provider: Literal["lambda", "aws"]
+    availability_zone: str | None = Field(default=None, pattern=r"^[a-z]{2}-[a-z]+-[0-9][a-z]$")
+    quarantine: bool = False
     provider_instance_id: NonEmpty
     node_name: Slug
     node_uid: NonEmpty | None = None
@@ -82,6 +85,8 @@ class WorkerRequest(ContractModel):
 
     @model_validator(mode="after")
     def restricted_input(self) -> Self:
+        if self.provider != "aws" and self.availability_zone is not None:
+            raise ValueError("AWS availability-zone metadata cannot describe a Lambda worker")
         if self.node_name.startswith("cp-"):
             raise ValueError("Worker operations cannot target control-plane nodes")
         for ref in (self.access_ref, self.join_ref):
@@ -102,6 +107,27 @@ class WorkerRequest(ContractModel):
         if seconds <= 0:
             raise ValueError("Operation deadline has expired")
         return seconds
+
+
+class GPUWorkerRequest(WorkerRequest):
+    """Opt-in GPU runtime. V1 serialization/digests remain unchanged for CPU work."""
+
+    schema_version: Literal["klip-worker-operation.v2"] = "klip-worker-operation.v2"
+    provider: Literal["lambda"] = "lambda"
+    runtime_profile: Literal["nvidia-operator"]
+    quarantine: Literal[True]
+
+
+def worker_request(content: str) -> WorkerRequest:
+    document = json.loads(content)
+    if not isinstance(document, dict):
+        raise ValueError("Worker request must be an object")
+    model = (
+        GPUWorkerRequest
+        if document.get("schema_version") == "klip-worker-operation.v2"
+        else WorkerRequest
+    )
+    return model.model_validate(document)
 
 
 def assert_node_identity(request: WorkerRequest, node: dict) -> None:

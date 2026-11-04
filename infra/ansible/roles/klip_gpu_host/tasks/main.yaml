@@ -1,0 +1,100 @@
+---
+- name: Require the reviewed plain Ubuntu GPU host profile
+  ansible.builtin.assert:
+    that:
+      - klip_node.provider == 'lambda'
+      - klip_node.role == 'worker'
+      - klip_node.quarantine | bool
+      - klip_node.containerd_version == '2.3.7'
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '24.04'
+      - ansible_facts.architecture == 'x86_64'
+    fail_msg: GPU preparation requires the quarantined plain Ubuntu 24.04 AMD64 profile
+- name: Check that this host has not joined Kubernetes
+  ansible.builtin.stat:
+    path: /etc/kubernetes/kubelet.conf
+  register: klip_gpu_host_kubelet
+- name: Refuse kernel changes on joined hosts or an unreviewed boot profile
+  ansible.builtin.assert:
+    that:
+      - not klip_gpu_host_kubelet.stat.exists
+      - ansible_facts.kernel is regex('^6\.8\.0-[0-9]+-generic$')
+      - ansible_facts.kernel.split('-')[1] | int <= klip_node.gpu_kernel.release.split('-')[1] | int
+    fail_msg: GPU kernel preparation is confined to fresh GA 6.8 hosts and never downgrades a newer kernel
+- name: Check for preinstalled NVIDIA userspace
+  ansible.builtin.stat:
+    path: '{{ item }}'
+  loop:
+    - /usr/bin/nvidia-smi
+    - /usr/bin/nvidia-container-runtime
+    - /usr/bin/nvidia-ctk
+  register: klip_gpu_host_existing_userspace
+- name: Read loaded modules without changing drivers
+  ansible.builtin.slurp:
+    src: /proc/modules
+  register: klip_gpu_host_loaded_modules
+- name: Observe installed packages before taking GPU software ownership
+  ansible.builtin.package_facts:
+    manager: apt
+- name: Reject a preinstalled or loaded NVIDIA stack
+  ansible.builtin.assert:
+    that:
+      - klip_gpu_host_existing_userspace.results | selectattr('stat.exists') | list | length == 0
+      - (klip_gpu_host_loaded_modules.content | b64decode) is not regex('(?m)^nvidia')
+      - ansible_facts.packages.keys() | select('match', '^(nvidia-|libnvidia|cuda-)') | list | length == 0
+    fail_msg: Use a plain image; driver/toolkit removal requires explicit recovery
+- name: Install the exact reviewed GA kernel with matching headers and modules
+  ansible.builtin.apt:
+    name:
+      - '{{ klip_node.gpu_kernel.image_package }}={{ klip_node.gpu_kernel.package_version }}'
+      - '{{ klip_node.gpu_kernel.headers_package }}={{ klip_node.gpu_kernel.package_version }}'
+      - '{{ klip_node.gpu_kernel.modules_package }}={{ klip_node.gpu_kernel.package_version }}'
+      - pciutils
+    state: present
+    update_cache: true
+    allow_downgrade: false
+  register: klip_gpu_host_kernel_packages
+- name: Keep Nouveau from claiming the device before the GPU Operator
+  ansible.builtin.copy:
+    dest: /etc/modprobe.d/klip-gpu-nouveau.conf
+    content: "blacklist nouveau\noptions nouveau modeset=0\n"
+    owner: root
+    group: root
+    mode: '0644'
+  register: klip_gpu_host_nouveau
+- name: Regenerate the pinned kernel initramfs after OS prerequisite changes
+  ansible.builtin.command:
+    argv: [update-initramfs, -u, -k, '{{ klip_node.gpu_kernel.release }}']
+  when: klip_gpu_host_kernel_packages.changed or klip_gpu_host_nouveau.changed
+  changed_when: true
+- name: Boot the reviewed kernel before any Kubernetes or NVIDIA installation
+  ansible.builtin.reboot:
+    reboot_timeout: 240
+    connect_timeout: 10
+    post_reboot_delay: 5
+  when: >-
+    ansible_facts.kernel != klip_node.gpu_kernel.release or
+    (klip_gpu_host_loaded_modules.content | b64decode) is regex('(?m)^nouveau ')
+- name: Refresh actual kernel facts after the bounded reboot
+  ansible.builtin.setup:
+    gather_subset: [min]
+- name: Inspect loaded modules after OS preparation
+  ansible.builtin.slurp:
+    src: /proc/modules
+  register: klip_gpu_host_prepared_modules
+- name: Require the selected kernel with the GPU still owned by no NVIDIA driver
+  ansible.builtin.assert:
+    that:
+      - ansible_facts.kernel == klip_node.gpu_kernel.release
+      - (klip_gpu_host_prepared_modules.content | b64decode) is not regex('(?m)^(nouveau|nvidia)[ _]')
+    fail_msg: Kernel or module preparation failed; the host must remain outside Kubernetes
+- name: Observe NVIDIA PCI devices
+  ansible.builtin.command:
+    argv: [lspci, -Dn, -d, '10de:']
+  register: klip_gpu_host_pci
+  changed_when: false
+- name: Require an exposed NVIDIA PCI device before joining
+  ansible.builtin.assert:
+    that:
+      - klip_gpu_host_pci.stdout_lines | length > 0
+    fail_msg: No NVIDIA PCI device is visible; Kubernetes/GPU readiness is not established

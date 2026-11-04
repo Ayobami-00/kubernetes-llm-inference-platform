@@ -1,0 +1,30 @@
+{
+  "schema_version": "klip-platform-resource-envelope.v1",
+  "reviewed_at": "2026-11-03",
+  "desired_instance_type": "m7i.2xlarge",
+  "node_count": 3,
+  "minimum_allocatable_per_node": {"cpu": 7.5, "memory_gib": 29},
+  "minimum_single_worker_loss_capacity": {"cpu": 15, "memory_gib": 58},
+  "request_forecast": {
+    "existing_platform_cpu": 4.9,
+    "existing_platform_memory_gib": 8.1875,
+    "monitoring_cpu": 1.71,
+    "monitoring_memory_gib": 5.5,
+    "other_telemetry_and_one_runner_cpu": 3.25,
+    "other_telemetry_and_one_runner_memory_gib": 8.5
+  },
+  "forecast_limitations": "A declared resource budget, not a live performance or scheduler/failure proof. Reconcile against final rendered releases and observed native sidecars before acceptance. Includes one 1-CPU runner; additional runners require admission budgeting.",
+  "price_review": {
+    "region": "eu-west-2",
+    "currency": "USD",
+    "hours_per_month": 730,
+    "previous_type": "m7i.xlarge",
+    "previous_hourly_per_node": 0.2331,
+    "desired_hourly_per_node": 0.4662,
+    "previous_monthly_compute": 510.49,
+    "desired_monthly_compute": 1020.98,
+    "incremental_monthly_compute": 510.49,
+    "excluded": ["unchanged root/data volumes and IPv4", "other platform services", "tax and transfer"],
+    "evidence": "AWS Pricing GetProducts: London Linux, shared tenancy, RunInstances, no preinstalled software; reviewed against c7i.2xlarge at $0.4242/hour, which has half the memory."
+  }
+}

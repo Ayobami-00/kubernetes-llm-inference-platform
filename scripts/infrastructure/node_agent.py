@@ -22,11 +22,12 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 CONFIG = Path("/etc/klip/node.json")
 STATE = Path("/var/lib/klip")
+UTC = timezone.utc  # noqa: UP017 -- retained Ubuntu 22.04 has Python 3.10
 
 
 def command(*args: str, input_text: str | None = None, allow_failure: bool = False) -> str:
@@ -84,22 +85,13 @@ def imds(path: str) -> str:
     return opener.open(request, timeout=3).read().decode()
 
 
-def preflight(config: dict) -> dict:
-    if config["provider"] == "aws":
-        identity = json.loads(imds("dynamic/instance-identity/document"))
-        for field, expected in (
-            ("instanceId", config["instance_id"]),
-            ("accountId", config["account_id"]),
-            ("region", config["region"]),
-        ):
-            if identity[field] != expected:
-                raise ValueError(f"Host identity mismatch: {field}")
-    addresses = json.loads(command("ip", "-j", "address", "show"))
+def validate_host_networks(config: dict, addresses: list[dict]) -> None:
     protected = [
         ipaddress.ip_network(config[key]) for key in ("pod_cidr", "service_cidr", "wireguard_cidr")
     ]
-    if config["role"] != "control_plane":
-        protected += [ipaddress.ip_network(config["vpc_cidr"])]
+    vpc = ipaddress.ip_network(config["vpc_cidr"])
+    if config["role"] != "control_plane" and config["provider"] != "aws":
+        protected += [vpc]
     for interface in addresses:
         if interface["ifname"].startswith(("lo", "wg0", "cilium", "lxc", "veth")):
             continue
@@ -110,6 +102,25 @@ def preflight(config: dict) -> dict:
                 )
                 if any(actual.overlaps(network) for network in protected):
                     raise ValueError(f"Host network overlaps cluster allocation: {actual}")
+                if actual.overlaps(vpc) and not actual.subnet_of(vpc):
+                    raise ValueError("Host network covers more than the project VPC")
+
+
+def preflight(config: dict) -> dict:
+    if config["provider"] == "aws":
+        identity = json.loads(imds("dynamic/instance-identity/document"))
+        expected_identity = {
+            "instanceId": config["instance_id"],
+            "accountId": config["account_id"],
+            "region": config["region"],
+            "privateIp": config["private_ip"],
+        }
+        if config.get("availability_zone", "external") != "external":
+            expected_identity["availabilityZone"] = config["availability_zone"]
+        for field, expected in expected_identity.items():
+            if identity.get(field) != expected:
+                raise ValueError(f"Host identity mismatch: {field}")
+    validate_host_networks(config, json.loads(command("ip", "-j", "address", "show")))
     if shutil.disk_usage("/").free < 5 * 1024**3:
         raise ValueError("Root filesystem has less than 5 GiB free")
     if command("timedatectl", "show", "--property=NTPSynchronized", "--value") != "yes":
@@ -348,8 +359,11 @@ def etcd(*args: str, allow_failure: bool = False) -> str:
 
 
 def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
     with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        while block := stream.read(1024 * 1024):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def upload(config: dict, key: str, path: Path) -> dict:
@@ -461,12 +475,34 @@ def validate_pod_mtu(links: list[dict], routes: list[dict]) -> dict:
     return {"pod_interface_mtu": 1420, "pod_route_mtu": 1370}
 
 
-def pod_network() -> dict:
-    endpoint = "--runtime-endpoint=unix:///run/containerd/containerd.sock"
-    pods = command("crictl", endpoint, "pods", "--name", "smoke", "-q").splitlines()
+def pod_network(
+    pod_uid: str | None = None, *, cri_socket: str = "unix:///run/containerd/containerd.sock"
+) -> dict:
+    if cri_socket not in {
+        "unix:///run/containerd/containerd.sock",
+        "unix:///run/klip-containerd/containerd.sock",
+    }:
+        raise ValueError("Unreviewed CRI socket for Pod-network inspection")
+    endpoint = "--runtime-endpoint=" + cri_socket
+    if pod_uid is not None:
+        if not re.fullmatch(r"[a-f0-9-]{36}", pod_uid):
+            raise ValueError("Invalid Pod-network sandbox UID")
+        observed = json.loads(command("crictl", endpoint, "pods", "-o", "json"))
+        pods = [
+            p["id"]
+            for p in observed["items"]
+            if p.get("metadata", {}).get("uid") == pod_uid and p.get("state") == "SANDBOX_READY"
+        ]
+        if len(pods) != 1:
+            raise ValueError("Expected exactly one Ready sandbox with the admitted Pod UID")
+    else:
+        pods = command("crictl", endpoint, "pods", "--name", "smoke", "-q").splitlines()
     if not pods:
         raise ValueError("No smoke Pod sandbox exists on this host")
-    pid = json.loads(command("crictl", endpoint, "inspectp", pods[0]))["info"]["pid"]
+    sandbox = json.loads(command("crictl", endpoint, "inspectp", pods[0]))
+    if pod_uid is not None and sandbox.get("status", {}).get("metadata", {}).get("uid") != pod_uid:
+        raise ValueError("Pod sandbox identity changed during MTU inspection")
+    pid = sandbox["info"]["pid"]
     links = json.loads(command("nsenter", "-t", str(pid), "-n", "ip", "-j", "link", "show", "eth0"))
     routes = json.loads(command("nsenter", "-t", str(pid), "-n", "ip", "-j", "route", "show"))
     return validate_pod_mtu(links, routes)
@@ -494,11 +530,17 @@ def main() -> None:
             "pod-network",
         ],
     )
+    parser.add_argument("--pod-uid")
     args = parser.parse_args()
+    if args.pod_uid is not None and args.action != "pod-network":
+        parser.error("--pod-uid is accepted only for pod-network")
     config = json.loads(CONFIG.read_text())
     STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     if args.action == "pod-network":
-        result = pod_network()
+        result = pod_network(
+            args.pod_uid,
+            cri_socket=config.get("cri_socket", "unix:///run/containerd/containerd.sock"),
+        )
     elif args.action == "firewall":
         result = apply_firewall()
     elif args.action == "wg-key":

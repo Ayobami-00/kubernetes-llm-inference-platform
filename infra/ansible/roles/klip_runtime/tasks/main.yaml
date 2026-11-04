@@ -35,17 +35,19 @@
   loop: [kubelet, kubeadm, kubectl, cri-tools, kubernetes-cni]
 - name: Create pinned runtime directory
   ansible.builtin.file:
-    path: /opt/klip/containerd-2.4.2
+    path: /opt/klip/containerd-{{ klip_node.containerd_version }}
     state: directory
     mode: '0755'
 - name: Unpack verified containerd release
   ansible.builtin.unarchive:
-    src: '{{ klip_repository }}/artifacts/platform/containerd-linux-amd64'
-    dest: /opt/klip/containerd-2.4.2
-    creates: /opt/klip/containerd-2.4.2/bin/containerd
+    src: >-
+      {{ klip_repository }}/artifacts/platform/{{
+      {'2.4.2': 'containerd-linux-amd64', '2.3.7': 'containerd-gpu-linux-amd64'}[klip_node.containerd_version] }}
+    dest: /opt/klip/containerd-{{ klip_node.containerd_version }}
+    creates: /opt/klip/containerd-{{ klip_node.containerd_version }}/bin/containerd
 - name: Select the pinned containerd binary
   ansible.builtin.file:
-    src: /opt/klip/containerd-2.4.2/bin/{{ item }}
+    src: /opt/klip/containerd-{{ klip_node.containerd_version }}/bin/{{ item }}
     dest: /usr/local/bin/{{ item }}
     state: link
   loop: [containerd, containerd-shim-runc-v2, ctr]

@@ -1,0 +1,7 @@
+{
+  "hostname": "management.klip-lab.click",
+  "node_port": 30443,
+  "tls_policy": "ELBSecurityPolicy-TLS13-1-2-Res-PQ-2025-09",
+  "request_limit_per_5_minutes": 3000,
+  "login_limit_per_5_minutes": 30
+}

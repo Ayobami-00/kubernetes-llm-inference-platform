@@ -80,6 +80,29 @@ def test_exact_reviewed_plan_is_required(receipt):
         verify_receipt(receipt, "another-plan", "reviewed-source", "foundation")
 
 
+def test_platform_apply_rechecks_headroom_before_any_paid_mutation(receipt, tmp_path, monkeypatch):
+    import platform_capacity
+
+    receipt.update(root="platform", phase="apply")
+    path = tmp_path / "receipt.json"
+    path.write_text(json.dumps(receipt))
+    monkeypatch.setattr(manage, "plan_paths", lambda *_: (None, path))
+    monkeypatch.setattr(manage, "source_digest", lambda: "reviewed-source")
+    monkeypatch.setattr(manage.Aws, "preflight", lambda *_: {})
+
+    def reject(*_):
+        raise ValueError("Insufficient quota")
+
+    def terraform(root, action, *args):
+        assert action == "show", "Terraform apply must not run without regional headroom"
+        return "{}"
+
+    monkeypatch.setattr(platform_capacity, "ensure_capacity", reject)
+    monkeypatch.setattr(manage, "tf", terraform)
+    with pytest.raises(ValueError, match="Insufficient quota"):
+        manage.apply_plan("platform", receipt["plan_sha256"])
+
+
 def test_preview_plans_can_never_be_applied(receipt):
     receipt["preview"] = True
     with pytest.raises(ValueError, match="Preview"):
@@ -154,3 +177,16 @@ def test_operator_artifacts_are_private(tmp_path):
     write_private(path, {"account_id": CONFIG["account_id"]})
     assert path.stat().st_mode & 0o777 == 0o600
     assert path.parent.stat().st_mode & 0o777 == 0o700
+
+
+def test_source_identity_includes_local_helm_templates(tmp_path, monkeypatch):
+    import common
+
+    chart = tmp_path / "charts/fixture/templates/platform.yaml"
+    chart.parent.mkdir(parents=True)
+    chart.write_text("kind: ServiceAccount\n")
+    monkeypatch.setattr(common, "ROOT", tmp_path)
+    monkeypatch.setattr(common, "TERRAFORM", tmp_path / "infra/terraform")
+    original = common.source_digest()
+    chart.write_text("kind: ClusterRole\n")
+    assert common.source_digest() != original

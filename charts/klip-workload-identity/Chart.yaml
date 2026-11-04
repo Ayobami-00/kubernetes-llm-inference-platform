@@ -1,0 +1,6 @@
+apiVersion: v2
+name: klip-workload-identity
+version: 0.1.0
+description: Scoped HA deployment of the upstream AWS projected-token webhook for kubeadm
+type: application
+appVersion: 0.6.19

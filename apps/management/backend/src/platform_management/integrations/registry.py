@@ -12,7 +12,7 @@ SIMULATED = "simulated:v1"
 
 def configuration(mode="simulation"):
     s = get_settings()
-    return {
+    result = {
         "mode": mode,
         **{
             k: SIMULATED if mode == "simulation" else "unconfigured:v1"
@@ -22,6 +22,8 @@ def configuration(mode="simulation"):
         "runner_image": s.runner_image,
         "runner_command": s.runner_command,
         "runner_resources": s.runner_resources,
+        "runner_node_selector": s.runner_node_selector,
+        "runner_tolerations": s.runner_tolerations,
         "namespace": s.runner_namespace,
         "serving_namespace": s.serving_namespace,
         "service_account": s.runner_service_account,
@@ -29,11 +31,17 @@ def configuration(mode="simulation"):
         "artifact_root": str(s.artifacts_root.resolve()),
         "artifact_claim": s.artifact_claim,
         "startup_allowance_seconds": s.runner_startup_allowance_seconds,
+        "finalization_allowance_seconds": 120,
         "kube_api_url": s.kube_api_url,
         "kube_ca_file": str(s.kube_ca_file),
         "kube_token_file": str(s.kube_token_file),
         "kube_allow_insecure_local": s.kube_allow_insecure_local,
     }
+    if mode == "real":
+        from platform_management.integrations.lambda_policy import configuration as lifecycle
+
+        result.update(lifecycle(s))
+    return result
 
 
 def bind(db, mode="simulation"):

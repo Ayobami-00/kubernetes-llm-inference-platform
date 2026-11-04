@@ -2,7 +2,7 @@
 
 from typing import Literal, Self
 
-from pydantic import model_validator
+from pydantic import model_serializer, model_validator
 
 from .common import (
     ContractModel,
@@ -17,6 +17,7 @@ from .common import (
     Timestamp,
     VersionedSpec,
 )
+from .inventory import GPUCapacityObservation
 
 
 class WorkerGroupSpec(VersionedSpec):
@@ -27,8 +28,24 @@ class WorkerGroupSpec(VersionedSpec):
     hardware: GPUHardware
     worker_class: Slug
     host_profile: NonEmpty = "lambda-gpu-worker-v1"
-    ttl_minutes: PositiveInt = 90
+    capacity_lifecycle: Literal["leased", "externally_retained"] = "leased"
+    ttl_minutes: PositiveInt | None = 90
     drain_timeout_s: PositiveInt = 120
+
+    @model_serializer(mode="wrap")
+    def preserve_leased_spec(self, handler):
+        value = handler(self)
+        if self.capacity_lifecycle == "leased":
+            value.pop("capacity_lifecycle", None)
+        return value
+
+    @model_validator(mode="after")
+    def explicit_retention(self) -> Self:
+        if (self.capacity_lifecycle == "externally_retained") != (self.ttl_minutes is None):
+            raise ValueError(
+                "externally retained capacity requires no TTL; leased capacity requires a TTL"
+            )
+        return self
 
 
 class WorkerMember(ContractModel):
@@ -37,6 +54,14 @@ class WorkerMember(ContractModel):
     node_name: NonEmpty | None = None
     node_uid: NonEmpty | None = None
     error: ErrorInfo | None = None
+    gpu_observation: GPUCapacityObservation | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_member(self, handler):
+        value = handler(self)
+        if self.gpu_observation is None:
+            value.pop("gpu_observation", None)
+        return value
 
     @model_validator(mode="after")
     def check_node_identity(self) -> Self:
@@ -46,6 +71,8 @@ class WorkerMember(ContractModel):
             raise ValueError("GPU-ready member requires Kubernetes node identity")
         if self.phase == "failed" and self.error is None:
             raise ValueError("failed member requires an error")
+        if self.gpu_observation is not None and self.node_uid is None:
+            raise ValueError("GPU observations require the member's Kubernetes node identity")
         return self
 
 
@@ -58,6 +85,7 @@ class WorkerCounts(ContractModel):
 
 class WorkerGroupStatus(ContractModel):
     worker_group_ref: RevisionRef
+    capacity_lifecycle: Literal["leased", "externally_retained"] = "leased"
     phase: Literal[
         "allocating",
         "joining",
@@ -74,6 +102,13 @@ class WorkerGroupStatus(ContractModel):
     allocated_at: Timestamp | None = None
     expires_at: Timestamp | None = None
     active_operation_id: Slug | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_leased_status(self, handler):
+        value = handler(self)
+        if self.capacity_lifecycle == "leased":
+            value.pop("capacity_lifecycle", None)
+        return value
 
     @model_validator(mode="after")
     def check_observation(self) -> Self:
@@ -94,12 +129,17 @@ class WorkerGroupStatus(ContractModel):
             raise ValueError("worker counts disagree with members")
         if self.phase == "ready" and self.counts.gpu_ready_nodes != self.counts.desired_instances:
             raise ValueError("ready group has not reached its desired count")
-        if (self.allocated_at is None) != (self.expires_at is None):
+        retained = self.capacity_lifecycle == "externally_retained"
+        if retained and (self.expires_at is not None or self.phase == "expired"):
+            raise ValueError("externally retained capacity has no expiry or automatic termination")
+        if not retained and (self.allocated_at is None) != (self.expires_at is None):
             raise ValueError("allocation and expiry timestamps must be supplied together")
         if self.members and self.allocated_at is None:
-            raise ValueError("allocated members require a recorded lease deadline")
+            raise ValueError("allocated members require a recorded allocation timestamp")
         if self.allocated_at is not None:
-            if self.expires_at <= self.allocated_at or self.observed_at < self.allocated_at:
+            if (
+                not retained and self.expires_at <= self.allocated_at
+            ) or self.observed_at < self.allocated_at:
                 raise ValueError("invalid allocation, observation, or expiry ordering")
         if self.phase == "deleted" and active:
             raise ValueError("deleted status requires confirmed termination")
@@ -119,6 +159,8 @@ class WorkerGroup(RuntimeRecord):
     def match_spec(self) -> Self:
         if self.spec.ref != self.status.worker_group_ref:
             raise ValueError("worker status references a different spec")
+        if self.spec.capacity_lifecycle != self.status.capacity_lifecycle:
+            raise ValueError("worker specification and observation lifecycle differ")
         if self.spec.desired_instances != self.status.counts.desired_instances:
             raise ValueError("worker status desired count differs from spec")
         return self

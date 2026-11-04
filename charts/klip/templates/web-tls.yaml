@@ -1,0 +1,61 @@
+{{- if .Values.web.tls.enabled }}
+{{- if .Values.ingress.enabled }}
+{{- fail "Native web TLS needs an HTTPS-aware frontend; disable generic ingress or use its existing TLS termination with web.tls.enabled=false" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ .Release.Name }}-web-tls}
+data:
+  server.conf: |
+    listen 8443 ssl;
+    # Map input selects a constant basename; SNI can never inject a file path.
+    ssl_certificate $klip_tls_certificate_base.crt;
+    ssl_certificate_key $klip_tls_certificate_base.key;
+    # Supported by the pinned Nginx. Refresh rotated mounted files without a
+    # Pod restart, custom watcher, API privileges or process-namespace sharing.
+    ssl_certificate_cache max=4 inactive=2m valid=30s;
+    ssl_protocols TLSv1.2 TLSv1.3;
+    ssl_session_tickets off;
+    {{- if .Values.web.trustedProxyCIDRs }}
+    real_ip_header X-Forwarded-For;
+    real_ip_recursive on;
+    {{- range .Values.web.trustedProxyCIDRs }}
+    set_real_ip_from {{ . }};
+    {{- end }}
+    {{- end }}
+{{- if .Values.web.tls.createCertificate }}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata: {name: {{ .Release.Name }}-web-selfsigned}
+spec: {selfSigned: {}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: {{ .Release.Name }}-web-ca}
+spec:
+  isCA: true
+  commonName: {{ .Release.Name }} management internal CA
+  secretName: {{ .Release.Name }}-web-ca
+  duration: 87600h
+  renewBefore: 8760h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Never}
+  issuerRef: {name: {{ .Release.Name }}-web-selfsigned, kind: Issuer}
+---
+apiVersion: cert-manager.io/v1
+kind: Issuer
+metadata: {name: {{ .Release.Name }}-web-ca}
+spec: {ca: {secretName: {{ .Release.Name }}-web-ca}}
+---
+apiVersion: cert-manager.io/v1
+kind: Certificate
+metadata: {name: {{ .Release.Name }}-web}
+spec:
+  secretName: {{ .Values.web.tls.existingSecret }}
+  duration: 2160h
+  renewBefore: 720h
+  privateKey: {algorithm: ECDSA, size: 256, rotationPolicy: Always}
+  dnsNames: {{ required "TLS requires explicit web.tls.dnsNames" .Values.web.tls.dnsNames | toYaml | nindent 4 }}
+  issuerRef: {name: {{ .Release.Name }}-web-ca, kind: Issuer}
+{{- end }}
+{{- end }}

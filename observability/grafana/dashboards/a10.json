@@ -1,0 +1,916 @@
+{
+  "uid": "klip-a10-speculation",
+  "title": "KLIP / A10 WriterAssist speculation",
+  "schemaVersion": 41,
+  "version": 1,
+  "editable": false,
+  "timezone": "utc",
+  "tags": [
+    "klip",
+    "provisioned",
+    "retained-a10"
+  ],
+  "refresh": "10s",
+  "time": {
+    "from": "now-1h",
+    "to": "now"
+  },
+  "panels": [
+    {
+      "id": 1,
+      "type": "text",
+      "title": "Experiment boundaries",
+      "gridPos": {
+        "x": 0,
+        "y": 0,
+        "w": 24,
+        "h": 5
+      },
+      "options": {
+        "mode": "markdown",
+        "content": "Retained single A10, Qwen3-4B, private API-key authenticated llm-d. Baseline and n-gram variants use separate frozen run identities. Server histograms are diagnostics: authoritative **client completion, fixed-window SLO, delivery validity and JFLEG GLEU** are in management run reports. Non-streaming client requests do not provide client TTFT. No data stays No data; baseline has no speculation counters. GPU/server availability is not serving HA. Scraping started after the first baseline began; retained run records cover its full timeline."
+      }
+    },
+    {
+      "id": 2,
+      "type": "timeseries",
+      "title": "Serving scrape health",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "up{namespace=\"llm-d\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 3,
+      "type": "timeseries",
+      "title": "Ready model endpoints observed by llm-d",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 5,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "llm_d_epp_ready_endpoints{namespace=\"llm-d\",service=\"writer-assist-a10-epp\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 4,
+      "type": "timeseries",
+      "title": "Model requests running",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "vllm:num_requests_running{namespace=\"llm-d\",service=\"writer-assist-a10\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 5,
+      "type": "timeseries",
+      "title": "Model requests waiting",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 13,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "vllm:num_requests_waiting{namespace=\"llm-d\",service=\"writer-assist-a10\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 6,
+      "type": "timeseries",
+      "title": "Model completion rate",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:request_success_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "reqps",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 7,
+      "type": "timeseries",
+      "title": "Generated tokens per second",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 21,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:generation_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 8,
+      "type": "timeseries",
+      "title": "Model E2E p95 (server only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(vllm:e2e_request_latency_seconds_bucket{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m])))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 9,
+      "type": "timeseries",
+      "title": "Model queue p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 29,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(vllm:request_queue_time_seconds_bucket{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m])))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 10,
+      "type": "timeseries",
+      "title": "Model TTFT p95 (server only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 37,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(vllm:time_to_first_token_seconds_bucket{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m])))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 11,
+      "type": "timeseries",
+      "title": "Model KV cache utilization",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 37,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "vllm:kv_cache_usage_perc{namespace=\"llm-d\",service=\"writer-assist-a10\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 12,
+      "type": "timeseries",
+      "title": "llm-d scheduling p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 45,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(llm_d_epp_scheduler_e2e_duration_seconds_bucket{namespace=\"llm-d\",service=\"writer-assist-a10-epp\"}[1m])))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "s",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 13,
+      "type": "timeseries",
+      "title": "llm-d errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 45,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(llm_d_epp_request_error_total{namespace=\"llm-d\",service=\"writer-assist-a10-epp\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 14,
+      "type": "timeseries",
+      "title": "Gateway active requests",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 53,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "envoy_http_downstream_rq_active{namespace=\"llm-d\",pod=~\"inference-.*\",envoy_http_conn_manager_prefix=\"http-8080\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 15,
+      "type": "timeseries",
+      "title": "Gateway request time p95",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 53,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "histogram_quantile(0.95,sum by(le)(rate(envoy_http_downstream_rq_time_bucket{namespace=\"llm-d\",pod=~\"inference-.*\",envoy_http_conn_manager_prefix=\"http-8080\"}[1m])))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ms",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 16,
+      "type": "timeseries",
+      "title": "API-key rejections",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 61,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(envoy_http_api_key_auth_unauthorized{namespace=\"llm-d\",pod=~\"inference-.*\",envoy_http_conn_manager_prefix=\"http-8080\"}[1m]))+sum(rate(envoy_http_api_key_auth_forbidden{namespace=\"llm-d\",pod=~\"inference-.*\",envoy_http_conn_manager_prefix=\"http-8080\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 17,
+      "type": "timeseries",
+      "title": "EPP poll errors",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 61,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(llm_d_epp_datalayer_poll_errors_total{namespace=\"llm-d\",service=\"writer-assist-a10-epp\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 18,
+      "type": "timeseries",
+      "title": "GPU utilization",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 69,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "DCGM_FI_DEV_GPU_UTIL{namespace=\"gpu-system\",UUID=\"GPU-aa3bb9d3-11f4-f795-1d71-127f61539a1d\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percent",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 19,
+      "type": "timeseries",
+      "title": "GPU framebuffer used",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 69,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "DCGM_FI_DEV_FB_USED{namespace=\"gpu-system\",UUID=\"GPU-aa3bb9d3-11f4-f795-1d71-127f61539a1d\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "decmbytes",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 20,
+      "type": "timeseries",
+      "title": "GPU temperature",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 77,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "DCGM_FI_DEV_GPU_TEMP{namespace=\"gpu-system\",UUID=\"GPU-aa3bb9d3-11f4-f795-1d71-127f61539a1d\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "celsius",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 21,
+      "type": "timeseries",
+      "title": "GPU power",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 77,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "DCGM_FI_DEV_POWER_USAGE{namespace=\"gpu-system\",UUID=\"GPU-aa3bb9d3-11f4-f795-1d71-127f61539a1d\"}",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "watt",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Speculative token acceptance (ngram only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 85,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:spec_decode_num_accepted_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))/sum(rate(vllm:spec_decode_num_draft_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Accepted tokens per draft (ngram only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 85,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:spec_decode_num_accepted_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))/sum(rate(vllm:spec_decode_num_drafts_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Proposed tokens per second (ngram only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 93,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:spec_decode_num_draft_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    }
+  ],
+  "links": [
+    {
+      "title": "Management runs and authoritative reports",
+      "url": "https://management.klip-lab.click",
+      "targetBlank": true
+    }
+  ]
+}

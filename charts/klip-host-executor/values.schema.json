@@ -1,0 +1,13 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "required": ["image", "fileSystemId", "accessPointId", "imagePullRoleArn", "replicas"],
+  "properties": {
+    "image": {"type": "string", "pattern": "^127811062476\\.dkr\\.ecr\\.eu-west-2\\.amazonaws\\.com/klip/management-backend@sha256:[a-f0-9]{64}$"},
+    "fileSystemId": {"type": "string", "pattern": "^fs-[a-f0-9]{17}$"},
+    "accessPointId": {"type": "string", "pattern": "^fsap-[a-f0-9]{17}$"},
+    "imagePullRoleArn": {"const": "arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-images-pull"},
+    "replicas": {"const": 2}
+  }
+}

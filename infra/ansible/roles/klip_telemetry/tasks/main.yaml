@@ -1,0 +1,48 @@
+---
+- name: Read the installed host identity before telemetry setup
+  ansible.builtin.slurp:
+    src: /etc/klip/node.json
+  register: klip_telemetry_identity
+  no_log: true
+- name: Require the exact project host before installing local telemetry
+  ansible.builtin.assert:
+    that:
+      - (klip_telemetry_identity.content | b64decode | from_json).instance_id == klip_node.instance_id
+      - (klip_telemetry_identity.content | b64decode | from_json).name == inventory_hostname
+    fail_msg: Host identity differs from the telemetry target
+  no_log: true
+- name: Create the public textfile observation directory
+  ansible.builtin.file:
+    path: '{{ item }}'
+    state: directory
+    owner: root
+    group: root
+    mode: '0755'
+  loop: [/var/lib/node_exporter, /var/lib/node_exporter/klip, /usr/local/lib/klip]
+- name: Install the read-only public WireGuard observer
+  ansible.builtin.copy:
+    src: '{{ klip_repository }}/observability/agents/wireguard_metrics.py'
+    dest: /usr/local/lib/klip/wireguard_metrics.py
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+- name: Install hardened local telemetry units
+  ansible.builtin.copy:
+    src: '{{ klip_repository }}/observability/agents/{{ item }}'
+    dest: /etc/systemd/system/{{ item }}
+    owner: root
+    group: root
+    mode: '0644'
+    backup: true
+  loop: [klip-wireguard-metrics.service, klip-wireguard-metrics.timer]
+- name: Enable periodic local public telemetry
+  ansible.builtin.systemd_service:
+    name: klip-wireguard-metrics.timer
+    state: started
+    enabled: true
+    daemon_reload: true
+- name: Prime the first observation when WireGuard is configured
+  ansible.builtin.systemd_service:
+    name: klip-wireguard-metrics.service
+    state: started

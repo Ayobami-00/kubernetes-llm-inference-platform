@@ -1,0 +1,69 @@
+{{- if not (regexMatch "^[^[:space:]]+@sha256:[a-f0-9]{64}$" .Values.image) }}
+{{- fail "A reviewed immutable fixture image is required" }}
+{{- end }}
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: inference-stub
+  labels: {app.kubernetes.io/instance: {{ .Release.Name }}, klip.dev/fixture: "true"}
+spec:
+  replicas: 1
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {app.kubernetes.io/name: inference-stub}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: inference-stub, klip.dev/fixture: "true"}
+    spec:
+      serviceAccountName: {{ .Values.serviceAccount }}
+      automountServiceAccountToken: false
+      nodeSelector: {{ toYaml .Values.nodeSelector | nindent 8 }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: stub
+          image: {{ .Values.image | quote }}
+          imagePullPolicy: IfNotPresent
+          ports: [{name: http, containerPort: 8001}]
+          env:
+            - {name: LANG, value: C.UTF-8}
+            - {name: LC_ALL, value: C.UTF-8}
+            - {name: LANGUAGE, value: C}
+            - {name: PYTHONDONTWRITEBYTECODE, value: "1"}
+          resources: {{ toYaml .Values.resources | nindent 12 }}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          readinessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 5}
+          livenessProbe: {httpGet: {path: /health, port: http}, periodSeconds: 10}
+          volumeMounts: [{name: temporary, mountPath: /tmp}]
+      volumes:
+        - name: temporary
+          emptyDir: {sizeLimit: 32Mi}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: inference-stub}
+spec:
+  type: ClusterIP
+  selector: {app.kubernetes.io/name: inference-stub}
+  ports: [{name: http, port: 8001, targetPort: http}]
+---
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata: {name: inference-stub}
+spec:
+  podSelector:
+    matchLabels: {app.kubernetes.io/name: inference-stub}
+  policyTypes: [Ingress, Egress]
+  ingress:
+    - from:
+        - podSelector:
+            matchLabels: {app.kubernetes.io/managed-by: klip}
+      ports: [{port: 8001, protocol: TCP}]
+  egress: []

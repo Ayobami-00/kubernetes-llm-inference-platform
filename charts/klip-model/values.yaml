@@ -1,0 +1,32 @@
+# Supply these from a validated ServingProfile and fresh measured worker evidence.
+profileRef: ""
+profileSHA256: ""
+deploymentId: ""
+nodeUID: ""
+workerClass: latency
+model:
+  repository: ""
+  revision: ""
+  tokenizerRevision: ""
+  alias: ""
+engine:
+  image: ""
+  dtype: bfloat16
+  maxModelLen: 768
+  maxNumSeqs: 8
+  gpuMemoryUtilization: 0.8
+  maxOutputTokens: 128
+  chatTemplateKwargs: {enable_thinking: false}
+  speculativeDecoding: null
+gpus: 1
+cpu: "6"
+memoryGiB: 32
+cacheGiB: 32
+gatewayNamespace: llm-d
+gatewayLabels:
+  gateway.envoyproxy.io/owning-gateway-name: inference
+monitoringNamespace: observability
+routerLabels:
+  app.kubernetes.io/name: writer-assist-a10-epp
+imagePullSecrets: []
+serviceAccountName: klip-model-release

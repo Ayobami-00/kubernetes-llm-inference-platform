@@ -1,0 +1,73 @@
+# Monitors live in the namespaces watched by the existing Prometheus Operator.
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: retained-a10-model
+  namespace: observability
+  labels: {release: klip-monitoring}
+spec:
+  namespaceSelector: {matchNames: [llm-d]}
+  selector:
+    matchLabels: {klip.dev/serving-deployment: writer-assist-a10}
+  endpoints:
+    - {port: http, path: /metrics, interval: 10s, scrapeTimeout: 5s}
+  sampleLimit: 20000
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: retained-a10-epp
+  namespace: observability
+  labels: {release: klip-monitoring}
+spec:
+  namespaceSelector: {matchNames: [llm-d]}
+  selector:
+    matchLabels: {app.kubernetes.io/name: writer-assist-a10-epp}
+  endpoints:
+    - {port: http-metrics, path: /metrics, interval: 10s, scrapeTimeout: 5s}
+  sampleLimit: 20000
+---
+apiVersion: monitoring.coreos.com/v1
+kind: PodMonitor
+metadata:
+  name: retained-a10-gateway
+  namespace: observability
+  labels: {release: klip-monitoring}
+spec:
+  namespaceSelector: {matchNames: [llm-d]}
+  selector:
+    matchLabels: {gateway.envoyproxy.io/owning-gateway-name: inference}
+  podMetricsEndpoints:
+    - {port: metrics, path: /stats/prometheus, interval: 10s, scrapeTimeout: 5s}
+  sampleLimit: 20000
+---
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: retained-a10-dcgm
+  namespace: observability
+  labels: {release: klip-monitoring}
+spec:
+  namespaceSelector: {matchNames: [gpu-system]}
+  selector:
+    matchLabels: {app: nvidia-dcgm-exporter}
+  endpoints:
+    - {port: gpu-metrics, path: /metrics, interval: 10s, scrapeTimeout: 5s}
+  sampleLimit: 20000
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: retained-a10-metric-scrapes, namespace: observability}
+spec:
+  endpointSelector:
+    matchLabels: {app.kubernetes.io/name: prometheus}
+  egress:
+    - toEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: llm-d, klip.dev/serving-deployment: writer-assist-a10}
+      toPorts: [{ports: [{port: '8000', protocol: TCP}]}]
+    - toEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: llm-d, llm-d-router-gateway: writer-assist-a10-epp}
+      toPorts: [{ports: [{port: '9090', protocol: TCP}]}]
+    - toEndpoints:
+        - matchLabels: {k8s:io.kubernetes.pod.namespace: llm-d, gateway.envoyproxy.io/owning-gateway-name: inference}
+      toPorts: [{ports: [{port: '19001', protocol: TCP}]}]

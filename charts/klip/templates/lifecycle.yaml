@@ -1,0 +1,13 @@
+{{- if .Values.lifecycle.enabled }}
+{{- if ne .Release.Namespace "klip" }}
+{{- fail "Real lifecycle is restricted to the klip management namespace" }}
+{{- end }}
+{{- if not .Values.lifecycle.policy }}
+{{- fail "An explicit reviewed lifecycle.policy is required" }}
+{{- end }}
+apiVersion: v1
+kind: ConfigMap
+metadata: {name: {{ .Release.Name }}-lifecycle-policy}
+data:
+  policy.json: {{ .Values.lifecycle.policy | toJson | quote }}
+{{- end }}

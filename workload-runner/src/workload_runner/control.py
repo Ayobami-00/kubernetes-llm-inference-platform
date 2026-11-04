@@ -12,6 +12,7 @@ import re
 import signal
 import subprocess
 import sys
+import tempfile
 import time
 from datetime import UTC, datetime
 from pathlib import Path
@@ -20,6 +21,7 @@ import httpx
 from platform_contracts import Run, RunnerObservation, RunSnapshot, validate_for_execution
 
 from .adapters.engine import build_engine_inputs, normalize
+from .adapters.journal import journal_status
 from .artifacts import artifact_path, atomic_json, canonical, digest, read_jsonl
 from .reporting.quality import evaluate_quality
 from .reporting.report import write_report
@@ -110,6 +112,7 @@ def result_artifacts(directory):
         "report": "report.md",
         "engine-log": "engine.log",
         "readiness": "readiness.json",
+        "journal-status": "journal-status.json",
     }
     raw = directory / "aiperf"
     if raw.is_dir():
@@ -262,6 +265,8 @@ def execute(directory: Path):
         child = None
         interrupted = False
         previous = {}
+        scratch = tempfile.TemporaryDirectory(prefix="klip-engine-")
+        local = Path(scratch.name)
 
         def cancel(_signum, _frame):
             (directory / "cancel-requested").touch()
@@ -277,7 +282,9 @@ def execute(directory: Path):
             if probes:
                 atomic_json(directory / "readiness.json", probes)
             build_engine_inputs(run.snapshot, directory)
-            environment = dict(os.environ, PLATFORM_RUN_DIR=str(directory))
+            environment = dict(
+                os.environ, PLATFORM_RUN_DIR=str(directory), PLATFORM_LOCAL_DIR=str(local)
+            )
             start = time.monotonic()
             budget = (
                 run.snapshot.scenario.warmup.duration_s
@@ -335,6 +342,10 @@ def execute(directory: Path):
                     time.sleep(0.1)
             data["stage"] = "finalizing"
             persist_run(directory, data)
+            journal_report = journal_status(local)
+            atomic_json(directory / "journal-status.json", journal_report)
+            if journal_report["status"] != "drained":
+                raise RuntimeError("transport_journal_failed; partial events retained")
             scrub_artifacts(directory, run.snapshot)
             cancelled = (directory / "cancel-requested").exists()
             requests, sessions = normalize(run.snapshot, directory, run.id, cancelled=cancelled)
@@ -402,8 +413,13 @@ def execute(directory: Path):
                 except (ValueError, OSError, KeyError):
                     pass  # Keep raw artifacts when their normalization itself failed.
         finally:
-            for signum, handler in previous.items():
-                signal.signal(signum, handler)
+            try:
+                if child and not (directory / "journal-status.json").exists():
+                    atomic_json(directory / "journal-status.json", journal_status(local))
+            finally:
+                scratch.cleanup()
+                for signum, handler in previous.items():
+                    signal.signal(signum, handler)
         if data.get("error"):
             data["error"]["message"] = redact(
                 data["error"]["message"], credential_values(run.snapshot)

@@ -1,0 +1,10 @@
+# A10-only execution configuration. Immutable Secret values are staged separately.
+runner:
+  secretRefs: [klip-writer-inference]
+  command:
+    - workload-runner
+    - execute
+    - --manifest
+    - '{attempt_dir}/manifest.json'
+    - --credential-file
+    - INFERENCE_TOKEN=/run/secrets/runner/klip-writer-inference/api-key

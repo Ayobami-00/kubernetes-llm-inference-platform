@@ -185,6 +185,41 @@
         "title": "ArtifactView",
         "type": "object"
       },
+      "BootstrapFailure": {
+        "additionalProperties": false,
+        "properties": {
+          "code": {
+            "enum": [
+              "configuration",
+              "ssh_policy",
+              "host_key",
+              "callback"
+            ],
+            "title": "Code",
+            "type": "string"
+          }
+        },
+        "required": [
+          "code"
+        ],
+        "title": "BootstrapFailure",
+        "type": "object"
+      },
+      "BootstrapFailureRecorded": {
+        "additionalProperties": false,
+        "properties": {
+          "status": {
+            "const": "recorded",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status"
+        ],
+        "title": "BootstrapFailureRecorded",
+        "type": "object"
+      },
       "Capacity": {
         "additionalProperties": false,
         "properties": {
@@ -319,8 +354,11 @@
             "type": "string"
           },
           "mode": {
-            "const": "simulation",
             "default": "simulation",
+            "enum": [
+              "simulation",
+              "real"
+            ],
             "title": "Mode",
             "type": "string"
           },
@@ -1375,6 +1413,76 @@
         "title": "FoundationObservation",
         "type": "object"
       },
+      "GPUCapacityObservation": {
+        "additionalProperties": false,
+        "description": "Observed usable memory, distinct from the provider's advertised hardware.",
+        "properties": {
+          "allocatable_gpu_count": {
+            "minimum": 0.0,
+            "title": "Allocatable Gpu Count",
+            "type": "integer"
+          },
+          "devices": {
+            "items": {
+              "$ref": "#/components/schemas/GPUDeviceObservation"
+            },
+            "minItems": 1,
+            "title": "Devices",
+            "type": "array"
+          },
+          "observed_at": {
+            "format": "date-time",
+            "title": "Observed At",
+            "type": "string"
+          }
+        },
+        "required": [
+          "observed_at",
+          "devices",
+          "allocatable_gpu_count"
+        ],
+        "title": "GPUCapacityObservation",
+        "type": "object"
+      },
+      "GPUDeviceObservation": {
+        "additionalProperties": false,
+        "properties": {
+          "driver_version": {
+            "minLength": 1,
+            "title": "Driver Version",
+            "type": "string"
+          },
+          "index": {
+            "minimum": 0.0,
+            "title": "Index",
+            "type": "integer"
+          },
+          "memory_total_mib": {
+            "exclusiveMinimum": 0.0,
+            "title": "Memory Total Mib",
+            "type": "integer"
+          },
+          "name": {
+            "minLength": 1,
+            "title": "Name",
+            "type": "string"
+          },
+          "uuid": {
+            "pattern": "^GPU-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+            "title": "Uuid",
+            "type": "string"
+          }
+        },
+        "required": [
+          "index",
+          "uuid",
+          "name",
+          "memory_total_mib",
+          "driver_version"
+        ],
+        "title": "GPUDeviceObservation",
+        "type": "object"
+      },
       "GPUHardware": {
         "additionalProperties": false,
         "properties": {
@@ -1633,6 +1741,41 @@
           "ssh_credential_ref"
         ],
         "title": "HostAccess",
+        "type": "object"
+      },
+      "HostAttestation": {
+        "additionalProperties": false,
+        "properties": {
+          "host_key": {
+            "maxLength": 256,
+            "title": "Host Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_key"
+        ],
+        "title": "HostAttestation",
+        "type": "object"
+      },
+      "HostAttestationAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "const": "accepted",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "fingerprint"
+        ],
+        "title": "HostAttestationAccepted",
         "type": "object"
       },
       "ImportAccepted": {
@@ -4234,6 +4377,15 @@
       "WorkerGroupSpec": {
         "additionalProperties": false,
         "properties": {
+          "capacity_lifecycle": {
+            "default": "leased",
+            "enum": [
+              "leased",
+              "externally_retained"
+            ],
+            "title": "Capacity Lifecycle",
+            "type": "string"
+          },
           "desired_instances": {
             "default": 1,
             "minimum": 0.0,
@@ -4315,10 +4467,17 @@
             "type": "string"
           },
           "ttl_minutes": {
+            "anyOf": [
+              {
+                "exclusiveMinimum": 0.0,
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
             "default": 90,
-            "exclusiveMinimum": 0.0,
-            "title": "Ttl Minutes",
-            "type": "integer"
+            "title": "Ttl Minutes"
           },
           "worker_class": {
             "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
@@ -4360,6 +4519,15 @@
               }
             ],
             "title": "Allocated At"
+          },
+          "capacity_lifecycle": {
+            "default": "leased",
+            "enum": [
+              "leased",
+              "externally_retained"
+            ],
+            "title": "Capacity Lifecycle",
+            "type": "string"
           },
           "counts": {
             "$ref": "#/components/schemas/WorkerCounts"
@@ -4418,6 +4586,107 @@
         "title": "WorkerGroupStatus",
         "type": "object"
       },
+      "WorkerLeaseOption": {
+        "additionalProperties": false,
+        "properties": {
+          "lease_minutes": {
+            "title": "Lease Minutes",
+            "type": "integer"
+          },
+          "spec_ref": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+            "title": "Spec Ref",
+            "type": "string"
+          },
+          "worker_class": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Worker Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec_ref",
+          "worker_class",
+          "lease_minutes"
+        ],
+        "title": "WorkerLeaseOption",
+        "type": "object"
+      },
+      "WorkerLifecycleOptions": {
+        "additionalProperties": false,
+        "properties": {
+          "compatible_specs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WorkerLeaseOption"
+            },
+            "title": "Compatible Specs",
+            "type": "array"
+          },
+          "configured": {
+            "default": false,
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "instance_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Type"
+          },
+          "max_total_lease_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Lease Minutes"
+          },
+          "price_ceiling_cents_per_hour": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Ceiling Cents Per Hour"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          }
+        },
+        "title": "WorkerLifecycleOptions",
+        "type": "object"
+      },
       "WorkerMember": {
         "additionalProperties": false,
         "properties": {
@@ -4425,6 +4694,16 @@
             "anyOf": [
               {
                 "$ref": "#/components/schemas/ErrorInfo"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "gpu_observation": {
+            "anyOf": [
+              {
+                "$ref": "#/components/schemas/GPUCapacityObservation"
               },
               {
                 "type": "null"
@@ -4537,6 +4816,10 @@
         "in": "cookie",
         "name": "management_session",
         "type": "apiKey"
+      },
+      "BootstrapCredential": {
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -5316,6 +5599,262 @@
         "summary": "Current",
         "tags": [
           "Authentication"
+        ]
+      }
+    },
+    "/api/v1/bootstrap/{identity}": {
+      "post": {
+        "operationId": "attestHost",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identity",
+            "required": true,
+            "schema": {
+              "pattern": "^op-[a-f0-9]{16,32}$",
+              "title": "Identity",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostAttestation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostAttestationAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "BootstrapCredential": []
+          }
+        ],
+        "summary": "Attest",
+        "tags": [
+          "Host bootstrap"
+        ]
+      }
+    },
+    "/api/v1/bootstrap/{identity}/failure": {
+      "post": {
+        "operationId": "reportBootstrapFailure",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identity",
+            "required": true,
+            "schema": {
+              "pattern": "^op-[a-f0-9]{16,32}$",
+              "title": "Identity",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/BootstrapFailure"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/BootstrapFailureRecorded"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "BootstrapCredential": []
+          }
+        ],
+        "summary": "Failure",
+        "tags": [
+          "Host bootstrap"
         ]
       }
     },
@@ -12105,6 +12644,112 @@
           }
         ],
         "summary": "Fault",
+        "tags": [
+          "Workflows"
+        ]
+      }
+    },
+    "/api/v1/worker-lifecycle-options": {
+      "get": {
+        "operationId": "getWorkerLifecycleOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerLifecycleOptions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Worker Lifecycle Options",
         "tags": [
           "Workflows"
         ]

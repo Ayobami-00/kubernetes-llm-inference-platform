@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { WorkerObservations } from '../features/capacity/WorkerObservations';
 import { endpoints as e, message, mutationHeaders, unwrap } from '../api/client';
 import type { GraphNode, GroupView, OperationView, Run, SpecView, SpecWrite } from '../api/client';
 import { icons, names } from './resourceTheme';
@@ -626,6 +627,7 @@ export default function Inspector({
                               .filter(
                                 (g) =>
                                   g.group.status.phase === 'ready' &&
+                                  g.mode === 'simulation' &&
                                   g.group.spec.worker_class === data.worker_class,
                               )
                               .map((g) => (
@@ -668,10 +670,12 @@ export default function Inspector({
                 )}
                 {node.kind === 'group' && (
                   <>
-                    <div className="notice synthetic">
+                    <div className={node.document.mode === 'real' ? 'notice' : 'notice synthetic'}>
                       {node.document.ownership === 'external'
                         ? 'B-managed GPU capacity. Lifecycle changes are handled by its owner.'
-                        : 'Simulated GPU lifecycle. State persists across worker restarts.'}
+                        : node.document.mode === 'real'
+                          ? 'Live Lambda worker lifecycle. Readiness follows verified host, network and GPU checks.'
+                          : 'Simulated GPU lifecycle. State persists across worker restarts.'}
                     </div>
                     <div className="detail-card">
                       {Object.entries((node.document.group as Doc).status.counts).map(([k, v]) => (
@@ -689,13 +693,16 @@ export default function Inspector({
                         <b>{formatDate((node.document.group as Doc).status.expires_at)}</b>
                       </div>
                     </div>
+                    <WorkerObservations
+                      members={(node.document.group as Doc).status.members || []}
+                    />
                     <label>
                       Extend lease (minutes)
                       <input
                         type="number"
                         value={minutes}
                         min={1}
-                        max={1440}
+                        max={node.document.mode === 'real' ? 90 : 1440}
                         onChange={(v) => setMinutes(Number(v.target.value))}
                       />
                     </label>

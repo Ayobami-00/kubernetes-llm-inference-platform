@@ -1,0 +1,5 @@
+apiVersion: v2
+name: klip-observability
+description: Namespace and network boundaries for the private telemetry releases
+type: application
+version: 0.1.0

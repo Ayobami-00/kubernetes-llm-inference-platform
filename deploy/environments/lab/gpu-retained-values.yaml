@@ -1,0 +1,6 @@
+# Apply over the pinned GPU Operator values while the externally retained Lambda
+# Stack A10 is attached. Keep this overlay for the lifetime of that node.
+driver:
+  enabled: false
+toolkit:
+  enabled: false

@@ -1,0 +1,534 @@
+"""Plan and install the locked private monitoring release with durable evidence."""
+
+from __future__ import annotations
+
+import argparse
+import fcntl
+import hashlib
+import json
+import shutil
+from datetime import UTC, datetime, timedelta
+from pathlib import Path
+
+import yaml
+from common import (
+    PROFILES,
+    Aws,
+    private_dir,
+    source_digest,
+    state_home,
+    tool,
+    utc_now,
+    write_private,
+)
+from observability_release import CACHE, CRDLoader, monitoring_values, render
+from observability_security import assess
+
+RELEASE = "klip-monitoring"
+NAMESPACE = "observability"
+
+
+def folder():
+    return private_dir(state_home() / "cluster/observability/monitoring")
+
+
+def sha(value):
+    return hashlib.sha256(
+        json.dumps(value, sort_keys=True, separators=(",", ":")).encode()
+    ).hexdigest()
+
+
+def get(kind, name, namespace=None):
+    from cluster import kubectl
+
+    args = ["-n", namespace] if namespace else []
+    data = kubectl(*args, "get", kind, name, "--ignore-not-found", "-o", "json").strip()
+    return json.loads(data) if data else None
+
+
+def verify_boundary():
+    from cluster import kubectl
+    from platform_services import render as render_service
+    from platform_services import values_for
+
+    documents = [d for d in yaml.safe_load_all(render_service("klip-observability", {})) if d]
+    for desired in documents:
+        kind, metadata = desired["kind"], desired["metadata"]
+        actual = get(kind, metadata["name"], metadata.get("namespace"))
+        if not actual:
+            raise ValueError("Missing private monitoring boundary: " + metadata["name"])
+        if kind == "Namespace":
+            if any(
+                actual["metadata"].get("labels", {}).get(k) != v
+                for k, v in metadata["labels"].items()
+            ):
+                raise ValueError("Telemetry namespace security labels differ")
+        elif actual["spec"] != desired["spec"]:
+            raise ValueError("Live telemetry network policy differs from the reviewed boundary")
+        if (
+            actual["metadata"].get("annotations", {}).get("meta.helm.sh/release-name")
+            != "klip-observability"
+        ):
+            raise ValueError("Telemetry boundary ownership differs")
+    for namespace in (NAMESPACE, "observability-node-agents"):
+        for kind in ("NetworkPolicy", "CiliumNetworkPolicy"):
+            observed = json.loads(kubectl("-n", namespace, "get", kind, "-o", "json"))["items"]
+            expected = {
+                d["metadata"]["name"]
+                for d in documents
+                if d["kind"] == kind and d["metadata"].get("namespace") == namespace
+            }
+            if {d["metadata"]["name"] for d in observed} != expected:
+                raise ValueError("Unexpected additive policy in telemetry namespace")
+    hooks = get("MutatingWebhookConfiguration", "klip-workload-identity")
+    expected_hook = next(
+        d
+        for d in yaml.safe_load_all(
+            render_service(
+                "klip-workload-identity",
+                values_for("klip-workload-identity"),
+            )
+        )
+        if d and d["kind"] == "MutatingWebhookConfiguration"
+    )
+    if (
+        not hooks
+        or hooks["webhooks"][0]["matchConditions"]
+        != expected_hook["webhooks"][0]["matchConditions"]
+        or hooks["webhooks"][0]["failurePolicy"] != "Fail"
+    ):
+        raise ValueError("Exact-subject Pod federation admission is not active")
+    return {"verified_at": utc_now(), "resources": len(documents)}
+
+
+def crds():
+    result = []
+    for path in sorted((CACHE / "kube-prometheus-stack/charts/crds/crds").glob("*.yaml")):
+        doc = yaml.load(path.read_text(), Loader=CRDLoader)
+        if (
+            doc["kind"] != "CustomResourceDefinition"
+            or doc["spec"]["group"] != "monitoring.coreos.com"
+        ):
+            raise ValueError("Unexpected monitoring CRD identity")
+        doc["metadata"].setdefault("labels", {})["klip.dev/managed-by"] = "klip-monitoring-crds"
+        doc["metadata"].setdefault("annotations", {})["klip.dev/spec-sha256"] = sha(doc["spec"])
+        result.append(doc)
+    if len(result) != 10:
+        raise ValueError("Expected all ten CRDs from the reviewed operator archive")
+    return result
+
+
+def check_crd(existing, desired):
+    if not existing:
+        return
+    spec = dict(existing["spec"])
+    # API-server defaults absent in the upstream document are not schema drift.
+    for key, default in (("conversion", {"strategy": "None"}), ("preserveUnknownFields", False)):
+        if key not in desired["spec"] and spec.get(key) == default:
+            spec.pop(key)
+    if (
+        existing["metadata"].get("labels", {}).get("klip.dev/managed-by") != "klip-monitoring-crds"
+        or spec != desired["spec"]
+    ):
+        raise ValueError("Existing monitoring CRD ownership/schema differs; no forced adoption")
+
+
+def archive_current():
+    active = folder() / "active.json"
+    if not active.exists():
+        return
+    current = json.loads(active.read_text())
+    destination = folder() / "history" / current["approval_sha256"]
+    manifest = destination / "manifest.json"
+    if manifest.exists():
+        for name, checksum in json.loads(manifest.read_text())["files"].items():
+            if hashlib.sha256((destination / name).read_bytes()).hexdigest() != checksum:
+                raise ValueError("Archived monitoring receipt changed")
+        return
+    original = folder() / (current["approval_sha256"] + ".json")
+    plan = json.loads(original.read_text())
+    values = folder() / "values.yaml"
+    applied = current["status"] == "installed" or current.get("failed_after_helm", False)
+    if (
+        applied
+        and values.exists()
+        and sha(yaml.safe_load(values.read_text())) != plan["values_sha256"]
+    ):
+        raise ValueError("Previous release values changed before archival")
+    private_dir(destination)
+    for name in (
+        "active.json",
+        "values.yaml",
+        "helm.log",
+        "helm-admission.log",
+        "observation.json",
+    ):
+        if not applied and name != "active.json":
+            continue  # These files belong to the last successful release, not a rejected plan.
+        source = folder() / name
+        if source.exists():
+            if (destination / name).exists() and (
+                destination / name
+            ).read_bytes() != source.read_bytes():
+                raise ValueError("Partial monitoring archive conflicts with the original receipt")
+            shutil.copyfile(source, destination / name)
+            (destination / name).chmod(0o600)
+    write_private(destination / "plan.json", plan)
+    write_private(
+        manifest,
+        {
+            "approval_sha256": current["approval_sha256"],
+            "archived_at": utc_now(),
+            "files": {
+                p.name: hashlib.sha256(p.read_bytes()).hexdigest()
+                for p in destination.iterdir()
+                if p.is_file()
+            },
+        },
+    )
+
+
+def reconcile(approval):
+    """Retire a proven stable failure; never replay an ambiguous Helm upgrade."""
+    from cluster import kubectl
+
+    path = folder() / "active.json"
+    current = json.loads(path.read_text())
+    if current["approval_sha256"] != approval:
+        raise ValueError("Reconciliation must identify the original monitoring attempt")
+    if current["status"] == "failed":
+        return current
+    stage = current.get("interrupted_stage")
+    if stage is None and "schemas_established_at" not in current:
+        # Compatibility with the initial installer, which saved this timestamp
+        # only after successful dry-run and before invoking Helm.
+        stage = "installing-crds"
+    if current["status"] != "interrupted" or stage not in {
+        "installing-crds",
+        "hardening-admission",
+    }:
+        raise ValueError("An ambiguous Helm transition requires separate operator recovery")
+    pending = kubectl(
+        "-n",
+        NAMESPACE,
+        "get",
+        "secret",
+        "-l",
+        "owner=helm,name=klip-monitoring,"
+        "status in (pending-install,pending-upgrade,pending-rollback)",
+        "-o",
+        "name",
+    ).strip()
+    if pending or not observe()["ready"]:
+        raise ValueError("Existing monitoring release is not stable for pre-Helm reconciliation")
+    if stage == "hardening-admission":
+        # A postcondition failure can be retired only after observing a fully
+        # deployed Helm revision with the exact attempted values. Never replay it.
+        from cluster import FOLDER, checked, kubeconfigs, tunnel
+
+        plan = json.loads((folder() / (approval + ".json")).read_text())
+        if (
+            current.get("error_type") != "ValueError"
+            or not (folder() / "helm-admission.log").exists()
+        ):
+            raise ValueError("No proof that the original Helm hardening command completed")
+        kubeconfigs()
+        with tunnel():
+            status = json.loads(
+                checked(
+                    [
+                        tool("helm"),
+                        "status",
+                        RELEASE,
+                        "-n",
+                        NAMESPACE,
+                        "--kubeconfig",
+                        str(FOLDER / "operator.conf"),
+                        "--output",
+                        "json",
+                    ]
+                )
+            )
+        if status["info"]["status"] != "deployed" or sha(status["config"]) != plan["values_sha256"]:
+            raise ValueError("The observed Helm revision differs from the attempted configuration")
+        current.update(failed_after_helm=True, observed_helm_revision=status["version"])
+    current.update(
+        status="failed",
+        reconciled_at=utc_now(),
+        failed_before_helm=stage == "installing-crds",
+        reason=(
+            "Read-only validation failed before Helm; existing release retained"
+            if stage == "installing-crds"
+            else "Helm deployed the reviewed values, but admission postcondition failed"
+        ),
+    )
+    write_private(path, current)
+    archive_current()
+    return current
+
+
+def admission_fail_closed():
+    for kind in ("MutatingWebhookConfiguration", "ValidatingWebhookConfiguration"):
+        document = get(kind, "klip-monitoring-admission")
+        if (
+            not document
+            or document["metadata"].get("annotations", {}).get("meta.helm.sh/release-name")
+            != RELEASE
+            or not document.get("webhooks")
+        ):
+            return False
+        for hook in document["webhooks"]:
+            service = hook["clientConfig"].get("service", {})
+            if (
+                hook.get("failurePolicy") != "Fail"
+                or not hook["clientConfig"].get("caBundle")
+                or service.get("namespace") != NAMESPACE
+                or service.get("name") != "klip-monitoring-operator"
+                or service.get("port", 443) != 443
+            ):
+                return False
+    return True
+
+
+def prepare(security_directory):
+    from observability import verify_roles
+    from platform_resize import verify_capacity
+
+    active_path = folder() / "active.json"
+    if active_path.exists() and json.loads(active_path.read_text())["status"] not in {
+        "installed",
+        "failed",
+    }:
+        raise ValueError("Reconcile the original interrupted monitoring operation first")
+    archive_current()
+    Aws(PROFILES["foundation"]).preflight("foundation")
+    capacity = verify_capacity()
+    boundary = verify_boundary()
+    render()
+    assessment = assess(security_directory)
+    identities = verify_roles()
+    definitions = crds()
+    for doc in definitions:
+        check_crd(get("crd", doc["metadata"]["name"]), doc)
+    plan = {
+        "schema_version": "klip-monitoring-plan.v1",
+        "prepared_at": utc_now(),
+        "source_sha256": source_digest(),
+        "security_directory": str(security_directory.resolve()),
+        "security": assessment,
+        "identities": identities,
+        "boundary": boundary,
+        "capacity_verified_at": capacity["verified_at"],
+        "storage_budget": {
+            "gp3_gib": 43,
+            "estimated_monthly_usd": 3.99,
+            "pricing_review": "2026-11-03 AWS Pricing GetProducts, eu-west-2 gp3, $0.0928/GB-month",
+            "limitations": "Retained volumes, tax, snapshots and transfer may add charges",
+        },
+        "node_uids": {k: v["uid"] for k, v in capacity["nodes"].items()},
+        "values_sha256": sha(monitoring_values()),
+        "crds_sha256": sha(definitions),
+        "status": "prepared",
+    }
+    plan["approval_sha256"] = sha(plan)
+    write_private(folder() / "plan.json", plan)
+    write_private(folder() / (plan["approval_sha256"] + ".json"), plan)
+    return plan
+
+
+def observe():
+    from cluster import kubectl
+
+    result = {"observed_at": utc_now(), "workloads": {}, "ready": True}
+    for kind, name, namespace, replicas in (
+        ("deployment", "klip-monitoring-operator", NAMESPACE, 1),
+        ("deployment", "klip-monitoring-kube-state-metrics", NAMESPACE, 1),
+        ("statefulset", "prometheus-klip-monitoring-prometheus", NAMESPACE, 2),
+        ("statefulset", "alertmanager-klip-monitoring-alertmanager", NAMESPACE, 3),
+    ):
+        doc = get(kind, name, namespace)
+        status = doc.get("status", {}) if doc else {}
+        ok = bool(
+            doc
+            and doc["spec"].get("replicas") == replicas
+            and status.get("observedGeneration") == doc["metadata"]["generation"]
+            and status.get("readyReplicas", 0) == replicas
+            and status.get("updatedReplicas", 0) == replicas
+        )
+        result["workloads"][name] = {"ready": ok, "ready_replicas": status.get("readyReplicas", 0)}
+        result["ready"] &= ok
+    agent = get(
+        "daemonset", "klip-monitoring-prometheus-node-exporter", "observability-node-agents"
+    )
+    status = agent.get("status", {}) if agent else {}
+    nodes = json.loads(kubectl("get", "nodes", "-l", "kubernetes.io/os=linux", "-o", "json"))[
+        "items"
+    ]
+    ok = bool(
+        agent
+        and status.get("observedGeneration") == agent["metadata"]["generation"]
+        and status.get("desiredNumberScheduled") == len(nodes)
+        and status.get("numberReady") == len(nodes)
+        and status.get("updatedNumberScheduled") == len(nodes)
+    )
+    result["workloads"]["node-exporter"] = {
+        "ready": ok,
+        "ready_replicas": status.get("numberReady", 0),
+    }
+    result["ready"] &= ok
+    write_private(folder() / "observation.json", result)
+    return result
+
+
+def apply(approval):
+    from cluster import FOLDER, Host, checked, kubeconfigs, kubectl, load_hosts, tunnel
+    from observability import verify_roles
+    from platform_resize import verify_capacity
+    from smoke import wait_until
+
+    plan = json.loads((folder() / "plan.json").read_text())
+    original = {k: v for k, v in plan.items() if k != "approval_sha256"}
+    if approval != plan["approval_sha256"] or sha(original) != approval:
+        raise ValueError("Select the exact reviewed monitoring plan")
+    active_path = folder() / "active.json"
+    if active_path.exists():
+        previous = json.loads(active_path.read_text())
+        if previous["approval_sha256"] == approval:
+            if previous["status"] == "installed":
+                return previous
+            raise ValueError("Inspect the original interrupted Helm operation; no automatic replay")
+    if (
+        plan["source_sha256"] != source_digest()
+        or not timedelta(0)
+        <= datetime.now(UTC) - datetime.fromisoformat(plan["prepared_at"])
+        <= timedelta(hours=1)
+        or plan["values_sha256"] != sha(monitoring_values())
+    ):
+        raise ValueError("Monitoring source/configuration changed or plan expired")
+    render()  # Re-extract checksum-verified charts; never trust a stale cache.
+    assess(Path(plan["security_directory"]))
+    verify_roles()
+    capacity = verify_capacity()
+    if plan["node_uids"] != {k: v["uid"] for k, v in capacity["nodes"].items()}:
+        raise ValueError("Platform identity changed after monitoring review")
+    verify_boundary()
+    definitions = crds()
+    if sha(definitions) != plan["crds_sha256"]:
+        raise ValueError("Monitoring schemas changed")
+    active = {"approval_sha256": approval, "status": "installing-crds", "started_at": utc_now()}
+    write_private(active_path, active)
+    host = Host(load_hosts()["cp-01"])
+    prefix = ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf"]
+    try:
+        for doc in definitions:
+            existing = get("crd", doc["metadata"]["name"])
+            check_crd(existing, doc)
+            if not existing:
+                host.run([*prefix, "create", "-f", "-"], data=yaml.safe_dump(doc))
+        kubectl(
+            "wait",
+            "--for=condition=Established",
+            "--timeout=60s",
+            "crd",
+            *[d["metadata"]["name"] for d in definitions],
+        )
+        rendered = (CACHE / "monitoring-rendered.yaml").read_text()
+        # Validate a merge patch, as Helm uses, without claiming server-side
+        # apply ownership of its existing fields. This remains a server dry-run.
+        host.run(
+            [
+                *prefix,
+                "apply",
+                "--dry-run=server",
+                "--field-manager=klip-monitoring-review",
+                "-f",
+                "-",
+            ],
+            data=rendered,
+        )
+        values_path = folder() / "values.yaml"
+        write_private(values_path, yaml.safe_dump(monitoring_values()))
+        active.update(status="installing", schemas_established_at=utc_now())
+        write_private(active_path, active)
+        kubeconfigs()
+        with tunnel():
+            command = [
+                tool("helm"),
+                "upgrade",
+                "--install",
+                RELEASE,
+                str(CACHE / "kube-prometheus-stack"),
+                "--namespace",
+                NAMESPACE,
+                "--kubeconfig",
+                str(FOLDER / "operator.conf"),
+                "--values",
+                str(values_path),
+                "--skip-crds",
+                "--atomic",
+                "--wait",
+                "--timeout",
+                "10m",
+                "--history-max",
+                "10",
+            ]
+            output = checked(command, timeout=750)
+        write_private(folder() / "helm.log", output)
+        observed = wait_until(
+            lambda: r if (r := observe())["ready"] else None,
+            "replicated monitoring workloads",
+            timeout=300,
+            interval=5,
+        )
+        if not admission_fail_closed():
+            # Upstream uses IgnoreOnInstallOnly while its serving certificate and
+            # first Pod become ready. An unchanged Helm upgrade makes it Fail.
+            active.update(status="hardening-admission", hardening_started_at=utc_now())
+            write_private(active_path, active)
+            with tunnel():
+                hardened = checked(command, timeout=750)
+            write_private(folder() / "helm-admission.log", hardened)
+            if not admission_fail_closed():
+                raise ValueError("Monitoring admission must verify TLS and fail closed")
+        active.update(
+            status="installed",
+            completed_at=utc_now(),
+            observation=observed,
+            admission_fail_closed=True,
+        )
+        write_private(active_path, active)
+        return active
+    except Exception as error:
+        active.update(
+            interrupted_stage=active["status"],
+            status="interrupted",
+            interrupted_at=utc_now(),
+            error_type=type(error).__name__,
+        )
+        write_private(active_path, active)
+        raise
+
+
+def main():
+    parser = argparse.ArgumentParser(description=__doc__)
+    parser.add_argument("command", choices=["prepare", "apply", "observe", "reconcile"])
+    parser.add_argument("--security-directory", type=Path)
+    parser.add_argument("--approve-plan")
+    args = parser.parse_args()
+    with (private_dir(state_home() / "cluster") / "operator.lock").open("a+") as lock:
+        fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
+        if args.command == "prepare":
+            if not args.security_directory:
+                parser.error("--security-directory is required")
+            result = prepare(args.security_directory)
+        elif args.command == "apply":
+            result = apply(args.approve_plan)
+        elif args.command == "reconcile":
+            result = reconcile(args.approve_plan)
+        else:
+            result = observe()
+        print(json.dumps(result, indent=2))
+
+
+if __name__ == "__main__":
+    main()
