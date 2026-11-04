@@ -210,7 +210,7 @@ def render_report(data, comparison, runs):
             "### Exact stage timeline",
             "",
             "```json",
-            json.dumps(data["stages"], indent=2),
+            json.dumps(comparison["stages"], indent=2),
             "```",
             "",
             "### SLO, quality, uncertainty and diagnostic evidence",
@@ -286,18 +286,32 @@ def build_comparison(data, root):
             entries,
             lambda text: tokenizer.encode(text, add_special_tokens=False).ids,
         )
-        comparison.update(
-            analysis_inputs_sha256=identity,
-            report_generated_at=now().isoformat(),
-            total_wall_seconds=(now() - datetime.fromisoformat(data["created_at"])).total_seconds(),
-            stages=data["stages"],
-        )
         comparison["server_diagnostics"] = {
             variant: diagnostic_metrics(
                 run, context, json.loads((root / variant / "readiness.json").read_text())
             )
             for variant, run, context in zip(("baseline", "ngram"), runs, contexts, strict=True)
         }
+        completed = now()
+        stages = json.loads(json.dumps(data["stages"]))
+        for details in stages.values():
+            ended = details.get("finished_at") or completed.isoformat()
+            details["observed_wall_seconds"] = (
+                datetime.fromisoformat(ended) - datetime.fromisoformat(details["started_at"])
+            ).total_seconds()
+        comparison.update(
+            analysis_inputs_sha256=identity,
+            report_generated_at=completed.isoformat(),
+            total_wall_seconds=(
+                completed - datetime.fromisoformat(data["created_at"])
+            ).total_seconds(),
+            stages=stages,
+            timing_convention=(
+                "Orchestration uses durable UTC wall-clock boundaries across worker recovery; "
+                "client durations use AIPerf monotonic timing. Polling gaps and terminal "
+                "registration are visible in the parent execution record."
+            ),
+        )
         state = {"comparison": comparison, "report_context": data}
         # Freeze calculation/clock/diagnostics before materializing output files.
         # Recovery reproduces exact bytes even if the worker died between writes.

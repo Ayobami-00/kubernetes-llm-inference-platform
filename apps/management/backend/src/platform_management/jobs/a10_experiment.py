@@ -405,6 +405,7 @@ def step_experiment(op, payload, checkpoint, config, owner=None):
                 # Do not probe, recompile, refresh evidence or inject extra traffic.
                 checkpoint["step"] = variant + "-run"
                 data["stage"] = checkpoint["step"]
+                data["stages"][stage]["finished_at"] = now().isoformat()
                 return data, checkpoint, False, False, "Recovered original child run"
             if (
                 now() - datetime.fromisoformat(checkpoint["activation_started_at"])

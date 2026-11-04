@@ -13,6 +13,10 @@ rules:
   - apiGroups: [""]
     resources: [pods]
     verbs: [get, list]
+  - apiGroups: [""]
+    resources: [services]
+    resourceNames: [inference]
+    verbs: [get]
   # Pod names change on gateway rollout; code restricts this to the two reviewed
   # gateway replicas and loopback admin port 19000. No exec/Secret/provider access.
   - apiGroups: [""]
