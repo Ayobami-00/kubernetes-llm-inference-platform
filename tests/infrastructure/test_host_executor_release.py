@@ -170,3 +170,49 @@ def test_preflight_job_has_no_cluster_token_or_api_client_key():
         for v in actual["containers"][0]["volumeMounts"]
     ]
     assert len(mounts) == len(set(mounts))
+
+
+def test_network_update_cannot_change_images_or_add_broader_access():
+    import yaml
+    from common import ROOT
+    from host_executor_network import validate_delta
+
+    original = {
+        "kind": "Deployment",
+        "metadata": {"name": "host-executor"},
+        "spec": {"image": "immutable-fixture"},
+    }
+    policy = list(
+        yaml.safe_load_all(
+            (ROOT / "charts/klip-host-executor/templates/api-access.yaml").read_text()
+        )
+    )[0]
+    old = yaml.safe_dump(original)
+    candidate = yaml.safe_dump_all([original, policy])
+    validate_delta(old, candidate)
+    changed = copy.deepcopy(original)
+    changed["spec"]["image"] = "other"
+    with pytest.raises(ValueError):
+        validate_delta(old, yaml.safe_dump_all([changed, policy]))
+    wide = copy.deepcopy(policy)
+    wide["spec"]["egress"][0]["toEntities"] = ["cluster"]
+    with pytest.raises(ValueError):
+        validate_delta(old, yaml.safe_dump_all([original, wide]))
+    with pytest.raises(ValueError, match="Duplicate"):
+        validate_delta(old, yaml.safe_dump_all([original, policy, policy]))
+
+
+def test_management_namespace_probe_has_only_client_tls_and_no_api_or_ssh_credentials():
+    from host_executor_acceptance import PROGRAM, probe_job
+    from image_release import guard_workloads
+
+    compile(PROGRAM, "tls-boundary-probe", "exec")
+    job = probe_job("host-service-probe-synthetic", "reviewed-image", "synthetic-cluster-uid")
+    guard_workloads([job])
+    pod = job["spec"]["template"]["spec"]
+    assert pod["automountServiceAccountToken"] is False
+    assert {v["secret"]["secretName"] for v in pod["volumes"] if "secret" in v} == {
+        "klip-host-client-tls"
+    }
+    assert not any("persistentVolumeClaim" in v or "projected" in v for v in pod["volumes"])
+    assert job["spec"]["backoffLimit"] == 0
