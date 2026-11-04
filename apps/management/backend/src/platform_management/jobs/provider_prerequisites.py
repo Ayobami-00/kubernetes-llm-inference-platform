@@ -21,6 +21,15 @@ from platform_management.providers.prerequisite_ledger import (
 from platform_management.settings import get_settings
 
 
+def load_spec(path):
+    # Kubernetes projects ConfigMap keys through ..data symlinks. Resolve within
+    # the fixed input directory; reject links escaping that mounted directory.
+    resolved = path.resolve(strict=True)
+    if not resolved.is_relative_to(path.parent.resolve()) or resolved.stat().st_size > 65536:
+        raise ValueError("Unsafe provider setup input")
+    return PrerequisiteSpec.model_validate_json(resolved.read_bytes())
+
+
 def execute(spec, settings, *, verify_only=False):
     key = settings.secret(settings.lambda_api_key_file, required=True)
     if hashlib.sha256(key.encode()).hexdigest() != spec.provider_credential_sha256:
@@ -60,9 +69,7 @@ def main():
     parser.add_argument("--verify-only", action="store_true")
     args = parser.parse_args()
     try:
-        if args.spec.is_symlink() or args.spec.stat().st_size > 65536:
-            raise ValueError("Unsafe provider setup input")
-        spec = PrerequisiteSpec.model_validate_json(args.spec.read_bytes())
+        spec = load_spec(args.spec)
         result = execute(spec, get_settings(), verify_only=args.verify_only)
     except Exception as error:
         # API bodies, credentials and arbitrary exception messages never become logs.

@@ -211,3 +211,23 @@ def test_firewall_provider_ids_accept_documented_hex_and_uuid_forms():
         assert LambdaLifecyclePolicy(**fields, firewall_ruleset_ids=(identity,))
     with pytest.raises(ValueError):
         LambdaLifecyclePolicy(**fields, firewall_ruleset_ids=("../global",))
+
+
+def test_cli_accepts_kubernetes_projected_inputs_but_rejects_directory_escape(spec, tmp_path):
+    from platform_management.jobs.provider_prerequisites import load_spec
+
+    root = tmp_path / "config"
+    root.mkdir()
+    revision = root / "..2026-test"
+    revision.mkdir()
+    (revision / "provider-setup.json").write_text(spec.model_dump_json())
+    (root / "..data").symlink_to(revision.name, target_is_directory=True)
+    path = root / "provider-setup.json"
+    path.symlink_to("..data/provider-setup.json")
+    assert load_spec(path) == spec
+    external = tmp_path / "external.json"
+    external.write_text(spec.model_dump_json())
+    path.unlink()
+    path.symlink_to(external)
+    with pytest.raises(ValueError, match="Unsafe"):
+        load_spec(path)

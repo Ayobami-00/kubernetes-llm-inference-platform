@@ -50,6 +50,35 @@ CPU-only unit tests exercise the actual bounded HTTP transport against synthetic
 responses. Management PostgreSQL tests additionally cover concurrent setup and
 committed intent before I/O; they run against the isolated CI test database.
 
+The operator workflow uses the reviewed four-image CI receipt bundle:
+
+```sh
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/lambda_provider_setup.py prepare --receipts <directory>
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/lambda_provider_setup.py apply --approve-plan <printed-sha256>
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/lambda_provider_setup.py observe --approve-plan <printed-sha256>
+```
+
+Preparation reads public identity and CPU addresses from the executor's retained
+volume, validates the image/source/scan review, and binds live namespace, storage
+and credential UIDs. Its resource envelope explicitly permits zero GPU instances.
+It freezes the ConfigMap, Job and expected artifact path before dispatch. The Job
+uses the existing application database/Secret references and client TLS leaf;
+it has no host SSH keys, foundation AWS role, Kubernetes API token, host mounts
+or GPU reservation. Kubernetes projected ConfigMap links are accepted only while
+remaining within the mounted input directory.
+
+There is one native Job per execution attempt, with no retry and a 180-second
+deadline. Repeated `apply` calls cannot recreate it; `observe` binds its original
+UID and validates the retained result. An uncertain dispatch or failed Job must
+be reconciled before preparing a separately identified observation/recovery
+attempt. The database intent survives such a recovery and prevents another POST
+after an uncertain provider create. Frozen evidence is retained under private
+`cluster/lambda-provider-setup/<plan-sha256>/` operator state and the application
+artifact mount. This workflow does not enable management's paid lifecycle flag.
+
 Official interfaces checked on 4 November 2026:
 [Lambda API](https://docs.lambda.com/api/cloud) and
 [firewall behavior](https://docs.lambda.ai/public-cloud/firewalls/). The transport
