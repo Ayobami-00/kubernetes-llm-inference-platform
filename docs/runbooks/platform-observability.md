@@ -277,12 +277,18 @@ uses `telemetry_secrets.py stage-local`; it makes no cloud upload. `verify-local
 and `restore-local` validate the exact ciphertext and refuse to overwrite a
 different identity. Operator disk loss is not covered by this local copy.
 
-Automatic approval review rejected uploading the newly generated Grafana
-credentials to `klip-database-127811062476-eu-west-2`, despite verified private
-account ownership, encryption and recovery requirements. The cloud backup
-procedure remains implemented but requires separate explicit user approval for
-that payload/destination before invocation. It is not part of automatic Grafana
-installation. Do not claim independent remote credential recovery until it passes.
+After explicit user approval of the exact ciphertext and S3 destination,
+`telemetry_secrets.py backup` passed at 03:03:42 UTC on 4 November 2026. It uploaded
+the 946-byte age-encrypted credential/encryption-key bundle, retained its S3
+version ID, downloaded that exact version, checked its SHA-256 and verified that
+decryption matched the local identity. The age private key remains off S3.
+The private receipt is `cluster/observability/grafana/secret-custody.json` under
+operator state. Its ciphertext SHA-256 is
+`8c9d857e9a90179a67e6f2db24f07d67cbc5218b1e88796593f604533b9827ef`.
+`verify` rechecks the retained version; `restore` writes credentials only if the
+local destination is absent and never overwrites a different identity. This
+proves version-bound credential recovery, not a complete Grafana/database restore
+or operator-disk-loss rehearsal. Cloud backup is separate from installation.
 
 Use the exact candidate scan artifacts from workflow `41731963265` to prepare
 these releases. `deploy/telemetry-risk-review.json` records the still-unfixed

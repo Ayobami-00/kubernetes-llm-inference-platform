@@ -249,6 +249,35 @@ def stage_local(action="stage-local"):
     return receipt
 
 
+def prepare_remote():
+    """Stage the exact locally verified ciphertext for review, without any cloud call."""
+    local = stage_local("verify-local")
+    folder = state_home() / "cluster/observability/grafana"
+    ciphertext = (folder / "local-credentials.age").read_text()
+    stamp = local["created_at"].replace(":", "").replace("+", "_")
+    receipt = {
+        "schema_version": "klip-grafana-secret-custody.v1",
+        "bucket": f"klip-database-{CONFIG['account_id']}-{CONFIG['region']}",
+        "key": "recovery-secrets/grafana-" + stamp + ".age",
+        "sha256": local["sha256"],
+        "created_at": local["created_at"],
+        "recovery_identity_sha256": local["recovery_identity_sha256"],
+    }
+    path, encrypted = folder / "secret-custody.json", folder / "credentials.age"
+    if path.exists():
+        previous = json.loads(path.read_text())
+        if any(previous.get(k) != v for k, v in receipt.items()):
+            raise ValueError("A different remote recovery intent already exists")
+        receipt = previous
+    if encrypted.exists() and encrypted.read_text() != ciphertext:
+        raise ValueError("Pending remote ciphertext differs from verified local recovery")
+    if not encrypted.exists():
+        write_private(encrypted, ciphertext)
+    if not path.exists():
+        write_private(path, receipt)
+    return receipt
+
+
 if __name__ == "__main__":
     import argparse
     import fcntl
@@ -258,12 +287,24 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
         "command",
-        choices=["backup", "verify", "restore", "stage-local", "verify-local", "restore-local"],
+        choices=[
+            "backup",
+            "verify",
+            "restore",
+            "stage-local",
+            "verify-local",
+            "restore-local",
+            "prepare-remote",
+        ],
     )
     args = parser.parse_args()
     with (FOLDER / "operator.lock").open("a+") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX | fcntl.LOCK_NB)
         result = (
-            stage_local(args.command) if args.command.endswith("-local") else operate(args.command)
+            prepare_remote()
+            if args.command == "prepare-remote"
+            else stage_local(args.command)
+            if args.command.endswith("-local")
+            else operate(args.command)
         )
         print(json.dumps(result, indent=2))
