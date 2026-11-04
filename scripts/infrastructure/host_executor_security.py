@@ -3,6 +3,7 @@
 import argparse
 import hashlib
 import json
+import os
 import re
 import subprocess
 from datetime import UTC, date, datetime, timedelta
@@ -29,9 +30,29 @@ def receipt(path):
     return value
 
 
-def scan(path, destination):
-    value = receipt(path)
-    private_dir(destination)
+def scan_environment(*, ci=False):
+    if ci:
+        if os.environ.get("GITHUB_ACTIONS") != "true":
+            raise ValueError("CI scan credentials require the actual GitHub Actions environment")
+        env = {
+            k: v for k, v in os.environ.items() if k not in {"AWS_PROFILE", "AWS_DEFAULT_PROFILE"}
+        }
+        identity = subprocess.run(
+            ["aws", "sts", "get-caller-identity", "--output", "json", "--region", "eu-west-2"],
+            env=env,
+            capture_output=True,
+            text=True,
+            timeout=30,
+            check=False,
+        )
+        if identity.returncode:
+            raise ValueError("Cannot verify the scoped CI scanner identity")
+        value = json.loads(identity.stdout)
+        if value.get("Account") != "127811062476" or not value.get("Arn", "").startswith(
+            "arn:aws:sts::127811062476:assumed-role/klip-images-push/"
+        ):
+            raise ValueError("Unexpected CI scanner account or role")
+        return env
     env = environment(PROFILES["registry"])
     # AWS CLI resolves the operator's interactive session; secrets remain in
     # child-process environment only. No registry password/STS key is retained.
@@ -51,9 +72,18 @@ def scan(path, destination):
             "AWS_ACCESS_KEY_ID": credential["AccessKeyId"],
             "AWS_SECRET_ACCESS_KEY": credential["SecretAccessKey"],
             "AWS_SESSION_TOKEN": credential["SessionToken"],
-            "TRIVY_CACHE_DIR": str(ROOT / "artifacts/security/host-executor-cache"),
         }
     )
+    return env
+
+
+def scan(path, destination, *, ci=False):
+    value = receipt(path)
+    private_dir(destination)
+    env = scan_environment(ci=ci)
+    if ci and value["source_commit"] != os.environ.get("GITHUB_SHA"):
+        raise ValueError("CI scan receipt differs from the publishing source")
+    env["TRIVY_CACHE_DIR"] = str(ROOT / "artifacts/security/host-executor-cache")
     version = subprocess.run(
         [tool("trivy"), "--version"], capture_output=True, text=True, check=True
     ).stdout
@@ -173,9 +203,13 @@ if __name__ == "__main__":
     parser.add_argument("action", choices=["scan", "assess"])
     parser.add_argument("--receipt", required=True, type=Path)
     parser.add_argument("--directory", required=True, type=Path)
+    parser.add_argument("--ci-credentials", action="store_true")
     args = parser.parse_args()
     print(
         json.dumps(
-            (scan if args.action == "scan" else assess)(args.receipt, args.directory), indent=2
+            scan(args.receipt, args.directory, ci=args.ci_credentials)
+            if args.action == "scan"
+            else assess(args.receipt, args.directory),
+            indent=2,
         )
     )

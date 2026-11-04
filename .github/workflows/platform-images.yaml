@@ -8,6 +8,7 @@ on:
       - 'scripts/infrastructure/publish_images.py'
       - 'scripts/infrastructure/host_executor_image.py'
       - 'scripts/infrastructure/host_executor_openssh.py'
+      - 'scripts/infrastructure/host_executor_security.py'
       - 'scripts/infrastructure/cluster*.py'
       - 'dev/host-executor/**'
       - 'infra/ansible/**'
@@ -158,6 +159,35 @@ jobs:
             org.opencontainers.image.revision=${{ github.sha }}
       - name: Retain digest, source and complete registry scan evidence
         run: python3 scripts/infrastructure/publish_images.py record '${{ matrix.component }}'
+      - name: Install the pinned full-image scanner for the SSH executor
+        if: matrix.component == 'host-executor'
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p artifacts/tools/bin
+          scanner_archive="$RUNNER_TEMP/klip-host-trivy.tar.gz"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_archive"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_archive" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_archive" --directory artifacts/tools/bin trivy
+      - name: Scan executor OS packages, Python packages and embedded Go binaries
+        if: matrix.component == 'host-executor'
+        env:
+          GOMAXPROCS: '2'
+        run: >-
+          python3 scripts/infrastructure/host_executor_security.py scan
+          --receipt artifacts/releases/host-executor.json
+          --directory artifacts/security/host-executor --ci-credentials
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always() && matrix.component == 'host-executor'
+        with:
+          name: host-executor-security-${{ github.sha }}
+          path: |
+            artifacts/security/host-executor/scan.json
+            artifacts/security/host-executor/summary.json
+          if-no-files-found: error
+          retention-days: 90
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
         with:
           name: private-image-${{ matrix.component }}-${{ github.sha }}

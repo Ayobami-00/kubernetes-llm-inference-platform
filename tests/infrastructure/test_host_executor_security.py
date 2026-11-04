@@ -4,6 +4,7 @@ import copy
 import hashlib
 import json
 from datetime import UTC, datetime, timedelta
+from types import SimpleNamespace
 
 import host_executor_security as security
 import pytest
@@ -120,3 +121,37 @@ def test_unreviewed_or_incomplete_scan_is_not_a_deployment_approval(evidence, ch
         (directory / "scan.json").write_text(json.dumps({**report, "changed": True}))
     with pytest.raises(ValueError):
         security.assess(path, directory, now=now)
+
+
+def test_ci_scanning_requires_the_real_workload_role(monkeypatch):
+    monkeypatch.delenv("GITHUB_ACTIONS", raising=False)
+    monkeypatch.setattr(security.subprocess, "run", lambda *_a, **_k: pytest.fail("No AWS call"))
+    with pytest.raises(ValueError, match="GitHub Actions"):
+        security.scan_environment(ci=True)
+
+
+@pytest.mark.parametrize("allowed", [True, False])
+def test_ci_role_is_verified_without_exporting_or_retaining_secret_values(monkeypatch, allowed):
+    monkeypatch.setenv("GITHUB_ACTIONS", "true")
+    monkeypatch.setenv("AWS_PROFILE", "must-not-select-local-custody")
+
+    def run(args, **options):
+        assert args[:3] == ["aws", "sts", "get-caller-identity"]
+        assert "AWS_PROFILE" not in options["env"] and options["capture_output"]
+        return SimpleNamespace(
+            returncode=0,
+            stdout=json.dumps(
+                {
+                    "Account": "127811062476",
+                    "Arn": "arn:aws:sts::127811062476:assumed-role/"
+                    + ("klip-images-push/ci-host" if allowed else "unrelated-role/session"),
+                }
+            ),
+        )
+
+    monkeypatch.setattr(security.subprocess, "run", run)
+    if allowed:
+        assert "AWS_PROFILE" not in security.scan_environment(ci=True)
+    else:
+        with pytest.raises(ValueError, match="account or role"):
+            security.scan_environment(ci=True)
