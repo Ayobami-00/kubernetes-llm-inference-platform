@@ -40,6 +40,16 @@ def test_pinned_controller_render_is_deterministic_and_has_no_generated_secrets(
         "ValidatingAdmissionPolicyBinding",
     }
     assert all(v["metadata"]["name"] == "safe-upgrades.gateway.networking.k8s.io" for v in policies)
+    for policy in policies:
+        key = (
+            "matchConstraints"
+            if policy["kind"] == "ValidatingAdmissionPolicy"
+            else "matchResources"
+        )
+        match = policy["spec"][key]
+        assert match["matchPolicy"] == "Equivalent"
+        assert match["namespaceSelector"] == match["objectSelector"] == {}
+        assert all(rule["scope"] == "*" for rule in match["resourceRules"])
     crds = list(yaml.safe_load_all(platform.crd_bundle(rendered)))
     assert crds and all(v["kind"] == "CustomResourceDefinition" for v in crds)
     assert all(
@@ -120,3 +130,31 @@ def test_native_ha_proof_requires_two_actual_pinned_ready_pods(problem):
             len(platform.verify_controller_pods(values, "gateway", {"platform-01", "platform-02"}))
             == 2
         )
+
+
+def test_replanning_retains_original_plan_and_manifest_bytes(tmp_path, monkeypatch):
+    import json
+
+    import cluster
+    import inference_security
+
+    content = {"controller": "original fixture manifest"}
+    monkeypatch.setattr(platform, "folder", lambda: tmp_path)
+    monkeypatch.setattr(platform, "fetch", lambda: None)
+    monkeypatch.setattr(platform, "render", lambda: dict(content))
+    monkeypatch.setattr(platform, "boundary", lambda: "fixture boundary")
+    monkeypatch.setattr(platform, "raw_apis", lambda: "fixture APIs")
+    monkeypatch.setattr(platform, "configuration_hashes", lambda: {"fixture": "hash"})
+    monkeypatch.setattr(platform, "native_inputs", lambda _: {"fixture": "cluster-inputs"})
+    monkeypatch.setattr(platform, "seed_digest", lambda: "a" * 64)
+    monkeypatch.setattr(inference_security, "assess", lambda _: {"scope": "synthetic-test"})
+    monkeypatch.setattr(cluster, "kubectl", lambda *a: '{"metadata":{"uid":"fixture-cluster"}}')
+    first = platform.prepare(tmp_path)
+    directory = tmp_path / "plans" / first["approval_sha256"]
+    original = (directory / "plan.json").read_bytes()
+    content["controller"] = "new fixture manifest"
+    second = platform.prepare(tmp_path)
+    assert second["approval_sha256"] != first["approval_sha256"]
+    assert (directory / "plan.json").read_bytes() == original
+    assert (directory / "controller.yaml").read_text() == "original fixture manifest"
+    assert json.loads((tmp_path / "plan.json").read_text()) == second

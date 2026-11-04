@@ -4,6 +4,7 @@ import argparse
 import fcntl
 import hashlib
 import json
+import re
 import secrets
 import subprocess
 from pathlib import Path
@@ -11,6 +12,7 @@ from pathlib import Path
 import yaml
 from common import ROOT, private_dir, source_digest, state_home, tool, utc_now, write_private
 from inference_artifacts import CACHE, fetch, settings
+from platform_management.integrations.job_runner import frozen_file
 
 RELEASES = {
     "klip-gateway-crds": ("gateway-crds", "envoy-gateway-system"),
@@ -346,6 +348,23 @@ def raw_apis():
                 raise ValueError(
                     "Only locked APIs and their exact upgrade safety policy are permitted"
                 )
+            if document["kind"] in {
+                "ValidatingAdmissionPolicy",
+                "ValidatingAdmissionPolicyBinding",
+            }:
+                key = (
+                    "matchConstraints"
+                    if document["kind"] == "ValidatingAdmissionPolicy"
+                    else "matchResources"
+                )
+                match = document["spec"][key]
+                # Materialize native defaults so the original client-side owner
+                # can share the same atomic match block without forced ownership.
+                match.setdefault("matchPolicy", "Equivalent")
+                match.setdefault("namespaceSelector", {})
+                match.setdefault("objectSelector", {})
+                for rule in match["resourceRules"]:
+                    rule.setdefault("scope", "*")
             document["metadata"].setdefault("labels", {}).update(
                 {
                     "app.kubernetes.io/part-of": "klip",
@@ -570,6 +589,14 @@ def prepare(scans):
         "uid"
     ]
     root = folder()
+    legacy = root / "plan.json"
+    if legacy.exists():
+        previous = json.loads(legacy.read_text())
+        retained = root / "plans" / previous["approval_sha256"]
+        frozen_file(retained / "plan.json", legacy.read_bytes())
+        old_receipt = root / (previous["approval_sha256"] + ".result.json")
+        if old_receipt.exists():
+            frozen_file(retained / "result.json", old_receipt.read_bytes())
     for name, text in rendered.items():
         write_private(root / (name + ".yaml"), text)
     write_private(root / "boundary.yaml", boundary())
@@ -592,6 +619,14 @@ def prepare(scans):
     }
     approval = sha(json.dumps(plan, sort_keys=True).encode())
     plan["approval_sha256"] = approval
+    retained = root / "plans" / approval
+    for name, text in {
+        **{k + ".yaml": v for k, v in rendered.items()},
+        "boundary.yaml": boundary(),
+        "apis.yaml": raw_apis(),
+        "plan.json": json.dumps(plan, indent=2) + "\n",
+    }.items():
+        frozen_file(retained / name, text.encode())
     write_private(root / "plan.json", plan)
     return plan
 
@@ -600,7 +635,9 @@ def deploy(approval):
     from cluster import FOLDER, Host, checked, kubeconfigs, kubectl, load_hosts, tunnel
     from inference_security import assess
 
-    root = folder()
+    if not isinstance(approval, str) or not re.fullmatch(r"[a-f0-9]{64}", approval):
+        raise ValueError("Exact inference controller plan identity required")
+    root = folder() / "plans" / approval
     plan = json.loads((root / "plan.json").read_text())
     if (
         approval != plan["approval_sha256"]
@@ -619,7 +656,7 @@ def deploy(approval):
         or plan["rendered"] != {k: sha(v.encode()) for k, v in render().items()}
     ):
         raise ValueError("Inference controller inputs changed after review")
-    receipt_path = root / (approval + ".result.json")
+    receipt_path = root / "result.json"
     if receipt_path.exists():
         raise ValueError("Observe/reconcile the original controller installation before replanning")
     receipt = {"approval_sha256": approval, "status": "running", "started_at": utc_now()}
