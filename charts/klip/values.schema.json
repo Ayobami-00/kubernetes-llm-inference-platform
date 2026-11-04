@@ -148,6 +148,57 @@
       "required": [
         "enabled"
       ]
+    },
+    "lifecycle": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "enabled": {
+          "type": "boolean"
+        },
+        "clientTLSSecret": {
+          "type": "string",
+          "minLength": 1
+        },
+        "bootstrapSeedSecret": {
+          "type": "string"
+        },
+        "bootstrapSeedKey": {
+          "type": "string",
+          "minLength": 1
+        },
+        "policy": {
+          "type": "object"
+        }
+      },
+      "required": [
+        "enabled",
+        "clientTLSSecret",
+        "bootstrapSeedSecret",
+        "bootstrapSeedKey",
+        "policy"
+      ],
+      "allOf": [
+        {
+          "if": {
+            "properties": {
+              "enabled": {
+                "const": true
+              }
+            }
+          },
+          "then": {
+            "properties": {
+              "bootstrapSeedSecret": {
+                "minLength": 1
+              },
+              "policy": {
+                "minProperties": 1
+              }
+            }
+          }
+        }
+      ]
     }
   }
 }

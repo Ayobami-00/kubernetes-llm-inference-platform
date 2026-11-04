@@ -22,6 +22,12 @@ auth:
   existingSecret: ""
   adminPasswordKey: admin-password
   lambdaApiKeyKey: lambda-api-key
+lifecycle:
+  enabled: false
+  clientTLSSecret: klip-host-client-tls
+  bootstrapSeedSecret: ""
+  bootstrapSeedKey: seed
+  policy: {}
 database:
   existingSecret: ""
   urlKey: database-url

@@ -127,7 +127,8 @@ def instance(plan):
 
 
 @pytest.mark.parametrize(
-    "invalid", [None, "price", "region", "image-family", "image-region", "architecture"]
+    "invalid",
+    [None, "price", "region", "image-family", "image-region", "image-version", "architecture"],
 )
 def test_preflight_rechecks_offering_price_and_plain_regional_image(plan, invalid):
     def handler(request):
@@ -160,7 +161,7 @@ def test_preflight_rechecks_offering_price_and_plain_regional_image(plan, invali
                         "family": "lambda-stack" if invalid == "image-family" else "ubuntu-24-04",
                         "architecture": "x86_64",
                         "region": {"name": "other" if invalid == "image-region" else plan.region},
-                        "version": "synthetic",
+                        "version": "changed" if invalid == "image-version" else "synthetic",
                         "unknown_secret": "do-not-retain",
                     }
                 ]
@@ -171,9 +172,9 @@ def test_preflight_rechecks_offering_price_and_plain_regional_image(plan, invali
     try:
         if invalid:
             with pytest.raises((ProviderIdentityConflict, CapacityUnavailable)):
-                api.check_offering(plan, 129)
+                api.check_offering(plan, 129, image_version="synthetic")
         else:
-            evidence = api.check_offering(plan, 129)
+            evidence = api.check_offering(plan, 129, image_version="synthetic")
             assert evidence["price_cents_per_hour"] == 129
             assert "do-not-retain" not in json.dumps(evidence)
     finally:

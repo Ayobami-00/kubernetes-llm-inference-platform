@@ -362,6 +362,34 @@ drain/removal; it cannot force provider termination past a drain failure.
 The real creation API now accepts explicit `mode: real`, rejects simulation
 faults, and requires a compatible pinned group specification and configured real
 binding. OpenAPI and the generated TypeScript types follow that actual route.
-UI provisioning controls, deployment mounts and actual GPU inspection remain
-integration work. The default deployed policy remains disabled and no rental is
-established by these tests or code changes.
+The provisioning controls and mounts described below are encoded in the repository;
+actual GPU inspection and runtime enablement remain integration work. The default
+deployed policy remains disabled and no rental is established by these tests or
+code changes.
+
+The capacity page now offers an explicit live-provisioning form. Its options come
+from `GET /api/v1/worker-lifecycle-options`; only published specifications matching
+the single-A10 policy are selectable. The lease is the selected specification's
+recorded value. Editing/publishing another profile supports another approved lease
+without silently rewriting a versioned configuration. Fresh provider capacity,
+regional availability, a known price within the ceiling and no unresolved live
+reservation are required in the UI; server preflight remains authoritative.
+
+`charts/klip` has optional lifecycle configuration and credential mounts. They are
+disabled by default and restricted to the `klip` namespace. Only API/worker Pods
+receive the executor client identity and bootstrap seed. Web, migration and runner
+Pods receive neither; privileged host/server credentials remain in `platform-ops`.
+The chart hashes the public policy into the Pod template to roll changed settings.
+
+Bindings also retain the provider credential fingerprint. A changed credential
+cannot be used to interpret another account's empty inventory as successful
+termination. Keep the original credential available until its allocations are
+cleaned up; account/credential rebinding requires an explicit audited procedure.
+No raw credential values enter the binding or retained task inputs. Simulated
+serving deployments are rejected against live worker groups.
+
+Workflow commit `5b24308` passed management backend/PostgreSQL, web and Kubernetes
+integration CI (`41776947204`). That proves the mocked external-I/O state-machine
+integration, including confirmed cleanup and lost-checkpoint recovery; it does not
+establish a real GPU-host run. Actual GPU inspection, deployment enablement and the
+live single-A10 acceptance gate remain outstanding.

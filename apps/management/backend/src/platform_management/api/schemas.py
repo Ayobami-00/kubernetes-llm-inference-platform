@@ -61,6 +61,22 @@ class CreateGroup(ContractModel):
     mode: Literal["simulation", "real"] = "simulation"
 
 
+class WorkerLeaseOption(ContractModel):
+    spec_ref: RevisionRef
+    worker_class: Slug
+    lease_minutes: int
+
+
+class WorkerLifecycleOptions(ContractModel):
+    configured: bool = False
+    reason: str | None = None
+    instance_type: str | None = None
+    region: str | None = None
+    price_ceiling_cents_per_hour: int | None = None
+    max_total_lease_minutes: int | None = None
+    compatible_specs: tuple[WorkerLeaseOption, ...] = ()
+
+
 class GroupView(ContractModel):
     id: str
     mode: Literal["simulation", "real"] = "simulation"

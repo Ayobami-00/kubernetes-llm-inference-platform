@@ -76,7 +76,7 @@ def test_executor_metadata_must_match_pinned_cluster_and_public_key():
 
 
 def test_disabled_and_incomplete_configuration_fail_closed(tmp_path):
-    assert configuration(Settings()) == {}
+    assert configuration(Settings(real_lifecycle_enabled=False)) == {}
     with pytest.raises(AppError, match="incomplete or invalid"):
         configuration(Settings(real_lifecycle_enabled=True))
 
@@ -85,6 +85,8 @@ def test_configuration_freezes_pins_and_secret_references_only(tmp_path):
     path, seed, tls = tmp_path / "policy.json", tmp_path / "bootstrap", tmp_path / "tls"
     path.write_text(policy().model_dump_json())
     seed.write_bytes(b"s" * 32)
+    provider = tmp_path / "lambda-key"
+    provider.write_text("synthetic-provider-key-material")
     tls.mkdir()
     for name in ("ca.crt", "tls.crt", "tls.key"):
         (tls / name).write_text("synthetic-" + name + "-material")
@@ -93,11 +95,40 @@ def test_configuration_freezes_pins_and_secret_references_only(tmp_path):
         lambda_lifecycle_policy_file=path,
         bootstrap_seed_file=seed,
         host_executor_tls_home=tls,
+        lambda_api_key_file=provider,
         allowed_origin="https://management.example.test",
     )
     result = configuration(settings)
     assert result["provider"] == "lambda:v1" and result["host"] == "isolated-host:v1"
     serialized = json.dumps(result)
     assert "s" * 32 not in serialized and "synthetic-tls.key-material" not in serialized
+    assert "synthetic-provider-key-material" not in serialized
     assert result["lifecycle"]["bootstrap_seed_file"] == str(seed)
     assert set(result["lifecycle"]["tls_fingerprints"]) == {"ca.crt", "tls.crt"}
+
+
+def test_changed_provider_credential_cannot_be_used_to_confirm_another_accounts_absence(
+    tmp_path, monkeypatch
+):
+    from platform_management.jobs import real_worker
+
+    path = tmp_path / "lambda-key"
+    path.write_text("different-synthetic-account-key")
+    constructor = []
+    monkeypatch.setattr(
+        real_worker, "LambdaMutations", lambda *args, **kwargs: constructor.append(True)
+    )
+    io = real_worker.RuntimeIO(
+        {
+            "lifecycle": {
+                "lambda_api_key_file": str(path),
+                "lambda_api_key_sha256": hashlib.sha256(
+                    b"original-synthetic-account-key"
+                ).hexdigest(),
+            }
+        }
+    )
+    with pytest.raises(AppError, match="original account identity"):
+        with io.provider():
+            pytest.fail("No provider request may be made after the identity changed")
+    assert not constructor

@@ -43,6 +43,12 @@ class RuntimeIO:
     @contextmanager
     def provider(self):
         key = Path(self.config["lambda_api_key_file"]).read_text().strip()
+        if hashlib.sha256(key.encode()).hexdigest() != self.config["lambda_api_key_sha256"]:
+            raise AppError(
+                409,
+                "Bound Lambda credential changed; reconcile the original account identity",
+                "provider_identity_conflict",
+            )
         api = LambdaMutations(key, gate=request_gate)
         try:
             yield api
@@ -517,7 +523,7 @@ class RealWorkerWorkflow:
                 and datetime.fromisoformat(value["expires_at"]) <= now()
             ):
                 self.checkpoint["request"]["expiry"] = True
-                self.failed("lease_expired", "Lease expired before worker readiness")
+                self.failed("lease_expired", "Worker lease expired; cleanup is required")
                 stage = "cleanup"
         if stage == "allocate":
             label, done = self.allocate(), False

@@ -358,6 +358,12 @@ def test_real_api_queue_runs_actual_branch_and_reuses_terminal_submission(client
     body = {"id": "real-api-worker", "spec_ref": "latency-workers@2", "mode": "real"}
     created = post(client, "/worker-groups", body, key)
     assert created.status_code == 202, created.text
+    options = client.get("/api/v1/worker-lifecycle-options").json()
+    assert options["configured"] is True
+    assert options["compatible_specs"] == [
+        {"spec_ref": "latency-workers@2", "worker_class": "latency", "lease_minutes": 90}
+    ]
+    assert "tls_fingerprints" not in str(options) and "bootstrap_seed_file" not in str(options)
     settle(60)
     with session() as db:
         resource = db.get(Resource, body["id"])
@@ -365,12 +371,44 @@ def test_real_api_queue_runs_actual_branch_and_reuses_terminal_submission(client
         assert not resource.payload["group"]["fixture"]
         assert db.get(Job, created.json()["operation_id"]).state == "completed"
     assert post(client, "/worker-groups", body, key).json() == created.json()
+    excessive_renewal = post(
+        client, "/worker-groups/real-api-worker/renew", {"additional_minutes": 91}
+    )
+    assert excessive_renewal.status_code == 422
+    with session() as db:
+        assert db.get(Resource, body["id"]).payload["group"]["status"]["phase"] == "ready"
+    simulated = post(
+        client,
+        "/serving-deployments",
+        {
+            "id": "wrong-mode-serving",
+            "profile_ref": "gec-baseline@1",
+            "group_id": body["id"],
+        },
+    )
+    assert simulated.status_code == 422 and "modes must match" in simulated.text
     deleted = post(client, "/worker-groups/real-api-worker/delete")
     assert deleted.status_code == 202
     settle(60)
     with session() as db:
         assert db.get(Resource, body["id"]).payload["group"]["status"]["phase"] == "deleted"
     assert io.launches == 1 and io.terminations == 1
+
+
+def test_disabled_live_options_do_not_expose_secrets_or_accept_a_real_allocation(client):
+    response = client.get("/api/v1/worker-lifecycle-options")
+    assert response.status_code == 200
+    options = response.json()
+    assert options["configured"] is False and options["compatible_specs"] == []
+    assert "lambda_api_key" not in response.text and "tls" not in response.text
+    denied = post(
+        client,
+        "/worker-groups",
+        {"id": "disabled-real", "spec_ref": "latency-workers@1", "mode": "real"},
+    )
+    assert denied.status_code == 422
+    with session() as db:
+        assert db.get(Resource, "disabled-real") is None
 
 
 def test_unknown_launch_deadline_never_recreates_the_vm_or_claims_cleanup():

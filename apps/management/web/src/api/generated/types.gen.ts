@@ -2467,6 +2467,58 @@ export type WorkerGroupStatus = {
 };
 
 /**
+ * WorkerLeaseOption
+ */
+export type WorkerLeaseOption = {
+    /**
+     * Lease Minutes
+     */
+    lease_minutes: number;
+    /**
+     * Spec Ref
+     */
+    spec_ref: string;
+    /**
+     * Worker Class
+     */
+    worker_class: string;
+};
+
+/**
+ * WorkerLifecycleOptions
+ */
+export type WorkerLifecycleOptions = {
+    /**
+     * Compatible Specs
+     */
+    compatible_specs?: Array<WorkerLeaseOption>;
+    /**
+     * Configured
+     */
+    configured?: boolean;
+    /**
+     * Instance Type
+     */
+    instance_type?: string | null;
+    /**
+     * Max Total Lease Minutes
+     */
+    max_total_lease_minutes?: number | null;
+    /**
+     * Price Ceiling Cents Per Hour
+     */
+    price_ceiling_cents_per_hour?: number | null;
+    /**
+     * Reason
+     */
+    reason?: string | null;
+    /**
+     * Region
+     */
+    region?: string | null;
+};
+
+/**
  * WorkerMember
  */
 export type WorkerMember = {
@@ -6229,3 +6281,56 @@ export type SetSimulationFaultResponses = {
 };
 
 export type SetSimulationFaultResponse = SetSimulationFaultResponses[keyof SetSimulationFaultResponses];
+
+export type GetWorkerLifecycleOptionsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/worker-lifecycle-options';
+};
+
+export type GetWorkerLifecycleOptionsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type GetWorkerLifecycleOptionsError = GetWorkerLifecycleOptionsErrors[keyof GetWorkerLifecycleOptionsErrors];
+
+export type GetWorkerLifecycleOptionsResponses = {
+    /**
+     * Successful Response
+     */
+    200: WorkerLifecycleOptions;
+};
+
+export type GetWorkerLifecycleOptionsResponse = GetWorkerLifecycleOptionsResponses[keyof GetWorkerLifecycleOptionsResponses];

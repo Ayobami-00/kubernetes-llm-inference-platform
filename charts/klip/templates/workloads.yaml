@@ -16,6 +16,10 @@ spec:
   template:
     metadata:
       labels: {app.kubernetes.io/name: {{ $.Release.Name }}, app.kubernetes.io/component: {{ $role }}}
+      {{- if $.Values.lifecycle.enabled }}
+      annotations:
+        klip.dev/lifecycle-policy-sha256: {{ $.Values.lifecycle.policy | toJson | sha256sum | quote }}
+      {{- end }}
     spec:
       serviceAccountName: {{ $.Release.Name }}-{{ $role }}
       terminationGracePeriodSeconds: {{ $.Values.terminationGracePeriodSeconds }}

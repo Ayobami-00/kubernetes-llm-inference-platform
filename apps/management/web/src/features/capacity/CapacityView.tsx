@@ -1,4 +1,5 @@
 import { useEffect, useState } from 'react';
+import type { ReactNode } from 'react';
 import {
   CircleCheck,
   CircleHelp,
@@ -179,11 +180,13 @@ export default function CapacityView({
   busy,
   refresh,
   requestError,
+  provisioning,
 }: {
   data?: Capacity;
   busy: boolean;
   refresh: () => void;
   requestError?: string;
+  provisioning?: (current: boolean) => ReactNode;
 }) {
   const observedAt = Date.parse(data?.observed_at || '');
   const [, checkFreshness] = useState(0);
@@ -227,6 +230,7 @@ export default function CapacityView({
           Refresh
         </button>
       </div>
+      {provisioning?.(current)}
       {error && (
         <div className="notice error" role="alert">
           {error}

@@ -24,6 +24,13 @@ eks.amazonaws.com/ecr-role-arn: {{ .Values.imagePullRoleArn | quote }}
   value: /run/secrets/management/admin-password
 - name: MANAGEMENT_LAMBDA_API_KEY_FILE
   value: /run/secrets/management/lambda-api-key
+- name: MANAGEMENT_REAL_LIFECYCLE_ENABLED
+  value: {{ .Values.lifecycle.enabled | quote }}
+{{- if .Values.lifecycle.enabled }}
+- {name: MANAGEMENT_LAMBDA_LIFECYCLE_POLICY_FILE, value: /etc/klip-lifecycle/policy.json}
+- {name: MANAGEMENT_HOST_EXECUTOR_TLS_HOME, value: /run/secrets/host-executor-client}
+- {name: MANAGEMENT_BOOTSTRAP_SEED_FILE, value: /run/secrets/bootstrap/seed}
+{{- end }}
 - name: MANAGEMENT_ARTIFACTS_ROOT
   value: /artifacts
 - name: MANAGEMENT_ALLOWED_ORIGIN
@@ -59,6 +66,11 @@ eks.amazonaws.com/ecr-role-arn: {{ .Values.imagePullRoleArn | quote }}
 - {name: management-secrets, mountPath: /run/secrets/management, readOnly: true}
 - {name: artifacts, mountPath: /artifacts}
 - {name: tmp, mountPath: /tmp}
+{{- if .Values.lifecycle.enabled }}
+- {name: lifecycle-policy, mountPath: /etc/klip-lifecycle, readOnly: true}
+- {name: host-executor-client, mountPath: /run/secrets/host-executor-client, readOnly: true}
+- {name: bootstrap-seed, mountPath: /run/secrets/bootstrap, readOnly: true}
+{{- end }}
 {{- if .Values.database.caSecret }}
 - {name: database-ca, mountPath: /run/secrets/database, readOnly: true}
 {{- end }}
@@ -75,6 +87,20 @@ eks.amazonaws.com/ecr-role-arn: {{ .Values.imagePullRoleArn | quote }}
     claimName: {{ include "klip.artifacts" . }}
 - name: tmp
   emptyDir: {}
+{{- if .Values.lifecycle.enabled }}
+- name: lifecycle-policy
+  configMap: {name: {{ .Release.Name }}-lifecycle-policy}
+- name: host-executor-client
+  secret:
+    secretName: {{ required "lifecycle.clientTLSSecret is required" .Values.lifecycle.clientTLSSecret }}
+    defaultMode: 0440
+    items: [{key: ca.crt, path: ca.crt}, {key: tls.crt, path: tls.crt}, {key: tls.key, path: tls.key}]
+- name: bootstrap-seed
+  secret:
+    secretName: {{ required "lifecycle.bootstrapSeedSecret is required" .Values.lifecycle.bootstrapSeedSecret }}
+    defaultMode: 0440
+    items: [{key: {{ .Values.lifecycle.bootstrapSeedKey }}, path: seed}]
+{{- end }}
 {{- if .Values.database.caSecret }}
 - name: database-ca
   secret:

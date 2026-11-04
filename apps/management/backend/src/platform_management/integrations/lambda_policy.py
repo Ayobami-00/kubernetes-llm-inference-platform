@@ -52,6 +52,7 @@ class LambdaLifecyclePolicy(ContractModel):
             or spec.hardware.vendor != "nvidia"
             or spec.hardware.gpu_model != "A10"
             or spec.hardware.gpu_count != 1
+            or spec.worker_class != "latency"
             or spec.host_profile != "lambda-gpu-worker-v1"
             or spec.ttl_minutes > self.max_initial_lease_minutes
             or spec.ttl_minutes * 60 <= self.cleanup_margin_s
@@ -104,6 +105,9 @@ def configuration(settings):
         seed = seed_path.read_bytes()
         if len(seed) != 32 or not (tls_home / "tls.key").is_file():
             raise ValueError("Runtime credential material is absent")
+        provider_key = settings.lambda_api_key_file.read_text().strip()
+        if not provider_key or any(c in provider_key for c in "\r\n"):
+            raise ValueError("Provider credential material is absent")
         origin = callback_origin(settings.allowed_origin)
         return {
             "provider": "lambda:v1",
@@ -113,6 +117,7 @@ def configuration(settings):
                 "policy": policy.model_dump(mode="json"),
                 "origin": origin,
                 "lambda_api_key_file": str(settings.lambda_api_key_file.resolve()),
+                "lambda_api_key_sha256": hashlib.sha256(provider_key.encode()).hexdigest(),
                 "bootstrap_seed_file": str(seed_path),
                 "bootstrap_seed_sha256": hashlib.sha256(seed).hexdigest(),
                 "host_executor_tls_home": str(tls_home),

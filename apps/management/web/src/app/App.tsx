@@ -3,6 +3,7 @@ import { ThemeControl } from './theme';
 import ImportsPage from '../features/integrations/ImportsPage';
 import ReadinessPage from '../features/integrations/ReadinessPage';
 import CapacityView from '../features/capacity/CapacityView';
+import WorkerProvisioner from '../features/capacity/WorkerProvisioner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
 import { useQuery, useQueryClient } from '@tanstack/react-query';
 import {
@@ -706,6 +707,15 @@ function Workspace() {
                 requestError={capacity.error ? message(capacity.error) : undefined}
                 busy={busy}
                 refresh={() => act(() => unwrap(e.refreshCapacity()), 'Capacity refresh requested')}
+                provisioning={(current) => (
+                  <WorkerProvisioner
+                    capacity={capacity.data}
+                    current={current}
+                    groups={groups.data || []}
+                    busy={busy || groups.isPending || Boolean(groups.error)}
+                    act={act}
+                  />
+                )}
               />
             ) : pathname === '/imports' ? (
               <ImportsPage act={act} busy={busy} />

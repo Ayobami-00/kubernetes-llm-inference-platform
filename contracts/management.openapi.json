@@ -4456,6 +4456,107 @@
         "title": "WorkerGroupStatus",
         "type": "object"
       },
+      "WorkerLeaseOption": {
+        "additionalProperties": false,
+        "properties": {
+          "lease_minutes": {
+            "title": "Lease Minutes",
+            "type": "integer"
+          },
+          "spec_ref": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*@[1-9][0-9]*$",
+            "title": "Spec Ref",
+            "type": "string"
+          },
+          "worker_class": {
+            "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",
+            "title": "Worker Class",
+            "type": "string"
+          }
+        },
+        "required": [
+          "spec_ref",
+          "worker_class",
+          "lease_minutes"
+        ],
+        "title": "WorkerLeaseOption",
+        "type": "object"
+      },
+      "WorkerLifecycleOptions": {
+        "additionalProperties": false,
+        "properties": {
+          "compatible_specs": {
+            "default": [],
+            "items": {
+              "$ref": "#/components/schemas/WorkerLeaseOption"
+            },
+            "title": "Compatible Specs",
+            "type": "array"
+          },
+          "configured": {
+            "default": false,
+            "title": "Configured",
+            "type": "boolean"
+          },
+          "instance_type": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Instance Type"
+          },
+          "max_total_lease_minutes": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Max Total Lease Minutes"
+          },
+          "price_ceiling_cents_per_hour": {
+            "anyOf": [
+              {
+                "type": "integer"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Price Ceiling Cents Per Hour"
+          },
+          "reason": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Reason"
+          },
+          "region": {
+            "anyOf": [
+              {
+                "type": "string"
+              },
+              {
+                "type": "null"
+              }
+            ],
+            "title": "Region"
+          }
+        },
+        "title": "WorkerLifecycleOptions",
+        "type": "object"
+      },
       "WorkerMember": {
         "additionalProperties": false,
         "properties": {
@@ -12275,6 +12376,112 @@
           }
         ],
         "summary": "Fault",
+        "tags": [
+          "Workflows"
+        ]
+      }
+    },
+    "/api/v1/worker-lifecycle-options": {
+      "get": {
+        "operationId": "getWorkerLifecycleOptions",
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/WorkerLifecycleOptions"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "APIKeyCookie": []
+          }
+        ],
+        "summary": "Worker Lifecycle Options",
         "tags": [
           "Workflows"
         ]
