@@ -11,7 +11,7 @@ COPY pyproject.toml uv.lock .python-version ./
 COPY scripts/management/stage_workspace.py /tmp/stage_workspace.py
 RUN --mount=type=bind,source=.,target=/workspace-context,readonly \
     python /tmp/stage_workspace.py /workspace-context /app \
-    && uv sync --locked --package platform-management --group infrastructure --no-dev
+    && uv sync --locked --package kubernetes-llm-inference-platform --package platform-management --group infrastructure --no-dev
 COPY scripts/infrastructure scripts/infrastructure
 COPY infra/ansible infra/ansible
 COPY infra/terraform/project.json infra/terraform/platform.json infra/terraform/
