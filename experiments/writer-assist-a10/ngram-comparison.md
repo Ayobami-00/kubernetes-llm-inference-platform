@@ -169,5 +169,6 @@ Download the per-execution Markdown report, comparison JSON, definition, overlap
 analysis and private disagreement bundle. Follow child links for snapshots,
 preparation, admissions, normalized records, raw AIPerf exports and quality reports.
 Artifacts are checksummed and verified before terminal completion; original
-results and historical assessments are never rewritten. Grafana links use each
-child's recorded time interval and the existing A10 diagnostics dashboard.
+results and historical assessments are never rewritten. Grafana links use the
+parent's recorded interval and the existing A10 diagnostics dashboard; exact child
+timeline origins and scored boundaries remain in the stage and child reports.
