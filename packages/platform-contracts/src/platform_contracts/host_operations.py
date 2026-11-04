@@ -171,3 +171,52 @@ class HostTaskObservation(ContractModel):
             if not valid:
                 raise ValueError("Malformed public WireGuard key")
         return self
+
+
+def validate_host_followup(
+    task: HostTask, previous: HostTask, observed: HostTaskObservation
+) -> bool:
+    """Validate a trusted chain; return whether this is a fresh failed-task recovery."""
+    recovery = observed.status == "failed" and (
+        (
+            task.action == "cleanup-check"
+            and previous.action in {"prepare", "join", "inspect", "cleanup-check"}
+        )
+        or (task.action == previous.action and task.action in {"remove", "revoke-bootstrap"})
+    )
+    if (
+        task.previous_task_id != previous.id
+        or observed.task_id != previous.id
+        or (observed.status != "completed" and not recovery)
+        or any(
+            getattr(task, field) != getattr(previous, field)
+            for field in (
+                "provider_instance_id",
+                "node_name",
+                "public_ip",
+                "private_ip",
+                "wireguard_ip",
+                "trusted_host_key",
+            )
+        )
+    ):
+        raise ValueError("Host follow-up differs from its completed trusted task chain")
+    known_uid = observed.node_uid or previous.node_uid
+    if known_uid and task.node_uid != known_uid:
+        raise ValueError("Host follow-up changed the observed Kubernetes UID")
+    permitted = {
+        "prepare": {"join", "cleanup-check"},
+        "join": {"inspect", "cleanup-check"},
+        "inspect": {"inspect", "remove", "cleanup-check"},
+        "remove": {"remove"},
+        "cleanup-check": {"cleanup-check", "revoke-bootstrap"},
+        "revoke-bootstrap": {"revoke-bootstrap"},
+    }
+    if task.action not in permitted[previous.action]:
+        raise ValueError("Invalid host lifecycle transition")
+    if task.action == "revoke-bootstrap" and not (
+        (previous.action == "cleanup-check" and observed.bootstrap_fence_permitted)
+        or (recovery and previous.provider_fence == task.provider_fence)
+    ):
+        raise ValueError("Fenced cleanup requires the completed bootstrap safety check")
+    return recovery

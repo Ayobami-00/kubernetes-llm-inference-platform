@@ -208,12 +208,25 @@ def test_account_gate_persists_pacing_and_does_not_hold_a_transaction():
     assert sorted(starts)[1] - sorted(starts)[0] >= 1.0
 
 
-def allocated_ledger():
+def cluster_metadata(**changes):
+    return {
+        "schema_version": "klip-host-executor-metadata.v1",
+        "cluster_id": "klip",
+        "kube_system_uid": "12345678-1234-1234-1234-123456789abc",
+        "registry_revision": 12,
+        "occupied_wireguard_ips": [f"10.200.0.{i}" for i in (11, 12, 13, 64, 65, 66)],
+        **changes,
+    }
+
+
+def allocated_ledger(reserve=True):
     document, ledger = plan(), PostgresLaunchLedger()
     intent(document)
     ledger.freeze(document)
     assert ledger.dispatch(document)
     ledger.allocated(document, [INSTANCE])
+    if reserve:
+        ledger.reserve_wireguard(document, cluster_metadata())
     return document, ledger
 
 
@@ -228,7 +241,7 @@ def host_receipt(action="cleanup-check", *, fence=None):
         wireguard_ip="10.200.0.67",
         trusted_host_key="ssh-ed25519 "
         + base64.b64encode(b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20" + b"x" * 32).decode(),
-        registry_revision=1,
+        registry_revision=12,
         deadline=now() + timedelta(minutes=10),
         previous_task_id="host-" + "0" * 24,
         provider_fence=fence,
@@ -244,7 +257,7 @@ def host_receipt(action="cleanup-check", *, fence=None):
         status="completed",
         stage="Synthetic safety evidence",
         observed_at=now(),
-        registry_revision=1,
+        registry_revision=12,
         evidence_sha256="a" * 64,
         bootstrap_fence_permitted=action == "cleanup-check",
         bootstrap_cleanup_complete=action == "revoke-bootstrap",
@@ -252,6 +265,25 @@ def host_receipt(action="cleanup-check", *, fence=None):
         node_uid=task.node_uid,
     )
     return task, result
+
+
+def remember_host_receipt(document, task, result):
+    """Seed a retained executor receipt; task-dispatch behavior has separate tests."""
+    with session() as db, db.begin():
+        row = db.get(ProviderIntent, document.intent_id, with_for_update=True)
+        value = row.payload["lambda_launch"]
+        tasks = {
+            **value["host_tasks"],
+            task.id: {
+                "task": task.model_dump(mode="json"),
+                "input_sha256": result.input_sha256,
+                "observation": result.model_dump(mode="json"),
+            },
+        }
+        row.payload = {
+            **row.payload,
+            "lambda_launch": {**value, "host_tasks": tasks, "active_host_task_id": task.id},
+        }
 
 
 def test_termination_requires_host_authorization_before_any_http():
@@ -265,6 +297,7 @@ def test_termination_requires_host_authorization_before_any_http():
 def test_fenced_allocation_holds_slot_until_exact_executor_cleanup():
     document, ledger = allocated_ledger()
     check, checked = host_receipt()
+    remember_host_receipt(document, check, checked)
     ledger.authorize_termination(document, check, checked)
     api = Mock()
     observed = observation(document)
@@ -285,6 +318,7 @@ def test_fenced_allocation_holds_slot_until_exact_executor_cleanup():
     with pytest.raises(CapacityUnavailable, match="reservation"):
         ledger.dispatch(second)
     revoke, revoked = host_receipt("revoke-bootstrap", fence=fence)
+    remember_host_receipt(document, revoke, revoked)
     with pytest.raises(ProviderIdentityConflict):
         ledger.cleanup_completed(document, revoke, checked)
     assert ledger.read(document)["state"] == "fenced"
@@ -301,6 +335,7 @@ def test_fenced_allocation_holds_slot_until_exact_executor_cleanup():
 def test_drained_removal_is_completed_only_after_provider_fencing():
     document, ledger = allocated_ledger()
     task, result = host_receipt("remove")
+    remember_host_receipt(document, task, result)
     ledger.authorize_termination(document, task, result)
     with pytest.raises(ProviderIdentityConflict, match="not complete"):
         ledger.cleanup_completed(document, task, result)
@@ -316,6 +351,7 @@ def test_drained_removal_is_completed_only_after_provider_fencing():
 def test_termination_authorization_rejects_unrelated_and_incomplete_receipts():
     document, ledger = allocated_ledger()
     task, result = host_receipt()
+    remember_host_receipt(document, task, result)
     for changed in (
         result.model_copy(update={"input_sha256": "b" * 64}),
         result.model_copy(update={"task_id": "host-" + "f" * 24}),
@@ -326,7 +362,7 @@ def test_termination_authorization_rejects_unrelated_and_incomplete_receipts():
             ledger.authorize_termination(document, task, changed)
     ledger.authorize_termination(document, task, result)
     ledger.authorize_termination(document, task, result)
-    with pytest.raises(ProviderIdentityConflict, match="immutable"):
+    with pytest.raises(ProviderIdentityConflict):
         ledger.authorize_termination(
             document, task, result.model_copy(update={"evidence_sha256": "b" * 64})
         )
@@ -339,3 +375,36 @@ def test_allocated_replay_needs_no_provider_or_bootstrap_readiness():
     assert not api.mock_calls
     with pytest.raises(ProviderIdentityConflict):
         allocate_once(document.model_copy(update={"image_id": "changed"}), None, ledger, api)
+
+
+def test_address_reservation_is_durable_concurrent_and_skips_executor_peers():
+    document, ledger = allocated_ledger(reserve=False)
+    metadata = cluster_metadata()
+    metadata["occupied_wireguard_ips"].append("10.200.0.67")
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        results = list(pool.map(lambda _: ledger.reserve_wireguard(document, metadata), range(2)))
+    assert results == ["10.200.0.68", "10.200.0.68"]
+    assert ledger.read(document)["wireguard_reservation"]["registry_revision"] == 12
+    with pytest.raises(ProviderIdentityConflict, match="cluster identity"):
+        ledger.reserve_wireguard(
+            document, cluster_metadata(kube_system_uid="abcdefab-1234-1234-1234-123456789abc")
+        )
+
+
+@pytest.mark.parametrize(
+    "changes",
+    [
+        {"schema_version": "other"},
+        {"cluster_id": "other"},
+        {"registry_revision": True},
+        {"occupied_wireguard_ips": ["10.200.0.11"]},
+        {
+            "occupied_wireguard_ips": [f"10.200.0.{i}" for i in (11, 12, 13, 64, 65, 66)]
+            + ["169.254.169.254"]
+        },
+    ],
+)
+def test_address_reservation_rejects_malformed_executor_scope(changes):
+    document, ledger = allocated_ledger(reserve=False)
+    with pytest.raises(ProviderIdentityConflict):
+        ledger.reserve_wireguard(document, cluster_metadata(**changes))

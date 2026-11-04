@@ -5,6 +5,7 @@ import re
 import time
 from contextlib import contextmanager
 from datetime import timedelta
+from ipaddress import IPv4Address, IPv4Network
 
 from platform_contracts import HostTask, HostTaskObservation, ProviderFence
 from sqlalchemy import select, text
@@ -91,12 +92,80 @@ class PostgresLaunchLedger:
                     "plan_sha256": digest(plan.model_dump(mode="json")),
                     "state": "pending",
                     "instance_ids": [],
+                    "host_tasks": {},
+                    "active_host_task_id": None,
                 },
             }
 
     def read(self, plan):
         with session() as db:
             return copy.deepcopy(self.checked(db.get(ProviderIntent, plan.intent_id), plan))
+
+    def reserve_wireguard(self, plan, metadata):
+        """Reserve from fresh authenticated executor metadata, retaining failed leases."""
+        if (
+            metadata.get("schema_version") != "klip-host-executor-metadata.v1"
+            or metadata.get("cluster_id") != plan.cluster_id
+            or not re.fullmatch(
+                r"[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}", metadata.get("kube_system_uid", "")
+            )
+            or type(metadata.get("registry_revision")) is not int
+            or metadata["registry_revision"] < 1
+            or not isinstance(metadata.get("occupied_wireguard_ips"), list)
+        ):
+            raise ProviderIdentityConflict("Executor cluster metadata is malformed")
+        occupied = {str(IPv4Address(address)) for address in metadata["occupied_wireguard_ips"]}
+        if not {
+            "10.200.0.11",
+            "10.200.0.12",
+            "10.200.0.13",
+            "10.200.0.64",
+            "10.200.0.65",
+            "10.200.0.66",
+        } <= occupied or any(
+            IPv4Address(address) not in IPv4Network("10.200.0.0/24") for address in occupied
+        ):
+            raise ProviderIdentityConflict("Executor fixed CPU address assignments differ")
+        with session() as db, db.begin():
+            db.execute(
+                text("SELECT pg_advisory_xact_lock(:key)"),
+                {"key": lock_key("lambda-wireguard-reservations:klip")},
+            )
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            previous = value.get("wireguard_reservation")
+            if previous:
+                if previous["kube_system_uid"] != metadata["kube_system_uid"]:
+                    raise ProviderIdentityConflict(
+                        "Reserved address belongs to another cluster identity"
+                    )
+                return previous["address"]
+            if value["state"] != "allocated" or value.get("termination_authorization"):
+                raise ProviderIdentityConflict("Address reservation requires an active allocation")
+            for other in db.scalars(select(ProviderIntent)):
+                allocation = other.payload.get("lambda_launch", {})
+                if allocation.get("state") != "terminated" and allocation.get(
+                    "wireguard_reservation"
+                ):
+                    occupied.add(allocation["wireguard_reservation"]["address"])
+            address = next(
+                (f"10.200.0.{i}" for i in range(67, 255) if f"10.200.0.{i}" not in occupied), None
+            )
+            if address is None:
+                raise CapacityUnavailable("No unreserved GPU WireGuard addresses remain")
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "wireguard_reservation": {
+                        "address": address,
+                        "kube_system_uid": metadata["kube_system_uid"],
+                        "registry_revision": metadata["registry_revision"],
+                        "reserved_at": now().isoformat(),
+                    },
+                },
+            }
+            return address
 
     def dispatch(self, plan):
         with session() as db, db.begin():
@@ -206,19 +275,21 @@ class PostgresLaunchLedger:
             or (task.node_uid and observation.node_uid != task.node_uid)
         ):
             raise ProviderIdentityConflict("Host safety receipt differs from the owned task")
+        saved = value.get("host_tasks", {}).get(task.id)
+        if (
+            saved is None
+            or saved.get("task") != task.model_dump(mode="json")
+            or saved.get("observation") != observation.model_dump(mode="json")
+            or value.get("active_host_task_id") != task.id
+        ):
+            raise ProviderIdentityConflict(
+                "Host safety receipt is not the durable active execution"
+            )
 
     def authorize_termination(self, plan, task: HostTask, observation: HostTaskObservation):
         with session() as db, db.begin():
             row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
             value = self.checked(row, plan)
-            self.check_host_receipt(value, task, observation)
-            if not (
-                (task.action == "cleanup-check" and observation.bootstrap_fence_permitted)
-                or (task.action == "remove" and task.node_uid is not None)
-            ):
-                raise ProviderIdentityConflict(
-                    "Termination needs bootstrap safety or drained removal"
-                )
             authorization = {
                 "task_id": task.id,
                 "input_sha256": observation.input_sha256,
@@ -229,6 +300,14 @@ class PostgresLaunchLedger:
                 if value["termination_authorization"] != authorization:
                     raise ProviderIdentityConflict("Termination authorization is immutable")
                 return
+            self.check_host_receipt(value, task, observation)
+            if not (
+                (task.action == "cleanup-check" and observation.bootstrap_fence_permitted)
+                or (task.action == "remove" and task.node_uid is not None)
+            ):
+                raise ProviderIdentityConflict(
+                    "Termination needs bootstrap safety or drained removal"
+                )
             if value["state"] != "allocated":
                 raise ProviderIdentityConflict(
                     "Cannot replace authorization after termination starts"
@@ -236,6 +315,54 @@ class PostgresLaunchLedger:
             row.payload = {
                 **row.payload,
                 "lambda_launch": {**value, "termination_authorization": authorization},
+            }
+
+    def authorize_unbootstrapped(self, plan):
+        """No dispatched host task means this VM never received cluster join material.
+
+        Absence of the field on historical documents is not proof. Every real
+        host task must be frozen in this ledger before its first external call.
+        """
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            authorization = {"route": "unbootstrapped"}
+            if value.get("termination_authorization") == authorization:
+                return
+            if (
+                value["state"] != "allocated"
+                or value.get("host_tasks") != {}
+                or value.get("active_host_task_id") is not None
+                or value.get("termination_authorization")
+            ):
+                raise ProviderIdentityConflict("Cannot prove absence of host bootstrap dispatch")
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {**value, "termination_authorization": authorization},
+            }
+
+    def unbootstrapped_cleanup_completed(self, plan):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            if (
+                value["state"] not in {"fenced", "terminated"}
+                or value.get("termination_authorization") != {"route": "unbootstrapped"}
+                or value.get("host_tasks") != {}
+                or value.get("active_host_task_id") is not None
+            ):
+                raise ProviderIdentityConflict("Unbootstrapped cleanup lacks provider fencing")
+            if value["state"] == "terminated":
+                return
+            row.state = "terminated"
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "state": "terminated",
+                    "cleanup_completed_at": now().isoformat(),
+                    "cleanup_kind": "no-host-dispatch",
+                },
             }
 
     def termination_acknowledged(self, plan, observed):

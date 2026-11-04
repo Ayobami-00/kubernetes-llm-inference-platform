@@ -292,3 +292,25 @@ These changes retain schema version 0.1 and old task input digests. The cleanup
 actions and provider ledger have offline ownership/transport tests and dedicated
 PostgreSQL tests. They have not yet been deployed into the executor or exercised
 against a real GPU allocation; real management lifecycle remains disabled.
+
+Management now has a PostgreSQL host-task journal in the existing provider intent.
+`DurableHostTasks` commits inputs and the active chain before calling the mTLS
+executor. It records the native Job identity and observations; another management
+process resumes that same task. Terminal observations are retained history and do
+not construct a new client or reload TLS credentials. Conflicting inputs, changed
+UIDs, unowned instances and invalid lifecycle transitions are rejected. The
+executor and management use the same shared follow-up validator.
+
+WireGuard reservations are serialized in PostgreSQL and bound to the executor's
+cluster UID and peer revision. They skip both current executor peers and unresolved
+database reservations. Failed/fenced allocations retain their addresses until
+cleanup completes. A task cannot use a different or older reservation. This
+reserves addresses; only the isolated executor writes the authoritative peer mesh.
+
+If host attestation fails before any host task was recorded, a separate
+`unbootstrapped` authorization permits provider termination without fabricating
+an SSH identity or node observation. That proof requires an explicitly empty task
+journal; missing historical fields do not count. Authorization and first dispatch
+lock the same intent, so they cannot both succeed. Provider fencing remains
+mandatory before releasing that reservation. Once a task is frozen, the regular
+safety-check/revocation path is required even if its HTTP response was lost.

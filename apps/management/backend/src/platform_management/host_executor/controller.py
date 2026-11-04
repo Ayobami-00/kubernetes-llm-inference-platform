@@ -11,6 +11,7 @@ from pathlib import Path
 from common import private_dir, utc_now, write_private
 from image_release import guard_workloads
 from platform_contracts import HostTask, HostTaskObservation
+from platform_contracts.host_operations import validate_host_followup
 
 from platform_management.integrations.job_runner import frozen_file
 from platform_management.services.common import AppError
@@ -227,54 +228,10 @@ class HostController:
             if task.previous_task_id:
                 previous_task = self.task(task.previous_task_id)
                 previous_result = self.observe(task.previous_task_id)
-                recovery = previous_result.status == "failed" and (
-                    (
-                        task.action == "cleanup-check"
-                        and previous_task.action in {"prepare", "join", "inspect", "cleanup-check"}
-                    )
-                    or (task.action == "remove" and previous_task.action == "remove")
-                    or (
-                        task.action == "revoke-bootstrap"
-                        and previous_task.action == "revoke-bootstrap"
-                    )
-                )
-                if (previous_result.status != "completed" and not recovery) or any(
-                    getattr(task, field) != getattr(previous_task, field)
-                    for field in (
-                        "provider_instance_id",
-                        "node_name",
-                        "public_ip",
-                        "private_ip",
-                        "wireguard_ip",
-                        "trusted_host_key",
-                    )
-                ):
-                    raise AppError(
-                        409, "Host follow-up differs from its completed trusted task chain"
-                    )
-                known_uid = previous_result.node_uid or previous_task.node_uid
-                if known_uid and task.node_uid != known_uid:
-                    raise AppError(409, "Host follow-up changed the observed Kubernetes UID")
-                permitted = {
-                    "prepare": {"join", "cleanup-check"},
-                    "join": {"inspect", "cleanup-check"},
-                    "inspect": {"inspect", "remove", "cleanup-check"},
-                    "remove": {"remove"},
-                    "cleanup-check": {"cleanup-check", "revoke-bootstrap"},
-                    "revoke-bootstrap": {"revoke-bootstrap"},
-                }
-                if task.action not in permitted[previous_task.action]:
-                    raise AppError(409, "Invalid host lifecycle transition")
-                if task.action == "revoke-bootstrap" and not (
-                    (
-                        previous_task.action == "cleanup-check"
-                        and previous_result.bootstrap_fence_permitted
-                    )
-                    or (recovery and previous_task.provider_fence == task.provider_fence)
-                ):
-                    raise AppError(
-                        409, "Fenced cleanup requires the completed bootstrap safety check"
-                    )
+                try:
+                    recovery = validate_host_followup(task, previous_task, previous_result)
+                except ValueError as error:
+                    raise AppError(409, str(error)) from error
             active = self.root / "active-task.json"
             if active.exists():
                 previous = json.loads(active.read_text())["id"]
