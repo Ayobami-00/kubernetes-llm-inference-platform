@@ -12,6 +12,7 @@ from platform_management.providers.base import (
     CapacityUnavailable,
     TransientProviderError,
 )
+from platform_management.providers.lambda_cloud import LambdaCloud
 from platform_management.providers.lambda_mutations import (
     MAX_RESPONSE_BYTES,
     LambdaMutations,
@@ -24,6 +25,77 @@ from platform_management.providers.lambda_mutations import (
 
 USER_DATA = "#cloud-config\nruncmd: []\n"
 INSTANCE = "a" * 32
+
+
+def test_capacity_reads_share_the_mutation_gate_and_strip_provider_credentials():
+    active, calls = [], []
+
+    @contextmanager
+    def gate(*, launch=False):
+        assert launch is False
+        active.append(True)
+        try:
+            yield
+        finally:
+            active.pop()
+
+    def handler(request):
+        assert active and request.method == "GET"
+        calls.append(request.url.path)
+        if request.url.path.endswith("instance-types"):
+            return httpx.Response(200, json={"data": {}})
+        return httpx.Response(
+            200, json={"data": [{"id": INSTANCE, "status": "active", "jupyter_url": "SENSITIVE"}]}
+        )
+
+    result = LambdaCloud(
+        "synthetic-key", transport=httpx.MockTransport(handler), gate=gate
+    ).observe()
+    assert len(calls) == 2 and not active and "SENSITIVE" not in json.dumps(result)
+
+
+@pytest.mark.parametrize(
+    "case", ["repeated-token", "duplicate-id", "unbounded-pages", "oversized", "malformed"]
+)
+def test_capacity_reader_rejects_incomplete_or_unbounded_observations(case):
+    pages = []
+
+    def handler(request):
+        if request.url.path.endswith("instance-types"):
+            return httpx.Response(200, json={"data": {}})
+        pages.append(len(pages))
+        index = len(pages)
+        if case == "oversized":
+            return httpx.Response(200, content=b"x" * (2 * 1024 * 1024 + 1))
+        if case == "malformed":
+            return httpx.Response(200, json={"data": {"unexpected": "shape"}})
+        return httpx.Response(
+            200,
+            json={
+                "data": [{"id": INSTANCE if case == "duplicate-id" else f"fixture-{index}"}],
+                "page_token": None
+                if case == "duplicate-id" and index == 2
+                else "same"
+                if case == "repeated-token"
+                else str(index),
+            },
+        )
+
+    with pytest.raises(ValueError):
+        LambdaCloud("synthetic-key", transport=httpx.MockTransport(handler)).observe()
+    assert len(pages) <= 32
+
+
+def test_capacity_reader_refuses_redirects_without_forwarding_credentials():
+    calls = []
+
+    def handler(request):
+        calls.append(request.url.host)
+        return httpx.Response(307, headers={"location": "https://untrusted.example/metadata"})
+
+    with pytest.raises(httpx.HTTPStatusError):
+        LambdaCloud("synthetic-key", transport=httpx.MockTransport(handler)).observe()
+    assert calls == ["cloud.lambda.ai"]
 
 
 @pytest.fixture

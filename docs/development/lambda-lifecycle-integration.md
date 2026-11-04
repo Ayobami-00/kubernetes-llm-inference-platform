@@ -245,3 +245,21 @@ Management's real lifecycle bindings remain disabled. No GPU has been rented and
 this checkpoint does not establish Ansible/GPU readiness or complete platform
 production readiness. Next work is durable management integration, actual GPU
 inspection, failure cleanup and the UI-driven single-A10 lifecycle.
+
+Capacity refresh now shares the PostgreSQL account-wide request gate with
+mutation calls. The existing observation-refresh lock still prevents duplicate
+refresh jobs; it no longer serves as independent provider pacing. Production
+reads refuse redirects and environment proxies, bound each response to 2 MiB and
+pagination to 32 pages, and reject repeated cursors or duplicate/missing instance
+identities. Only allowlisted instance fields are retained. Cloud-free tests cover
+gate ownership, secret-field filtering, redirects, oversized/malformed responses
+and pagination failures. Real allocation remains disabled until its full durable
+lifecycle and failure cleanup are integrated.
+
+A read-only catalog observation on 4 November confirmed Virginia A10 capacity at
+129 cents/hour and plain Ubuntu 24.04 image
+`6c389693-2b2d-47a3-93da-052c2331bd98` (`ubuntu-24-04`, `24.4.2-20250626`, x86_64).
+The private metadata receipt is `cluster/host-executor/lambda-catalog.json` under
+operator state. These are candidates for the next integration step; availability,
+image compatibility and price must be rechecked before launch. No provider resource
+was created by the catalog query.
