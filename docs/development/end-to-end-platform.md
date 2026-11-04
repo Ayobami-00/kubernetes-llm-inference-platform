@@ -506,3 +506,32 @@ provisioned views and executed 38 queries. Several storage panels were empty:
 The correction restores authoritative KSM/kubelet workload identity during metric
 relabeling, retains exporter labels under `scrape_*`, keeps global honor-label
 protection and preserves pinned sample filters. Live verification follows rollout.
+
+Monitoring plan `e57a4cf62bf95a799736f69217176a772e204f013b029e8cb3922df1c7cfbf61`
+completed at 23:52:25 UTC with fail-closed admission retained. The repeated private
+dashboard check at 23:53 executed all 38 queries: Pod/PVC panels now contain their
+actual data. The only empty panel was firing alerts excluding Watchdog; missing
+series are still not converted to zero.
+
+Real-cluster CPU acceptance `a3f48c210e6b` deployed the private stub and completed
+preparation Job UID `7964134a-b2ce-424e-bebd-c73b65a9a7b3`. All seven immutable
+synthetic scenarios completed through management's actual runner Job protocol,
+with registered artifacts downloaded and verified. WriterAssist and DocFlow had
+valid delivery; session profiles exceeded the lag policy and both mixed paths
+also missed admissions. These invalid results remain historical and unevaluated
+for SLOs. They are not model performance or completed live acceptance.
+
+The first WriterAssist run was `run-d499245b75f02100`, Job UID
+`b3a0e9fc-9d1f-4719-9fde-6c5d8997dfab`, on platform-02 with the actual pinned
+runner digest. Its completed artifact contained a timeline timestamp that management
+had not retained. The finalization fix now requires a matching final observation,
+result and origin, with a bounded deadline from Job completion rather than a
+worker-local timer. Its management CI passed; a new live attempt must prove it.
+
+A bounded read-only probe found clock-file reads around 1.7 ms, and twenty tiny
+synthetic append/lock/flush cycles in a new diagnostic directory had a 16.87 ms
+median and 26.60 ms maximum. Synchronous journal writes were in the HTTP hot path.
+The new bounded background writer and cached immutable inputs passed 710 offline
+tests (17 optional skips), Ruff/formatting, and all 17 native CPU AIPerf cases.
+Slow-sink, overflow, I/O failure and missing-receipt checks fail closed. Publication
+and fresh AWS acceptance of this change remain pending. No GPU has been rented.

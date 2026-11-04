@@ -2,10 +2,10 @@
 
 import asyncio
 import contextvars
-import fcntl
 import json
 import os
 import time
+from functools import lru_cache
 from pathlib import Path
 
 from aiperf.common.enums import ConversationContextMode
@@ -19,6 +19,7 @@ from aiperf.timing.strategies.fixed_schedule import FixedScheduleStrategy
 from aiperf.transports.aiohttp_client import AioHttpClient
 from aiperf.transports.aiohttp_transport import AioHttpTransport
 
+from workload_runner.adapters.journal import journal
 from workload_runner.artifacts import atomic_json
 
 
@@ -30,12 +31,26 @@ def run_directory():
 def event(value):
     directory = run_directory()
     if directory:
-        path = directory / "aiperf" / "transport-events.jsonl"
-        path.parent.mkdir(parents=True, exist_ok=True)
-        with path.open("a") as stream:
-            fcntl.flock(stream, fcntl.LOCK_EX)
-            stream.write(json.dumps(value, separators=(",", ":")) + "\n")
-            stream.flush()
+        journal(str(directory), os.getpid()).emit(value)
+
+
+def runtime_directory():
+    return Path(os.environ["PLATFORM_LOCAL_DIR"])
+
+
+@lru_cache(maxsize=4)
+def engine_context(directory):
+    return json.loads((directory / "engine-context.json").read_text())
+
+
+@lru_cache(maxsize=4)
+def engine_clock(directory):
+    return json.loads((directory / "engine-clock.json").read_text())
+
+
+async def close_journal():
+    if directory := run_directory():
+        await asyncio.to_thread(journal(str(directory), os.getpid()).close)
 
 
 class PlatformLoader(RawPayloadDatasetLoader):
@@ -98,9 +113,9 @@ class PlatformSchedule(FixedScheduleStrategy):
         Retiring the remaining credits avoids leaking that slot on early abort.
         These diagnostic records never become offered client requests.
         """
-        directory = run_directory()
         atomic_json(
-            directory / "session-state" / (credit.conversation_id + ".json"), {"reason": reason}
+            runtime_directory() / "session-state" / (credit.conversation_id + ".json"),
+            {"reason": reason},
         )
         if not credit.is_final_turn:
             meta = self._conversation_source.get_next_turn_metadata(credit)
@@ -109,12 +124,18 @@ class PlatformSchedule(FixedScheduleStrategy):
 
     async def execute_phase(self):
         if directory := run_directory():
+            journal(str(directory), os.getpid())
             origin = self._lifecycle.started_at_perf_ns
             atomic_json(
                 directory / "engine-clock.json",
                 {"perf_ns": origin, "epoch_ns": time.time_ns() - (time.perf_counter_ns() - origin)},
             )
+            atomic_json(runtime_directory() / "engine-clock.json", engine_clock(directory))
         await super().execute_phase()
+
+    @on_stop
+    async def _close_schedule_journal(self):
+        await close_journal()
 
     async def handle_credit_return(self, credit, *, error=None):
         if run_directory() and error:
@@ -128,9 +149,9 @@ class PlatformSchedule(FixedScheduleStrategy):
             self._retire_continuations(credit, "aborted")
             return
         if (directory := run_directory()) and not credit.is_final_turn:
-            context = json.loads((directory / "engine-context.json").read_text())
+            context = engine_context(directory)
             meta = self._conversation_source.get_next_turn_metadata(credit)
-            clock = json.loads((directory / "engine-clock.json").read_text())
+            clock = engine_clock(runtime_directory())
             due = (
                 (time.perf_counter_ns() - clock["perf_ns"]) / 1e6 + (meta.delay_ms or 0)
                 if meta.timestamp_ms is None
@@ -157,9 +178,9 @@ class PlatformHTTP(AioHttpTransport):
         self._limits = {}
         super().__init__(**kwargs)
         directory = run_directory()
-        self._context = (
-            json.loads((directory / "engine-context.json").read_text()) if directory else None
-        )
+        self._context = engine_context(directory) if directory else None
+        if directory:
+            journal(str(directory), os.getpid())
 
     @property
     def aiohttp_client(self):
@@ -174,6 +195,7 @@ class PlatformHTTP(AioHttpTransport):
         for client in self._clients.values():
             await client.close()
         self._clients.clear()
+        await close_journal()
 
     async def send_request(self, request_info, payload, *, first_token_callback=None):
         if self._context is None:
@@ -185,7 +207,7 @@ class PlatformHTTP(AioHttpTransport):
         plan = self._context["sessions"][session_id]
         ref = plan["customer_ref"]
         customer = self._context["customers"][ref]
-        if (run_directory() / "session-state" / (session_id + ".json")).exists():
+        if (runtime_directory() / "session-state" / (session_id + ".json")).exists():
             now = time.perf_counter_ns()
             event({"kind": "suppressed", "conversation_id": session_id, "turn_index": index})
             return RequestRecord(
@@ -210,7 +232,7 @@ class PlatformHTTP(AioHttpTransport):
             request_info.endpoint_headers["Authorization"] = "Bearer " + value
         async with limiter:
             directory = run_directory()
-            clock = json.loads((directory / "engine-clock.json").read_text())
+            clock = engine_clock(runtime_directory())
             now = time.perf_counter_ns()
             offset_ms = (now - clock["perf_ns"]) / 1e6
             if (
