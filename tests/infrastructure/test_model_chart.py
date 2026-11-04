@@ -45,6 +45,10 @@ def test_model_chart_rejects_unpinned_or_unsupported_inputs(bad):
     assert list(Draft7Validator(schema).iter_errors(value))
 
 
+@pytest.mark.skipif(
+    not (ROOT / "artifacts/tools/bin/helm").is_file(),
+    reason="Pinned Helm render runs in the infrastructure job after platform-tools installation",
+)
 def test_initial_model_chart_renders_exact_runtime_and_network_boundaries():
     result = subprocess.run(
         [
