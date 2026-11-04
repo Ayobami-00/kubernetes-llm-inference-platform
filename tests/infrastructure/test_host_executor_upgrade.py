@@ -141,6 +141,46 @@ def test_guard_holds_both_authoritative_locks_until_explicit_release(guard, monk
         fcntl.flock(stream, fcntl.LOCK_EX | fcntl.LOCK_NB)
 
 
+def test_native_preflight_runs_under_both_locks_before_guard_becomes_ready(guard, monkeypatch):
+    import time
+
+    root, _ = guard
+    monkeypatch.setenv("KLIP_UPGRADE_ID", "a" * 64)
+    source = """import fcntl,json
+from pathlib import Path
+for name in ('dispatch.lock','cluster/operator.lock'):
+    with (Path('/executor/state')/name).open('a') as stream:
+        try: fcntl.flock(stream,fcntl.LOCK_EX|fcntl.LOCK_NB)
+        except BlockingIOError: pass
+        else: raise ValueError('Preflight lost its writer fence')
+print(json.dumps({'registry_revision':12}))
+"""
+    monkeypatch.setattr(upgrade, "PREFLIGHT_PROGRAM", source)
+    program = upgrade.guard_program("a" * 64).replace("/executor/state", str(root))
+
+    def release(_):
+        directory = root / "upgrades" / ("a" * 64)
+        assert json.loads((directory / "preflight.json").read_text())["status"] == "verified"
+        assert (directory / "guard.json").exists()
+        (directory / "release").touch()
+
+    monkeypatch.setattr(time, "sleep", release)
+    exec(compile(program, "native-guard-with-preflight", "exec"), {})
+
+
+def test_failed_native_preflight_never_signals_ready_and_keeps_redacted_result(guard, monkeypatch):
+    root, _ = guard
+    monkeypatch.setenv("KLIP_UPGRADE_ID", "a" * 64)
+    monkeypatch.setattr(upgrade, "PREFLIGHT_PROGRAM", "raise ValueError('secret-marker')")
+    program = upgrade.guard_program("a" * 64).replace("/executor/state", str(root))
+    with pytest.raises(ValueError, match="Native preflight failed"):
+        exec(compile(program, "failed-native-preflight", "exec"), {})
+    directory = root / "upgrades" / ("a" * 64)
+    assert not (directory / "guard.json").exists()
+    assert "secret-marker" not in (directory / "preflight.json").read_text()
+    assert json.loads((directory / "preflight.json").read_text())["status"] == "failed"
+
+
 @pytest.mark.parametrize("problem", ["writer", "dispatch", "gpu-peer", "unfinished", "cleanup"])
 def test_guard_refuses_active_or_unresolved_ownership(guard, problem):
     from contextlib import ExitStack

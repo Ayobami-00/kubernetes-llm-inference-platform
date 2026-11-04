@@ -45,6 +45,7 @@ with ExitStack() as stack:
         value=json.loads(observed.read_text()) if observed.is_file() else {}
         if value.get('status') not in ('completed','failed') or value.get('cleanup_pending'):
             raise ValueError('Unfinished host task prevents an executor upgrade')
+    # NATIVE_PREFLIGHT
     from platform_management.integrations.job_runner import frozen_file
     directory=root/'upgrades'/os.environ['KLIP_UPGRADE_ID']
     frozen_file(directory/'guard.json',json.dumps({'pod_uid':os.environ['POD_UID'],
@@ -80,6 +81,19 @@ def preflight_program(approval):
         + "/preflight.json'),json.dumps(value,sort_keys=True).encode())\n"
         "print(json.dumps(value))\n"
     )
+
+
+def guard_program(approval):
+    # Keep SSH/STS and lock custody in the same native Job process. kubectl exec
+    # only reads the resulting receipts; it never owns nested SSM subprocesses.
+    path = "/executor/state/upgrades/" + approval + "/preflight.json"
+    replacement = (
+        "    exec(" + repr(preflight_program(approval)) + ",{})\n"
+        "    proof=json.loads(Path(" + repr(path) + ").read_text())\n"
+        "    if proof.get('status')!='verified':\n"
+        "        raise ValueError('Native preflight failed; redacted evidence retained')"
+    )
+    return GUARD_PROGRAM.replace("    # NATIVE_PREFLIGHT", replacement)
 
 
 def mapped(text):
@@ -270,7 +284,7 @@ def apply(approval):
         raise ValueError("Executor cluster, deployment, storage or credential identities changed")
     job = bootstrap_job(plan, list(mapped((root / "rendered.yaml").read_text()).values()))
     container = job["spec"]["template"]["spec"]["containers"][0]
-    container["command"] = ["python", "-c", GUARD_PROGRAM]
+    container["command"] = ["python", "-c", guard_program(approval)]
     container["env"] += [
         {"name": "KLIP_UPGRADE_ID", "value": approval},
         {"name": "POD_UID", "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}}},
@@ -320,11 +334,11 @@ def apply(approval):
                     "from pathlib import Path; import time\n"
                     + "p=Path("
                     + repr(guard_path)
-                    + "); deadline=time.monotonic()+30\n"
+                    + "); deadline=time.monotonic()+120\n"
                     + "while not p.is_file() and time.monotonic()<deadline: time.sleep(.1)\n"
                     + "print(p.read_text())",
                 ],
-                timeout=40,
+                timeout=130,
             )
         )
         if (
@@ -333,7 +347,17 @@ def apply(approval):
             or not guard.get("peer_writer_fenced")
         ):
             raise ValueError("Upgrade does not hold authoritative dispatch and peer-writer custody")
-        proof = json.loads(cp.run([*execute, preflight_program(approval)], secret=True))
+        proof = json.loads(
+            cp.run(
+                [
+                    *execute,
+                    "from pathlib import Path; print(Path("
+                    + repr("/executor/state/upgrades/" + approval + "/preflight.json")
+                    + ").read_text())",
+                ],
+                secret=True,
+            )
+        )
         if proof.get("status") != "verified":
             result["preflight"] = proof
             raise ValueError("Executor preflight failed; redacted native evidence retained")
