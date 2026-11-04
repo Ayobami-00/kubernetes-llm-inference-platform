@@ -46,13 +46,13 @@ jobs:
         env:
           MODEL_IMAGE: ${{ steps.existing.outputs.image }}
         run: |
-          docker build --platform linux/amd64 --file dev/model-serving/Dockerfile \
+          docker build --platform linux/amd64 --provenance=false --sbom=false --file dev/model-serving/Dockerfile \
             --label org.opencontainers.image.revision="$GITHUB_SHA" \
             --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
             --tag "$MODEL_IMAGE" .
           docker push "$MODEL_IMAGE"
-      - name: Retain immutable registry receipt
-        run: python3 scripts/infrastructure/publish_images.py record model-serving
+      - name: Retain image identity and truthful registry scan status
+        run: python3 scripts/infrastructure/publish_images.py record model-serving --allow-pending-registry
       - name: Extract native patch and package evidence without starting serving
         run: |
           set -euo pipefail

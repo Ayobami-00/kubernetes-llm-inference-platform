@@ -127,3 +127,19 @@ deterministic and never contains generated credentials. Deployment creates or
 verifies that exact Secret without replacing an existing value. The seed is
 retained under the operator's private state; encrypted external recovery must
 be completed before a retained-state rebuild. No MCP route is enabled.
+
+Envoy Gateway explicitly watches `llm-d` and `inference-gateway`; upstream also
+includes its own namespace. Its custom backend integration therefore receives
+only get/list/watch access to InferencePools in those three namespaces, with
+no write or Secret access added. The first native startup exposed that missing
+extension permission; the scoped reader is part of the boundary and its review.
+Secret observation retries one lost SSH GET with identical trust pins and a
+fresh transport; it never retries an uncertain Secret create.
+
+The large model build keeps ECR's status separately from its full native scan.
+Only the model workflow may retain an `IN_PROGRESS`/`PENDING` registry receipt
+so a slow registry scanner does not prevent Trivy from examining the actual
+image. Such a receipt explicitly says pending, not passing; unsupported or
+failed scans still fail, and other component receipts keep their completed-scan
+requirement. Neither receipt authorizes serving without the complete native
+scan and exact runtime review.

@@ -542,6 +542,8 @@ def seed_digest():
 def stage_seed(cp, expected):
     import base64
 
+    from cluster import CommandFailure
+
     if seed_digest() != expected:
         raise ValueError("The staged controller secret changed after planning")
     command = [
@@ -552,10 +554,15 @@ def stage_seed(cp, expected):
         "envoy-ai-gateway-system",
         "inference-gateway",
     ]
-    present = cp.run(
-        [*command, "get", "secret", "klip-ai-mcp-seed", "--ignore-not-found", "-o", "json"],
-        secret=True,
-    )
+    read = [*command, "get", "secret", "klip-ai-mcp-seed", "--ignore-not-found", "-o", "json"]
+    try:
+        present = cp.run(read, secret=True)
+    except CommandFailure as error:
+        if error.program != "ssh" or error.returncode not in {255, -13}:
+            raise
+        # Only this GET is repeated, with identical pins and a new transport.
+        # A lost Secret create response is never replayed here.
+        present = cp.run(read, secret=True, reuse=False)
     seed = seed_file().read_bytes()
     if present.strip():
         value = json.loads(present)

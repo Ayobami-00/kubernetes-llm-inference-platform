@@ -192,3 +192,38 @@ def test_extension_reader_covers_only_the_configured_namespace_watch():
         "watch"
     ]
     assert watch == {"type": "Namespaces", "namespaces": ["llm-d", "inference-gateway"]}
+
+
+def test_private_secret_read_retries_only_a_lost_get_with_the_same_pins(tmp_path, monkeypatch):
+    import base64
+    import json
+
+    from cluster import CommandFailure
+
+    seed = tmp_path / "seed"
+    seed.write_bytes(b"synthetic-secret-value")
+    monkeypatch.setattr(platform, "seed_file", lambda: seed)
+    monkeypatch.setattr(platform, "seed_digest", lambda: "a" * 64)
+
+    class ControlPlane:
+        def __init__(self):
+            self.calls = []
+
+        def run(self, args, **kwargs):
+            self.calls.append((args, kwargs))
+            assert "get" in args and "create" not in args
+            if len(self.calls) == 1:
+                raise CommandFailure("fixture transport failure", "ssh", 255)
+            return json.dumps(
+                {
+                    "metadata": {"uid": "original-secret"},
+                    "type": "Opaque",
+                    "data": {"seed": base64.b64encode(seed.read_bytes()).decode()},
+                }
+            )
+
+    cp = ControlPlane()
+    result = platform.stage_seed(cp, "a" * 64)
+    assert result["uid"] == "original-secret"
+    assert cp.calls[0][0] == cp.calls[1][0]
+    assert cp.calls[1][1] == {"secret": True, "reuse": False}

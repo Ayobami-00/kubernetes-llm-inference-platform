@@ -87,7 +87,11 @@ def resolve(component: str, sha: str) -> dict:
     }
 
 
-def record(component: str, sha: str, *, sleep=time.sleep) -> Path:
+def record(component: str, sha: str, *, sleep=time.sleep, allow_pending_registry=False) -> Path:
+    if allow_pending_registry and component != "model-serving":
+        raise ValueError(
+            "Pending registry diagnostics are restricted to the native-scanned model build"
+        )
     resolved = resolve(component, sha)
     if not resolved["digest"]:
         raise ValueError("Published image does not exist")
@@ -105,6 +109,8 @@ def record(component: str, sha: str, *, sleep=time.sleep) -> Path:
             break
         if status not in {"IN_PROGRESS", "PENDING"}:
             raise ValueError("Registry image scan did not complete: " + str(status))
+        if allow_pending_registry:
+            break
         sleep(10)
     else:
         raise TimeoutError("Registry scan exceeded five minutes")
@@ -123,6 +129,11 @@ def record(component: str, sha: str, *, sleep=time.sleep) -> Path:
         "scan": scan,
         "limitations": ["A completed scan is evidence, not a deployment security approval"],
     }
+    if status != "COMPLETE":
+        receipt["limitations"] = [
+            "Registry scan is pending, not passing. A complete native image scan and "
+            "exact runtime review remain mandatory before serving."
+        ]
     output = Path("artifacts/releases") / (component + ".json")
     output.parent.mkdir(parents=True, exist_ok=True)
     output.write_text(json.dumps(receipt, indent=2) + "\n")
@@ -133,10 +144,11 @@ def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["resolve", "record"])
     parser.add_argument("component", choices=ALL_COMPONENTS)
+    parser.add_argument("--allow-pending-registry", action="store_true")
     args = parser.parse_args()
     sha = os.environ["GITHUB_SHA"]
     if args.action == "record":
-        print(record(args.component, sha))
+        print(record(args.component, sha, allow_pending_registry=args.allow_pending_registry))
     else:
         resolved = resolve(args.component, sha)
         with Path(os.environ["GITHUB_OUTPUT"]).open("a") as stream:

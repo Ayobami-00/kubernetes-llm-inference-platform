@@ -83,3 +83,32 @@ def test_incomplete_scan_cannot_emit_a_success_receipt(monkeypatch):
     monkeypatch.setattr(images, "aws", aws)
     with pytest.raises(ValueError, match="UNSUPPORTED_IMAGE"):
         images.record("backend", SHA, sleep=lambda _: None)
+
+
+def test_pending_model_registry_scan_does_not_claim_success_or_block_native_scan(
+    tmp_path, monkeypatch
+):
+    monkeypatch.chdir(tmp_path)
+    (tmp_path / "uv.lock").write_text("fixture lock")
+    recipe = tmp_path / images.ALL_COMPONENTS["model-serving"][1]
+    recipe.parent.mkdir(parents=True)
+    recipe.write_text("FROM fixture@sha256:fixture")
+    monkeypatch.setenv("GITHUB_RUN_ID", "123")
+    monkeypatch.setenv("GITHUB_RUN_ATTEMPT", "1")
+
+    def aws(action, *args, **kwargs):
+        return (
+            {"imageDetails": [{"imageDigest": DIGEST}]}
+            if action == "describe-images"
+            else {"imageScanStatus": {"status": "IN_PROGRESS"}}
+        )
+
+    monkeypatch.setattr(images, "aws", aws)
+    receipt = json.loads(
+        images.record("model-serving", SHA, allow_pending_registry=True).read_text()
+    )
+    assert receipt["scan"]["imageScanStatus"]["status"] == "IN_PROGRESS"
+    assert "not passing" in receipt["limitations"][0]
+    assert "native image scan" in receipt["limitations"][0]
+    with pytest.raises(ValueError, match="restricted"):
+        images.record("backend", SHA, allow_pending_registry=True)
