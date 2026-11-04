@@ -554,3 +554,42 @@ observations on shared storage and retains the original execution error. Root
 checks passed 715 tests (17 optional skips); two focused native cases passed.
 Linux CI and a separately identified AWS/browser attempt must pass before
 acceptance. Earlier failed/invalid artifacts remain unchanged.
+
+On 4 November, exact source `3b96a9d` passed Linux native workload, container,
+management-Job, backend, frontend and management-integration CI. Management release
+`188dee73757326d0a14a5dc84e47301adc8d44f507034c8499898925bd291e15`
+completed at 00:39:32 UTC. Verification `36f98893a9f6` confirmed two replicas of
+each application role on distinct CPU hosts, verified PostgreSQL TLS and shared
+artifact access. The previous release's local plan/render/values were archived
+before preparing the replacement.
+
+Fresh synthetic cohort `e7a31b9c064f` prepared all seven immutable bundles with
+Job UID `f2eb28cc-d4a5-47ab-8362-f70bd3b5d8da`. The browser imported WriterAssist,
+launched its actual runner Job, inspected the result and downloaded its report
+through the UI. The downloaded report SHA-256 was
+`d240a34a0a75d214a19ee1608fbfb2855989680a7322840cc745d27fe88fc1cd`.
+The remaining six runs used the same management import/launch/artifact protocol
+sequentially. All seven completed with valid delivery, retained timing origins
+and passing **synthetic smoke** verdicts:
+
+| Scenario | Management run | Completed requests |
+| --- | --- | ---: |
+| WriterAssist | `run-7ec58204b9d5d875` | 24 |
+| TutorChat | `run-e8ef1e668e6f459a` | 48 |
+| DocFlow | `run-a00340ee2674eb1e` | 24 |
+| ResearchAgent | `run-67d8f274128bd911` | 48 |
+| CodeAgent | `run-d64256d95e8fcf1b` | 48 |
+| Shared contention | `run-13caf8694e2c447c` | 120 |
+| Platform mixed | `run-b56581281d3edcde` | 192 |
+
+These 504 emulated requests verify CPU orchestration, native scheduling, bounded
+journal shutdown, shared-storage finalization and report retrieval. They do not
+calibrate model performance, prove failure recovery or establish GPU readiness.
+Private receipts, downloaded artifacts and the credential-free browser screenshot
+are retained under the operator-state `workload-acceptance/e7a31b9c064f` directory.
+Earlier failed cohorts are preserved. No GPU had been rented at this checkpoint.
+
+At 00:41, a Thanos query restricted to both healthy object-store gateways still
+returned no historical metrics, matching zero sidecar block uploads. Its negative
+store-selection control was also empty. This is recorded as pending cold-history
+verification; successful live sidecar queries are not substituted for this gate.
