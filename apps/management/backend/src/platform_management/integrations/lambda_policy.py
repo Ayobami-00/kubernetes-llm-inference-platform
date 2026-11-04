@@ -119,7 +119,9 @@ def configuration(settings):
             "lifecycle": {
                 "policy": policy.model_dump(mode="json"),
                 "origin": origin,
-                "lambda_api_key_file": str(settings.lambda_api_key_file.resolve()),
+                # Kubernetes projected Secret targets are Pod-specific timestamps.
+                # Freeze the stable mount reference, never its current symlink target.
+                "lambda_api_key_file": str(settings.lambda_api_key_file.absolute()),
                 "lambda_api_key_sha256": hashlib.sha256(provider_key.encode()).hexdigest(),
                 "bootstrap_seed_file": str(seed_path),
                 "bootstrap_seed_sha256": hashlib.sha256(seed).hexdigest(),

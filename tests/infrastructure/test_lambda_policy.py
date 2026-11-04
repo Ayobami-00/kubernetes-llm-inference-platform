@@ -81,12 +81,21 @@ def test_disabled_and_incomplete_configuration_fail_closed(tmp_path):
         configuration(Settings(real_lifecycle_enabled=True))
 
 
-def test_configuration_freezes_pins_and_secret_references_only(tmp_path):
+@pytest.mark.parametrize("projected", [False, True])
+def test_configuration_freezes_pins_and_secret_references_only(tmp_path, monkeypatch, projected):
     path, seed, tls = tmp_path / "policy.json", tmp_path / "bootstrap", tmp_path / "tls"
     path.write_text(policy().model_dump_json())
     seed.write_bytes(b"s" * 32)
     provider = tmp_path / "lambda-key"
-    provider.write_text("synthetic-provider-key-material")
+    key = "synthetic-provider-key-material"
+    if projected:
+        generation = tmp_path / "..2026_11_04_09_32_28.2670861417"
+        generation.mkdir()
+        (generation / "lambda-key").write_text(key)
+        (tmp_path / "..data").symlink_to(generation.name)
+        provider.symlink_to("..data/lambda-key")
+    else:
+        provider.write_text(key)
     tls.mkdir()
     for name in ("ca.crt", "tls.crt", "tls.key"):
         (tls / name).write_text("synthetic-" + name + "-material")
@@ -104,7 +113,47 @@ def test_configuration_freezes_pins_and_secret_references_only(tmp_path):
     assert "s" * 32 not in serialized and "synthetic-tls.key-material" not in serialized
     assert "synthetic-provider-key-material" not in serialized
     assert result["lifecycle"]["bootstrap_seed_file"] == str(seed)
+    assert result["lifecycle"]["lambda_api_key_file"] == str(provider)
     assert set(result["lifecycle"]["tls_fingerprints"]) == {"ca.crt", "tls.crt"}
+    if projected:
+        # Another Pod, or a kubelet rotation, has a different projection target.
+        replacement = tmp_path / "..2026_11_04_09_35_00.1234567890"
+        replacement.mkdir()
+        (replacement / "lambda-key").write_text(key)
+        (tmp_path / "..data").unlink()
+        (tmp_path / "..data").symlink_to(replacement.name)
+        (generation / "lambda-key").unlink()
+        generation.rmdir()
+        from types import SimpleNamespace
+
+        from platform_management.jobs import real_worker
+
+        calls = []
+
+        def provider_client(value, **kwargs):
+            calls.append(value)
+            return SimpleNamespace(close=lambda: None)
+
+        monkeypatch.setattr(real_worker, "LambdaMutations", provider_client)
+        with real_worker.RuntimeIO(result).provider():
+            pass
+        assert calls == [key]
+        (replacement / "lambda-key").write_text("different-synthetic-account")
+        with pytest.raises(AppError, match="original account identity"):
+            with real_worker.RuntimeIO(result).provider():
+                pytest.fail("Changed keys must not reach the provider")
+        assert calls == [key]
+
+
+def test_missing_runtime_key_omits_mount_paths(tmp_path):
+    from platform_management.jobs.real_worker import RuntimeIO
+
+    with pytest.raises(AppError) as captured:
+        with RuntimeIO(
+            {"lifecycle": {"lambda_api_key_file": str(tmp_path / "private-mount")}}
+        ).provider():
+            pytest.fail("Missing credential must fail before transport construction")
+    assert str(tmp_path) not in captured.value.message
 
 
 def test_changed_provider_credential_cannot_be_used_to_confirm_another_accounts_absence(

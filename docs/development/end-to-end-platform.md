@@ -721,3 +721,14 @@ Virginia stock subsequently disappeared before any worker create was submitted.
 A bounded UI stock watch preserves the approved region, type, price and
 single-instance limits. Profile publication and an available-stock card do not
 establish allocation, GPU readiness, serving or measured SLO results.
+
+At 09:52 UTC Virginia stock returned and the public UI admitted
+`writer-a10-20261104` as `op-ff9dd63e9ad344c4`. Execution failed before provider
+dispatch because the binding resolved a mounted Secret to the API Pod's private
+projection timestamp directory, absent in the worker Pod. The retained provider
+intent was verified `pending`, with no `dispatched_at` and no instance IDs.
+No GPU charge or readiness is inferred. The correction freezes the stable mount
+path, retains credential fingerprints, and tests rotation/removal of the original
+projection directory. Missing credentials now report a safe application error.
+The original attempt/binding remain immutable; a fresh attempt requires the
+corrected deployment and reconciliation of this unsubmitted intent.

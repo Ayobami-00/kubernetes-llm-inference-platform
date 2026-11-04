@@ -43,7 +43,12 @@ class RuntimeIO:
 
     @contextmanager
     def provider(self):
-        key = Path(self.config["lambda_api_key_file"]).read_text().strip()
+        try:
+            key = Path(self.config["lambda_api_key_file"]).read_text().strip()
+        except OSError:
+            raise AppError(
+                503, "Runtime provider credential is unavailable", "adapter_unavailable"
+            ) from None
         if hashlib.sha256(key.encode()).hexdigest() != self.config["lambda_api_key_sha256"]:
             raise AppError(
                 409,
