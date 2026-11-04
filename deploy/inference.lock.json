@@ -2,7 +2,7 @@
   "schema_version": "klip-inference-artifacts.v1",
   "versions": {
     "llm-d": "1.0.0",
-    "vllm": "0.30.0",
+    "vllm": "0.32.0",
     "envoy-gateway": "1.9.3",
     "ai-gateway": "1.2.0",
     "gateway-api": "1.6.2",
@@ -109,6 +109,22 @@
       "configuration_digest": "sha256:5e4353ff49007f3a7e862b89515b53f2b3a857e2a1edcddba4f5b22c9d69522b",
       "compressed_layer_bytes": 24444648
     },
+    "docker.io/vllm/vllm-openai:v0.32.0": {
+      "reference": "docker.io/vllm/vllm-openai:v0.32.0",
+      "source_manifest_digest": "sha256:befccf0e7e4089aa23926bb6f887a85c0d46c2a99e6de5c5ffdf5cb7957c5b34",
+      "digest": "sha256:6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9",
+      "image": "docker.io/vllm/vllm-openai@sha256:6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:bd8a5d7a8774800c92d714c0c226b32c1863f929150f36efd610aebcd12a335d",
+      "compressed_layer_bytes": 9205727079
+    }
+  },
+  "limitations": [
+    "Pins and metadata only; native vulnerability review and live compatibility/readiness checks remain required.",
+    "Single-A10 aggregated serving only; no speculative decoding, disaggregation or serving HA claim."
+  ],
+  "revision": 2,
+  "superseded_candidates": {
     "docker.io/vllm/vllm-openai:v0.30.0": {
       "reference": "docker.io/vllm/vllm-openai:v0.30.0",
       "source_manifest_digest": "sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90",
@@ -116,11 +132,16 @@
       "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
       "platform": "linux/amd64",
       "configuration_digest": "sha256:d076d77d8dade699041dbcb6bb989a058e51b532e6367f13f80b5a4e63ee5c53",
-      "compressed_layer_bytes": 8730525875
+      "compressed_layer_bytes": 8730525875,
+      "reason": "Native 2026-11-04 scan: 31 Critical tuples, including 9 outside kernel headers. Not approved for serving."
     }
   },
-  "limitations": [
-    "Pins and metadata only; native vulnerability review and live compatibility/readiness checks remain required.",
-    "Single-A10 aggregated serving only; no speculative decoding, disaggregation or serving HA claim."
-  ]
+  "scan_components": {
+    "gateway": "docker.io/envoyproxy/gateway:v1.9.3",
+    "proxy": "docker.io/envoyproxy/envoy:distroless-v1.39.5",
+    "ai-controller": "docker.io/envoyproxy/ai-gateway-controller:v1.2.0",
+    "ai-extproc": "docker.io/envoyproxy/ai-gateway-extproc:v1.2.0",
+    "llmd-epp": "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0",
+    "vllm": "docker.io/vllm/vllm-openai:v0.32.0"
+  }
 }

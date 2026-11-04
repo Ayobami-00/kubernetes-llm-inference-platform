@@ -20,6 +20,16 @@ def settings():
     value = json.loads(LOCK.read_text())
     if value.get("schema_version") != "klip-inference-artifacts.v1":
         raise ValueError("Unknown inference artifact lock")
+    components = value["scan_components"]
+    if set(components) != {
+        "gateway",
+        "proxy",
+        "ai-controller",
+        "ai-extproc",
+        "llmd-epp",
+        "vllm",
+    } or set(components.values()) != set(value["images"]):
+        raise ValueError("Inference scan coverage differs from the six locked components")
     for reference, image in value["images"].items():
         repository = reference.rsplit(":", 1)[0]
         if (

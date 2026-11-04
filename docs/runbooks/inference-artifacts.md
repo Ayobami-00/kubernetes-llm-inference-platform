@@ -1,7 +1,7 @@
 # Pinned inference artifacts
 
 `deploy/inference.lock.json` records the base aggregated serving candidates:
-llm-d router 1.0.0, vLLM 0.30.0, Envoy Gateway 1.9.3, AI Gateway 1.2.0,
+llm-d router 1.0.0, vLLM 0.32.0, Envoy Gateway 1.9.3, AI Gateway 1.2.0,
 Gateway API 1.6.2 and Inference Extension 1.6.2. AI Gateway's upstream project
 is now named Agent Router; its chart/image/API names remain unchanged.
 The newer gateway pair replaces the older llm-d guide's gateway example and
@@ -37,3 +37,9 @@ deployment blocker; High findings require exact applicability review.
 The model Helm chart is separate from gateway/controller foundations. Dynamic
 model-release ownership belongs to management; shared CRDs/controllers belong
 to static platform deployment. Do not give both owners the same release.
+
+The first vLLM 0.30.0 scan failed with 31 Critical tuples: 22 in kernel headers
+and nine in Python dependencies. It is retained as a superseded, unapproved
+candidate. Revision 2 selects upstream's newer stable 0.32.0 for a separate scan;
+that selection is not a finding waiver or a readiness claim. Both model candidate
+documents remain draft and retain the same Qwen/tokenizer pins.

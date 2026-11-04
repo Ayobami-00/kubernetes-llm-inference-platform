@@ -2,6 +2,12 @@ name: Inference image security
 
 on:
   workflow_dispatch:
+    inputs:
+      component:
+        description: Scan all serving components or only the current vLLM candidate
+        type: choice
+        default: all
+        options: [all, vllm]
   push:
     branches: [codex/end-to-end-platform]
     paths:
@@ -12,24 +18,44 @@ permissions:
   contents: read
 
 concurrency:
-  group: inference-security-${{ github.ref }}
+  group: inference-security-${{ github.ref }}-${{ inputs.component || 'all' }}
   cancel-in-progress: false
 
 jobs:
+  identity:
+    runs-on: ubuntu-latest
+    outputs:
+      components: ${{ steps.matrix.outputs.components }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - id: matrix
+        env:
+          SELECTED_COMPONENT: ${{ inputs.component || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          from pathlib import Path
+          lock = json.loads(Path('deploy/inference.lock.json').read_text())
+          selected = os.environ['SELECTED_COMPONENT']
+          if selected not in {'all', 'vllm'}:
+              raise ValueError('Unknown image selection')
+          rows = [{'name': k, 'reference': v} for k, v in lock['scan_components'].items()
+                  if selected == 'all' or k == selected]
+          if not rows or any(row['reference'] not in lock['images'] for row in rows):
+              raise ValueError('Image selection differs from the immutable lock')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('components=' + json.dumps(rows) + '\n')
+          PY
   scan:
+    needs: identity
     runs-on: ubuntu-latest
     timeout-minutes: 30
     strategy:
       fail-fast: false
       max-parallel: 3
       matrix:
-        include:
-          - {name: gateway, reference: 'docker.io/envoyproxy/gateway:v1.9.3'}
-          - {name: proxy, reference: 'docker.io/envoyproxy/envoy:distroless-v1.39.5'}
-          - {name: ai-controller, reference: 'docker.io/envoyproxy/ai-gateway-controller:v1.2.0'}
-          - {name: ai-extproc, reference: 'docker.io/envoyproxy/ai-gateway-extproc:v1.2.0'}
-          - {name: llmd-epp, reference: 'ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0'}
-          - {name: vllm, reference: 'docker.io/vllm/vllm-openai:v0.30.0'}
+        include: ${{ fromJSON(needs.identity.outputs.components) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
         with: {persist-credentials: false}
