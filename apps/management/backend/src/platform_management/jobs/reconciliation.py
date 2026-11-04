@@ -67,6 +67,17 @@ def reconcile_expiry():
                 continue  # Expiry blocks readiness; it never implies provider termination.
             group = row.payload["group"]
             status = group["status"]
+            if row.payload.get("mode") == "real":
+                import copy
+
+                from platform_management.jobs.real_worker import recover_real_group
+                from platform_management.jobs.worker import counts
+
+                payload = copy.deepcopy(row.payload)
+                recover_real_group(db, payload)
+                counts(payload["group"])
+                row.payload = payload
+                status = payload["group"]["status"]
             if status["phase"] in {"expired", "deleted"} or row.active_operation_id:
                 continue
             expiry = status.get("expires_at")

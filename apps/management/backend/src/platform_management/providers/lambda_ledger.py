@@ -101,6 +101,77 @@ class PostgresLaunchLedger:
         with session() as db:
             return copy.deepcopy(self.checked(db.get(ProviderIntent, plan.intent_id), plan))
 
+    def record_preflight(self, plan, evidence):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            if value["state"] != "pending":
+                return
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "allocation_preflight": {**evidence, "observed_at": now().isoformat()},
+                },
+            }
+
+    def abandon_pending(self, plan):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            if value["state"] == "rejected" and value.get("rejection") == "not_dispatched":
+                return
+            if value["state"] != "pending" or value["instance_ids"]:
+                raise ProviderIdentityConflict(
+                    "An attempted launch cannot be abandoned as unsubmitted"
+                )
+            row.state = "rejected"
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {**value, "state": "rejected", "rejection": "not_dispatched"},
+            }
+
+    def renew(self, plan, operation_key, additional_minutes, maximum_total_minutes):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            renewals = value.get("renewals", {})
+            if operation_key in renewals:
+                if renewals[operation_key]["additional_minutes"] != additional_minutes:
+                    raise ProviderIdentityConflict("Lease renewal key has conflicting inputs")
+                return renewals[operation_key]["expires_at"]
+            from datetime import datetime
+
+            if (
+                value["state"] != "allocated"
+                or value.get("termination_authorization")
+                or type(additional_minutes) is not int
+                or not 0 < additional_minutes <= 90
+                or datetime.fromisoformat(value["expires_at"]) <= now()
+            ):
+                raise CapacityUnavailable("The real lease cannot be renewed")
+            expiry = datetime.fromisoformat(value["expires_at"]) + timedelta(
+                minutes=additional_minutes
+            )
+            if expiry > datetime.fromisoformat(value["dispatched_at"]) + timedelta(
+                minutes=maximum_total_minutes
+            ):
+                raise CapacityUnavailable("Renewal exceeds the reviewed maximum total lease")
+            receipt = {
+                "additional_minutes": additional_minutes,
+                "expires_at": expiry.isoformat(),
+                "at": now().isoformat(),
+            }
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "expires_at": expiry.isoformat(),
+                    "renewals": {**renewals, operation_key: receipt},
+                },
+            }
+            return expiry.isoformat()
+
     def reserve_wireguard(self, plan, metadata):
         """Reserve from fresh authenticated executor metadata, retaining failed leases."""
         if (

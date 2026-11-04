@@ -58,7 +58,7 @@ class CreateGroup(ContractModel):
     id: Slug
     spec_ref: RevisionRef
     fault: Fault = "none"
-    mode: Literal["simulation"] = "simulation"
+    mode: Literal["simulation", "real"] = "simulation"
 
 
 class GroupView(ContractModel):

@@ -126,6 +126,60 @@ def instance(plan):
     }
 
 
+@pytest.mark.parametrize(
+    "invalid", [None, "price", "region", "image-family", "image-region", "architecture"]
+)
+def test_preflight_rechecks_offering_price_and_plain_regional_image(plan, invalid):
+    def handler(request):
+        if request.url.path.endswith("instance-types"):
+            return httpx.Response(
+                200,
+                json={
+                    "data": {
+                        plan.instance_type: {
+                            "instance_type": {
+                                "name": plan.instance_type,
+                                "price_cents_per_hour": 150 if invalid == "price" else 129,
+                                "architecture": "arm64" if invalid == "architecture" else "x86_64",
+                                "specs": {"gpus": 1},
+                            },
+                            "regions_with_capacity_available": [
+                                {"name": "other" if invalid == "region" else plan.region}
+                            ],
+                        }
+                    }
+                },
+            )
+        assert request.url.path.endswith("images")
+        return httpx.Response(
+            200,
+            json={
+                "data": [
+                    {
+                        "id": plan.image_id,
+                        "family": "lambda-stack" if invalid == "image-family" else "ubuntu-24-04",
+                        "architecture": "x86_64",
+                        "region": {"name": "other" if invalid == "image-region" else plan.region},
+                        "version": "synthetic",
+                        "unknown_secret": "do-not-retain",
+                    }
+                ]
+            },
+        )
+
+    api = client(handler)
+    try:
+        if invalid:
+            with pytest.raises((ProviderIdentityConflict, CapacityUnavailable)):
+                api.check_offering(plan, 129)
+        else:
+            evidence = api.check_offering(plan, 129)
+            assert evidence["price_cents_per_hour"] == 129
+            assert "do-not-retain" not in json.dumps(evidence)
+    finally:
+        api.close()
+
+
 def client(handler, gate=None):
     return LambdaMutations(
         "synthetic-provider-secret", transport=httpx.MockTransport(handler), gate=gate

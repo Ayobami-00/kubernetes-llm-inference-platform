@@ -144,7 +144,10 @@ class LambdaMutations:
     def request(self, method, path, *, body=None, params=None):
         allowed = (
             method == "GET"
-            and (path == "instances" or re.fullmatch(r"instances/[a-f0-9]{32}", path))
+            and (
+                path in {"instances", "instance-types", "images"}
+                or re.fullmatch(r"instances/[a-f0-9]{32}", path)
+            )
         ) or (
             method == "POST"
             and path in {"instance-operations/launch", "instance-operations/terminate"}
@@ -248,6 +251,79 @@ class LambdaMutations:
         if not isinstance(data, dict) or data.get("id") != instance_id:
             raise ProviderIdentityConflict("Specific instance read changed the requested identity")
         return safe_instance(data)
+
+    def check_offering(self, plan, price_ceiling, *, image_version=None):
+        data, _ = self.request("GET", "instance-types")
+        candidates = (
+            [
+                v
+                for v in data.values()
+                if isinstance(v, dict)
+                and isinstance(v.get("instance_type"), dict)
+                and v["instance_type"].get("name") == plan.instance_type
+            ]
+            if isinstance(data, dict)
+            else []
+        )
+        if len(candidates) != 1:
+            raise ProviderIdentityConflict("Pinned provider offering is unavailable or ambiguous")
+        selected = candidates[0]
+        offering = selected["instance_type"]
+        price = offering.get("price_cents_per_hour")
+        if (
+            type(price) is not int
+            or not 0 < price <= price_ceiling
+            or offering.get("architecture") != "x86_64"
+            or type(offering.get("specs", {}).get("gpus")) is not int
+            or offering.get("specs", {}).get("gpus") != 1
+        ):
+            raise ProviderIdentityConflict("Offering price or hardware exceeds the reviewed policy")
+        regions = selected.get("regions_with_capacity_available")
+        if not isinstance(regions, list) or not any(
+            isinstance(r, dict) and r.get("name") == plan.region for r in regions
+        ):
+            raise CapacityUnavailable("The pinned Virginia A10 has no reported capacity")
+        images, seen, token = [], set(), None
+        for _ in range(32):
+            data, following = self.request(
+                "GET", "images", params={"page_token": token} if token else None
+            )
+            if not isinstance(data, list) or any(not isinstance(i, dict) for i in data):
+                raise TransientProviderError("Provider image catalog is malformed")
+            images.extend(
+                i
+                for i in data
+                if i.get("id") == plan.image_id
+                and isinstance(i.get("region"), dict)
+                and i["region"].get("name") == plan.region
+            )
+            if not following:
+                break
+            if not isinstance(following, str) or following in seen:
+                raise TransientProviderError("Provider image pagination did not advance")
+            seen.add(following)
+            token = following
+        else:
+            raise TransientProviderError("Provider image catalog page bound exceeded")
+        if (
+            len(images) != 1
+            or images[0].get("family") != "ubuntu-24-04"
+            or images[0].get("architecture") != "x86_64"
+            or (image_version is not None and images[0].get("version") != image_version)
+        ):
+            raise ProviderIdentityConflict(
+                "Pinned plain Ubuntu image is unavailable in the selected region"
+            )
+        return {
+            "price_cents_per_hour": price,
+            "instance_type": plan.instance_type,
+            "region": plan.region,
+            "image": {
+                k: images[0][k]
+                for k in ("id", "family", "architecture", "version")
+                if k in images[0]
+            },
+        }
 
     def terminate(self, instance_id: str):
         if not re.fullmatch(r"[a-f0-9]{32}", instance_id):

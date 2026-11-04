@@ -185,7 +185,7 @@ export type CreateGroup = {
     /**
      * Mode
      */
-    mode?: 'simulation';
+    mode?: 'simulation' | 'real';
     /**
      * Spec Ref
      */

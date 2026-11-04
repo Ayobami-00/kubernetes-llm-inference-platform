@@ -319,8 +319,11 @@
             "type": "string"
           },
           "mode": {
-            "const": "simulation",
             "default": "simulation",
+            "enum": [
+              "simulation",
+              "real"
+            ],
             "title": "Mode",
             "type": "string"
           },

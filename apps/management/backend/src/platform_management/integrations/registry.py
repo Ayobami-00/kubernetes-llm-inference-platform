@@ -12,7 +12,7 @@ SIMULATED = "simulated:v1"
 
 def configuration(mode="simulation"):
     s = get_settings()
-    return {
+    result = {
         "mode": mode,
         **{
             k: SIMULATED if mode == "simulation" else "unconfigured:v1"
@@ -37,6 +37,11 @@ def configuration(mode="simulation"):
         "kube_token_file": str(s.kube_token_file),
         "kube_allow_insecure_local": s.kube_allow_insecure_local,
     }
+    if mode == "real":
+        from platform_management.integrations.lambda_policy import configuration as lifecycle
+
+        result.update(lifecycle(s))
+    return result
 
 
 def bind(db, mode="simulation"):

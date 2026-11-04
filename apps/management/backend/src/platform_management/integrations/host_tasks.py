@@ -6,15 +6,17 @@ This module does not possess SSH keys or Kubernetes administrative authority.
 """
 
 import copy
+import re
 
 from platform_contracts import HostTask, HostTaskObservation
 from platform_contracts.host_operations import validate_host_followup
+from sqlalchemy import text
 
 from platform_management.db.models import ProviderIntent
-from platform_management.db.session import session
+from platform_management.db.session import engine, session
 from platform_management.providers.lambda_ledger import PostgresLaunchLedger
 from platform_management.providers.lambda_mutations import ProviderIdentityConflict
-from platform_management.services.common import digest
+from platform_management.services.common import digest, lock_key
 
 
 def task_digest(task):
@@ -27,6 +29,28 @@ def task_digest(task):
 class DurableHostTasks:
     def __init__(self, plan, client_factory):
         self.plan, self.client_factory = plan, client_factory
+
+    def ensure(self, slot, build):
+        """Materialize defaults once, before dispatch, across competing/recovered owners."""
+        if not re.fullmatch(
+            r"op-[a-f0-9]{16,32}:(prepare|join|inspect|remove|cleanup-check|revoke-bootstrap)", slot
+        ):
+            raise ValueError("Invalid durable host-task slot")
+        identity = "host-" + digest([self.plan.intent_id, slot])[:24]
+        key = lock_key("host-task-slot:" + self.plan.intent_id + ":" + slot)
+        with engine().connect().execution_options(isolation_level="AUTOCOMMIT") as guard:
+            guard.execute(text("SELECT pg_advisory_lock(:key)"), {"key": key})
+            try:
+                value = PostgresLaunchLedger().read(self.plan)
+                if identity in value.get("host_tasks", {}):
+                    return HostTask.model_validate(value["host_tasks"][identity]["task"])
+                task = build(identity, value)  # Pure construction, no external mutation.
+                if task.id != identity or task.action != slot.rsplit(":", 1)[1]:
+                    raise ProviderIdentityConflict("Task builder changed its durable identity")
+                self.freeze(task)
+                return task
+            finally:
+                guard.execute(text("SELECT pg_advisory_unlock(:key)"), {"key": key})
 
     def read(self, identity):
         with session() as db:

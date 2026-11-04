@@ -28,7 +28,7 @@ class HostExecutorClient:
     def request(self, method, path, body=None):
         try:
             with self.client.stream(method, path, json=body) as response:
-                if response.status_code >= 500 or response.status_code in {408, 429}:
+                if response.status_code >= 500 or response.status_code in {408, 409, 429}:
                     raise TransientProviderError("Host executor unavailable; observe original task")
                 if response.status_code not in {200, 201}:
                     raise ValueError("Host executor rejected the fixed typed operation")

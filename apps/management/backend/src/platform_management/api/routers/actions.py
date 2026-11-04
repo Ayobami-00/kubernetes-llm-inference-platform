@@ -69,10 +69,17 @@ def create_group(body: CreateGroup, db: Db, response: Response, key: Idempotency
         if db.get(Resource, body.id):
             raise AppError(409, "Resource ID already exists")
         spec = catalog(db).get("worker-group", body.spec_ref)
+        if body.mode == "real":
+            from platform_management.integrations.lambda_policy import checked_binding
+            from platform_management.integrations.registry import configuration
+
+            if body.fault != "none":
+                raise AppError(422, "Simulation faults cannot be used for a real worker")
+            checked_binding(configuration("real")).check_group(spec)
         if spec.desired_instances == 0:
             raise AppError(422, "Allocation requires at least one desired instance")
         group = WorkerGroup(
-            fixture=True,
+            fixture=body.mode == "simulation",
             spec=spec,
             status={
                 "worker_group_ref": spec.ref,
@@ -87,7 +94,9 @@ def create_group(body: CreateGroup, db: Db, response: Response, key: Idempotency
                 "active_operation_id": op_id,
             },
         )
-        payload = GroupView(id=body.id, group=group, fault=body.fault).model_dump(mode="json")
+        payload = GroupView(id=body.id, mode=body.mode, group=group, fault=body.fault).model_dump(
+            mode="json"
+        )
         db.add(
             Resource(id=body.id, kind="worker_group", payload=payload, active_operation_id=op_id)
         )
@@ -150,6 +159,8 @@ def delete(identity: str, db: Db, response: Response, key: Idempotency):
 )
 def fault(identity: str, fault: Fault, db: Db):
     row = resource(db, identity, "worker_group")
+    if row.payload.get("mode") == "real":
+        raise AppError(422, "Simulation faults cannot change real worker groups")
     row.payload = {**row.payload, "fault": fault}
     return row.payload
 

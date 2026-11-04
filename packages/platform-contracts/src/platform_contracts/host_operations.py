@@ -183,6 +183,11 @@ def validate_host_followup(
             and previous.action in {"prepare", "join", "inspect", "cleanup-check"}
         )
         or (task.action == previous.action and task.action in {"remove", "revoke-bootstrap"})
+        or (
+            task.action == "remove"
+            and previous.action == "inspect"
+            and previous.node_uid is not None
+        )
     )
     if (
         task.previous_task_id != previous.id
@@ -206,7 +211,7 @@ def validate_host_followup(
         raise ValueError("Host follow-up changed the observed Kubernetes UID")
     permitted = {
         "prepare": {"join", "cleanup-check"},
-        "join": {"inspect", "cleanup-check"},
+        "join": {"inspect", "remove", "cleanup-check"},
         "inspect": {"inspect", "remove", "cleanup-check"},
         "remove": {"remove"},
         "cleanup-check": {"cleanup-check", "revoke-bootstrap"},

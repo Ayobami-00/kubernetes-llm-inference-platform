@@ -328,3 +328,40 @@ including the concurrent ownership, address, fencing and journal tests. Ruff,
 formatting, JSON Schemas and management OpenAPI checks also passed. Local Docker
 did not answer a bounded daemon query; only that query was stopped, and the
 PostgreSQL tests ran in CI's isolated service instead.
+
+The management queue now has a separate real-worker workflow in
+`platform_management.jobs.real_worker`. It uses the durable provider/host journals
+for allocation, attestation, preparation, join, GPU inspection, renewal and cleanup.
+No simulator adapter or hardcoded GPU-ready transition is used on that branch.
+Unknown launch responses reconcile the original intent. Normal pending host
+observations remain pending without exhausting the generic exception retry count;
+the persisted workflow deadline still bounds unavailable dependencies.
+
+The explicit `MANAGEMENT_REAL_LIFECYCLE_ENABLED` switch defaults to false. Enabling
+it requires a validated policy file, separate 32-byte bootstrap seed reference,
+and dedicated executor client TLS mount. Immutable execution bindings retain the
+public policy, cluster/public-key identity, TLS fingerprints and credential paths;
+secret values are excluded. Existing resource bindings remain the authority for
+cleanup even if the current switch is subsequently disabled.
+
+The policy permits one Virginia A10, a pinned plain Ubuntu image/version and
+explicit provider SSH/firewall identities. Offering, price, architecture, GPU
+count, regional capacity and image metadata are rechecked before the first POST.
+Initial leases are at most 90 minutes. Explicit renewal operations are idempotent,
+at most 90 additional minutes each and at most 180 total minutes by default; no
+automatic renewal or replacement rental is introduced. Host setup deadlines leave
+a cleanup margin before expiry. Price remains bounded to the reviewed 129 cents
+per instance-hour for this gate.
+
+After a lost management checkpoint, the error/expiry paths recover committed
+instance IDs and lease timestamps from the provider ledger. Termination and
+cleanup remain observable obligations rather than disappearing with a failed
+operation. A failed GPU inspection with an already bound node UID can use normal
+drain/removal; it cannot force provider termination past a drain failure.
+
+The real creation API now accepts explicit `mode: real`, rejects simulation
+faults, and requires a compatible pinned group specification and configured real
+binding. OpenAPI and the generated TypeScript types follow that actual route.
+UI provisioning controls, deployment mounts and actual GPU inspection remain
+integration work. The default deployed policy remains disabled and no rental is
+established by these tests or code changes.

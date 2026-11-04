@@ -188,3 +188,22 @@ def test_unbootstrapped_authorization_and_first_host_dispatch_are_serialized():
 
     with ThreadPoolExecutor(max_workers=2) as pool:
         assert sorted(pool.map(compete, ["authorize", "dispatch"])) == [False, True]
+
+
+def test_concurrent_materialization_freezes_defaults_once_and_reuses_terminal_inputs():
+    plan, _ = allocated_ledger()
+    store = DurableHostTasks(plan, Mock())
+    calls = []
+
+    def build(identity, value):
+        calls.append(identity)
+        return prepared_task().model_copy(update={"id": identity})
+
+    with ThreadPoolExecutor(max_workers=2) as pool:
+        tasks = list(pool.map(lambda _: store.ensure(plan.intent_id + ":prepare", build), range(2)))
+    assert tasks[0] == tasks[1] and calls == [tasks[0].id]
+    store.record(observation(tasks[0], "completed", evidence_sha256="a" * 64))
+    assert (
+        store.ensure(plan.intent_id + ":prepare", lambda *_: pytest.fail("Must retain defaults"))
+        == tasks[0]
+    )
