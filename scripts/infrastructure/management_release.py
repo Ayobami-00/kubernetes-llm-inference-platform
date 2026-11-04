@@ -269,6 +269,7 @@ def retain_active_release(root):
 
 def prepare(receipts: Path) -> dict:
     from cluster import kubectl
+    from lambda_lifecycle_activation import configuration as lifecycle_configuration
 
     source = json.loads(next(receipts.rglob("backend.json")).read_text())["source_commit"]
     # Infrastructure can evolve while retaining a tested application image. All
@@ -304,6 +305,9 @@ def prepare(receipts: Path) -> dict:
         raise ValueError("Management namespace changed")
     targets = healthy_targets()
     values = values_for(assessed)
+    lifecycle = lifecycle_configuration()
+    if lifecycle is not None:
+        values["lifecycle"] = lifecycle["chart_values"]
     manifest = render(values)
     guard_workloads([d for d in yaml.safe_load_all(manifest) if d])
     retain_active_release(folder())
@@ -315,6 +319,7 @@ def prepare(receipts: Path) -> dict:
         "source_sha256": source_digest(),
         "namespace_uid": staged["namespace_uid"],
         "credential_uids": staged["secret_uids"],
+        "lifecycle_binding": lifecycle,
         "targets": targets,
         "values_sha256": hashlib.sha256(yaml.safe_dump(values).encode()).hexdigest(),
         "manifest_sha256": hashlib.sha256(manifest.encode()).hexdigest(),
@@ -330,6 +335,7 @@ def prepare(receipts: Path) -> dict:
 
 def deploy(approval: str) -> dict:
     from cluster import FOLDER, Host, checked, kubeconfigs, kubectl, load_hosts, tunnel
+    from lambda_lifecycle_activation import configuration as lifecycle_configuration
 
     root = folder()
     plan = json.loads((root / "plan.json").read_text())
@@ -346,6 +352,8 @@ def deploy(approval: str) -> dict:
     fresh = assess(Path(plan["receipts"]), plan["image_assessment"]["source_commit"])
     if fresh != plan["image_assessment"]:
         raise ValueError("Image scan/assessment changed after review")
+    if lifecycle_configuration() != plan.get("lifecycle_binding"):
+        raise ValueError("Lifecycle custody or runtime approval changed after planning")
     credentials = stage()  # Recheck every value/UID without rewriting any Secret.
     if credentials["secret_uids"] != plan["credential_uids"]:
         raise ValueError("Management credential identities changed")

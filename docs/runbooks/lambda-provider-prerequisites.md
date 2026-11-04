@@ -86,3 +86,35 @@ Official interfaces checked on 4 November 2026:
 [firewall behavior](https://docs.lambda.ai/public-cloud/firewalls/). The transport
 retains the existing fixed API origin and refuses redirects; this component does
 not introduce a caller-selected provider endpoint.
+
+## Activate the bounded management lifecycle
+
+After the inspection-capable executor contains the exact GPU runtime review and
+its cluster-bound approval has been staged, bind the existing chart configuration:
+
+```sh
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/lambda_lifecycle_activation.py \
+  --provider-receipt <verified-provider-result.json>
+```
+
+This derives the SSH registration name and firewall ID from the verified free
+setup, pins the previously checked plain Ubuntu image and creates an immutable
+32-byte bootstrap seed Secret. Only its fingerprint and native UID enter the
+operator receipt. The seed stays in private operator credentials and the
+application's restricted Secret mount; never print it or commit it. Repeating
+staging verifies and reuses the original seed/receipt. Different existing data,
+an unresolved prerequisite, changed identities or missing runtime approval fail.
+
+Staging does not change the running management release or allocate a GPU. The
+next `management_release.py prepare/deploy` uses the staged lifecycle values and
+rechecks executor/operator custody, seed UID and runtime approval at both phases.
+Its saved plan includes this binding. Historical deployments without a binding
+remain compatible while lifecycle is disabled. Keep the seed in the encrypted
+recovery inventory before a destroy/rebuild rehearsal; a live Kubernetes Secret
+alone is not a recovery backup.
+
+The active policy permits only one `gpu_1x_a10` in Virginia, at most $1.29/hour,
+90 initial minutes and 180 total minutes after an explicit renewal. It does not
+authorize automatic substitution or larger-model capacity. The public UI/API
+still owns the real create operation and its durable allocation receipt.

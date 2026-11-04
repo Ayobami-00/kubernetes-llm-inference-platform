@@ -297,6 +297,7 @@ def checked_image_source(review):
         "deploy/artifacts.lock.json",
         "deploy/gpu-host.lock.json",
         "deploy/gpu-operator.lock.json",
+        "deploy/gpu-runtime-risk-review.json",
         "infra/terraform/project.json",
         "infra/terraform/platform.json",
         "infra/terraform/identity.json",
