@@ -33,7 +33,7 @@ run "private_immutable_project_images" {
     error_message = "Automatic retention must not remove tagged historical run images."
   }
   assert {
-    condition     = length(local.subjects.pull) == 8 && contains(local.subjects.pull, "system:serviceaccount:platform-ops:klip-host-api") && contains(local.subjects.pull, "system:serviceaccount:platform-ops:klip-host-job") && local.subjects.push == ["repo:Ayobami-00@41403457/kubernetes-llm-inference-platform@1432746028:ref:refs/heads/codex/end-to-end-platform"] && aws_iam_role.images["pull"].max_session_duration == 3600 && !contains(jsondecode(aws_iam_role_policy.images["pull"].policy).Statement[1].Action, "ecr:PutImage")
+    condition     = length(local.subjects.pull) == 8 && contains(local.subjects.pull, "system:serviceaccount:platform-ops:klip-host-api") && contains(local.subjects.pull, "system:serviceaccount:platform-ops:klip-host-job") && local.subjects.push == ["repo:Ayobami-00@41403457/kubernetes-llm-inference-platform@1432746028:ref:refs/heads/main", "repo:Ayobami-00@41403457/kubernetes-llm-inference-platform@1432746028:ref:refs/heads/feat/a10-ngram-experiment"] && aws_iam_role.images["pull"].max_session_duration == 3600 && !contains(jsondecode(aws_iam_role_policy.images["pull"].policy).Statement[1].Action, "ecr:PutImage")
     error_message = "Image pull and publisher credentials need distinct exact workload subjects and permissions."
   }
   assert {

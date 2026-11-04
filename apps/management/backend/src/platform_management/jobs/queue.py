@@ -36,6 +36,8 @@ def submit(db, key, action, target, payload, mutate):
         if action.endswith("worker_group")
         else "run"
         if action.endswith("run")
+        else "experiment"
+        if action.endswith("experiment")
         else "serving_deployment"
     )
     db.flush()

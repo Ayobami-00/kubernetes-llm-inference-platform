@@ -2,7 +2,7 @@ name: GPU runtime image security
 
 on:
   push:
-    branches: [codex/end-to-end-platform]
+    branches: [main, feat/a10-ngram-experiment]
     paths:
       - 'deploy/gpu-operator.lock.json'
       - 'scripts/infrastructure/gpu_runtime_scan.py'

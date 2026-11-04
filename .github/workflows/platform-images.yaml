@@ -2,7 +2,7 @@ name: Platform experiment images
 
 on:
   push:
-    branches: [codex/end-to-end-platform]
+    branches: [main, feat/a10-ngram-experiment]
     paths:
       - '.github/workflows/platform-images.yaml'
       - 'scripts/infrastructure/publish_images.py'
@@ -34,6 +34,10 @@ on:
       - 'datasets/manifests/**'
       - 'contracts/fixtures/**'
       - 'scripts/management/stage_workspace.py'
+      - 'scripts/management/install_experiment_tool.py'
+      - 'experiments/writer-assist-a10/**'
+      - 'deploy/environments/lab/experiments/a10/**'
+      - 'deploy/retained-a10-*-risk-review.json'
   workflow_dispatch:
     inputs:
       component:

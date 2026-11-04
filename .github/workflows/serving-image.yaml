@@ -3,7 +3,7 @@ name: Pinned model serving image
 on:
   workflow_dispatch:
   push:
-    branches: [codex/end-to-end-platform]
+    branches: [main, feat/a10-ngram-experiment]
     paths:
       - '.github/workflows/serving-image.yaml'
       - 'dev/model-serving/**'

@@ -1,5 +1,11 @@
 # A10-only execution configuration. Immutable Secret values are staged separately.
+experiments:
+  a10Enabled: true
 runner:
+  nodeSelector:
+    node-role.kubernetes.io/control-plane: null
+    klip.dev.node-restriction.kubernetes.io/platform: "true"
+    kubernetes.io/hostname: platform-01
   secretRefs: [klip-writer-inference]
   command:
     - workload-runner

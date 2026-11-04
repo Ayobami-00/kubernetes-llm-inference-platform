@@ -146,6 +146,10 @@ def deploy(evidence, approval):
 
     from cluster import FOLDER, checked, kubeconfigs, kubectl, tunnel
 
+    active = json.loads(kubectl("-n", "llm-d", "get", "deployment", DEPLOYMENT, "-o", "json"))
+    if active["metadata"].get("annotations", {}).get("klip.dev/a10-experiment"):
+        raise ValueError("A dashboard experiment owns this deployment; cancel or finish it first")
+
     if not re.fullmatch(r"[a-f0-9]{64}", approval):
         raise ValueError("Exact saved model plan required")
     root = evidence / "models" / approval

@@ -36,6 +36,7 @@ def configuration(mode="simulation"):
         "kube_ca_file": str(s.kube_ca_file),
         "kube_token_file": str(s.kube_token_file),
         "kube_allow_insecure_local": s.kube_allow_insecure_local,
+        "a10_experiment_enabled": s.a10_experiment_enabled,
     }
     if mode == "real":
         from platform_management.integrations.lambda_policy import configuration as lifecycle

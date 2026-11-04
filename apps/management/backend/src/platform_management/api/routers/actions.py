@@ -343,6 +343,9 @@ def start_run(body: RunLaunch, db: Db, response: Response, key: Idempotency):
 
     def mutate(op_id):
         snap = snapshot(db, body)
+        from platform_management.services.a10_experiments import assert_run_access
+
+        assert_run_access(db, snap)
         if body.mode == "real" and (snap.target is None or snap.target.mode != "benchmark"):
             raise AppError(422, "Real launches require a benchmark execution target")
         if body.mode == "simulation" and snap.target and snap.target.mode != "local-stub":

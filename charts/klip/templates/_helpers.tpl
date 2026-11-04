@@ -26,6 +26,8 @@ eks.amazonaws.com/ecr-role-arn: {{ .Values.imagePullRoleArn | quote }}
   value: /run/secrets/management/lambda-api-key
 - name: MANAGEMENT_REAL_LIFECYCLE_ENABLED
   value: {{ .Values.lifecycle.enabled | quote }}
+- name: MANAGEMENT_A10_EXPERIMENT_ENABLED
+  value: {{ .Values.experiments.a10Enabled | quote }}
 {{- if .Values.lifecycle.enabled }}
 - {name: MANAGEMENT_LAMBDA_LIFECYCLE_POLICY_FILE, value: /etc/klip-lifecycle/policy.json}
 - {name: MANAGEMENT_HOST_EXECUTOR_TLS_HOME, value: /run/secrets/host-executor-client}

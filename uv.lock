@@ -1808,7 +1808,9 @@ dependencies = [
     { name = "psycopg", extra = ["binary"] },
     { name = "pydantic-settings" },
     { name = "sqlalchemy" },
+    { name = "tokenizers" },
     { name = "uvicorn", extra = ["standard"] },
+    { name = "workload-runner" },
 ]
 
 [package.metadata]
@@ -1821,7 +1823,9 @@ requires-dist = [
     { name = "psycopg", extras = ["binary"], specifier = ">=3.2,<4" },
     { name = "pydantic-settings", specifier = ">=2.8,<3" },
     { name = "sqlalchemy", specifier = ">=2.0,<2.1" },
+    { name = "tokenizers", specifier = ">=0.23,<0.24" },
     { name = "uvicorn", extras = ["standard"], specifier = ">=0.34,<1" },
+    { name = "workload-runner", editable = "workload-runner" },
 ]
 
 [[package]]

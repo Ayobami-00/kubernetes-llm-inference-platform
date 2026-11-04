@@ -12,6 +12,7 @@ from platform_management.api.routers import (
     actions,
     auth,
     bootstrap,
+    experiments,
     imports,
     specifications,
     topology,
@@ -45,6 +46,7 @@ for router in (
     topology.router,
     imports.router,
     bootstrap.router,
+    experiments.router,
 ):
     app.include_router(router, prefix="/api/v1")
 

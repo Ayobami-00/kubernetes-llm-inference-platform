@@ -387,6 +387,7 @@ def prepare(receipts: Path, *, external_capacity_only=False) -> dict:
             (ROOT / "deploy/environments/lab/experiments/a10/management-values.yaml").read_text()
         )
         values["runner"].update(overlay["runner"])
+        values["experiments"] = overlay["experiments"]
     manifest = render(values)
     guard_workloads([d for d in yaml.safe_load_all(manifest) if d])
     retain_active_release(folder())
