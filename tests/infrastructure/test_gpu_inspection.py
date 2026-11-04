@@ -230,7 +230,17 @@ def test_missing_runtime_approval_is_unconfigured_without_revealing_paths(tmp_pa
 
 
 @pytest.mark.parametrize(
-    "change", [None, "expired", "cluster", "lock", "images", "kernel-artifacts"]
+    "change",
+    [
+        None,
+        "expired",
+        "cluster",
+        "lock",
+        "images",
+        "kernel-artifacts",
+        "missing-assessment",
+        "assessment-drift",
+    ],
 )
 def test_runtime_approval_binds_exact_pins_cluster_and_expiry(tmp_path, monkeypatch, change):
     now = datetime.now(UTC)
@@ -239,6 +249,8 @@ def test_runtime_approval_binds_exact_pins_cluster_and_expiry(tmp_path, monkeypa
         "profile": "single-a10",
         "reviewed_at": (now - timedelta(minutes=1)).isoformat(),
         "expires_at": (now + timedelta(days=1)).isoformat(),
+        "configuration": {},
+        "images": {},
     }
     review.write_text(json.dumps(data))
     monkeypatch.setattr(gpu_approval, "REVIEW", review)
@@ -257,7 +269,7 @@ def test_runtime_approval_binds_exact_pins_cluster_and_expiry(tmp_path, monkeypa
             "policy_uid": NODE_UID,
             "policy_spec_sha256": "b" * 64,
         },
-        **data,
+        **{k: v for k, v in data.items() if k not in {"configuration", "images"}},
     }
     if change == "expired":
         value["expires_at"] = (now - timedelta(seconds=1)).isoformat()
@@ -270,6 +282,21 @@ def test_runtime_approval_binds_exact_pins_cluster_and_expiry(tmp_path, monkeypa
     elif change == "kernel-artifacts":
         value["base_artifacts_sha256"] = "c" * 64
     (tmp_path / "cluster").mkdir()
+    assessment = {
+        "schema_version": "klip-gpu-runtime-assessment.v1",
+        "status": "conditionally-reviewed-single-a10-bootstrap-only",
+        "profile": "single-a10",
+        "configuration": {},
+        "images": {},
+        "review_sha256": value["review_sha256"],
+        "expires_at": data["expires_at"],
+    }
+    body = json.dumps(assessment).encode()
+    value["assessment_sha256"] = hashlib.sha256(body).hexdigest()
+    if change != "missing-assessment":
+        (tmp_path / "cluster/gpu-runtime-assessment.json").write_bytes(
+            body + b" " if change == "assessment-drift" else body
+        )
     (tmp_path / "cluster/gpu-runtime-approval.json").write_text(json.dumps(value))
     assert gpu_approval.configured(tmp_path, NODE_UID)["gpu_inspection_configured"] is (
         change is None

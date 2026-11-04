@@ -38,3 +38,46 @@ the driver report attributes kernel findings to its `linux-libc-dev` headers.
 Any header-only applicability decision must verify the actual package file
 inventory and report checksum. It cannot establish the running host kernel's
 security or replace its independent version/configuration checks.
+
+## Conditional single-A10 bootstrap review
+
+`deploy/gpu-runtime-risk-review.json` binds all eight Linux AMD64 operand images,
+host binaries, native report hashes, exact High/Critical finding sets, operator
+values and network boundary. This seven-day review permits bootstrap/readiness
+validation only. Public inference, arbitrary tenant images and subsequent
+serving images remain outside its scope. Known kernel advisories remain a
+limitation of this experimental baseline, rather than a production-security
+claim. Raw reports are never edited or suppressed.
+
+The driver's 22 Critical tuples and its header-attributed High tuples belong to
+one `linux-libc-dev` package with 990 installed headers/documentation files. The
+assessor verifies their complete inventory checksum and rejects any executable,
+kernel image or changed file set. Non-header Critical findings always fail.
+Other High findings retain component-specific applicability rationales and
+limits. Upstream fixes should replace this temporary review when available.
+
+The official Ubuntu `Ubuntu-6.8.0-147.147` source annotations explicitly disable
+`CONFIG_GCOV_KERNEL` for AMD64. The executor additionally checks the actual booted
+host configuration; source metadata cannot substitute for that observation.
+
+After the executor image contains this exact review, prepare and stage its
+cluster-bound receipt:
+
+```sh
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/gpu_runtime_approval.py prepare \
+  --image-directory artifacts/security/<native-image-reports> \
+  --host-directory artifacts/security/<native-host-report>
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/gpu_runtime_approval.py apply --approve-plan <printed-sha256>
+```
+
+Preparation verifies fresh native evidence and freezes the cluster namespace,
+executor image/custody identities, operator Deployment/ClusterPolicy UIDs and
+policy-spec checksum. Staging requires both unchanged executor replicas and the
+same operator identity. It holds the authoritative dispatch/peer-writer locks,
+refuses unfinished tasks or allocated GPU peers, and writes immutable assessment
+and approval files. The executor validates the actual retained assessment bytes,
+not merely a supplied checksum string. A lost staging response requires explicit
+receipt reconciliation; the helper never automatically repeats an attempt.
+No GPU, host, Secret or network mutation is performed by this staging operation.

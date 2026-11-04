@@ -23,6 +23,11 @@ def approval(root, cluster_uid, *, now=None):
     if path.is_symlink() or path.stat().st_size > 65536 or not path.is_file():
         raise ValueError("Missing or unsafe GPU runtime approval")
     value = json.loads(path.read_text())
+    evidence = root / "cluster/gpu-runtime-assessment.json"
+    if evidence.is_symlink() or not evidence.is_file() or evidence.stat().st_size > 262144:
+        raise ValueError("Missing or unsafe GPU runtime assessment")
+    body = evidence.read_bytes()
+    assessment = json.loads(body)
     review = json.loads(REVIEW.read_text())
     start = datetime.fromisoformat(value["reviewed_at"])
     expiry = datetime.fromisoformat(value["expires_at"])
@@ -36,6 +41,14 @@ def approval(root, cluster_uid, *, now=None):
         or value.get("base_artifacts_sha256") != hashlib.sha256(BASE_LOCK.read_bytes()).hexdigest()
         or value.get("images") != settings()["images"]
         or not re.fullmatch(r"[a-f0-9]{64}", value.get("assessment_sha256", ""))
+        or value["assessment_sha256"] != hashlib.sha256(body).hexdigest()
+        or assessment.get("schema_version") != "klip-gpu-runtime-assessment.v1"
+        or assessment.get("status") != "conditionally-reviewed-single-a10-bootstrap-only"
+        or assessment.get("profile") != "single-a10"
+        or assessment.get("review_sha256") != value["review_sha256"]
+        or assessment.get("configuration") != review.get("configuration")
+        or assessment.get("expires_at") != value["expires_at"]
+        or set(assessment.get("images", {})) != set(review.get("images", {}))
         or not start <= now < expiry
         or expiry - start > timedelta(days=7)
         or review.get("profile") != "single-a10"

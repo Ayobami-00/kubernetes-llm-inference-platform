@@ -14,6 +14,7 @@ on:
       - 'infra/ansible/**'
       - 'deploy/gpu-host.lock.json'
       - 'deploy/gpu-operator.lock.json'
+      - 'deploy/gpu-runtime-risk-review.json'
       - 'infra/terraform/identity.json'
       - 'deploy/artifacts.lock.json'
       - 'deploy/host-executor-aws-config'
