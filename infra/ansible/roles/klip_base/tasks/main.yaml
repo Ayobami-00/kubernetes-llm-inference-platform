@@ -36,6 +36,19 @@
     owner: root
     group: root
     mode: '0600'
+- name: Enable the image's native time synchronization service
+  ansible.builtin.command:
+    argv: [timedatectl, set-ntp, 'true']
+  changed_when: false
+- name: Wait for verified time synchronization after a fresh boot
+  ansible.builtin.command:
+    argv: [timedatectl, show, --property=NTPSynchronized, --value]
+  register: klip_base_clock
+  until: klip_base_clock.stdout | trim == 'yes'
+  retries: 24
+  delay: 5
+  timeout: 10
+  changed_when: false
 - name: Validate identity, networks, clock and storage capacity
   ansible.builtin.command: python3 /usr/local/sbin/klip-node preflight
   changed_when: false

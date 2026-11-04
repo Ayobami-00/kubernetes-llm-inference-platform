@@ -98,23 +98,33 @@ def guard_program(approval, recovery=None):
     )
     program = GUARD_PROGRAM.replace("    # NATIVE_PREFLIGHT", replacement)
     if recovery is not None:
+        chains = recovery if isinstance(recovery, list) else [recovery]
+        if (
+            not chains
+            or len(chains) > 32
+            or len({c["provider_instance_id"] for c in chains}) != len(chains)
+        ):
+            raise ValueError("Recovery requires one exact chain per distinct fenced instance")
         extra = (
             "    from host_executor_recovery import fenced_chain\n"
-            + "    expected="
-            + repr(recovery)
+            + "    expected_chains="
+            + repr(chains)
             + "\n"
-            "    if fenced_chain(root,expected['head'])!=expected:\n"
-            "        raise ValueError('Fenced task evidence changed after planning')\n"
-            "    recovered=set(expected['tasks'])"
+            "    for expected in expected_chains:\n"
+            "        if fenced_chain(root,expected['head'])!=expected:\n"
+            "            raise ValueError('Fenced task evidence changed after planning')\n"
+            "        recovered.update(expected['tasks'])"
         )
         program = program.replace("    # FENCED_RECOVERY_PROOF", extra)
         program = program.replace(
             "    from platform_management.integrations.job_runner import frozen_file",
             "    from cluster import Host,load_hosts\n"
             "    cp=Host(load_hosts()['cp-01'])\n"
-            "    node=cp.run(['sudo','kubectl','--kubeconfig=/etc/kubernetes/admin.conf',\n"
-            "        'get','node',expected['node_name'],'--ignore-not-found','-o','json'])\n"
-            "    if node.strip(): raise ValueError('Fenced recovery node is still registered')\n"
+            "    for expected in expected_chains:\n"
+            "        node=cp.run(['sudo','kubectl','--kubeconfig=/etc/kubernetes/admin.conf',\n"
+            "            'get','node',expected['node_name'],'--ignore-not-found','-o','json'])\n"
+            "        if node.strip():\n"
+            "            raise ValueError('Fenced recovery node is still registered')\n"
             "    from platform_management.integrations.job_runner import frozen_file",
         )
     return program
@@ -245,7 +255,14 @@ def prepare(receipt, directory, *, fenced_recovery_task=None):
     if fenced_recovery_task:
         from host_executor_recovery import preview
 
-        recovery = preview(cp, fenced_recovery_task)
+        tasks = (
+            [fenced_recovery_task]
+            if isinstance(fenced_recovery_task, str)
+            else fenced_recovery_task
+        )
+        if not isinstance(tasks, list) or not 0 < len(tasks) <= 32 or len(set(tasks)) != len(tasks):
+            raise ValueError("Supply distinct exact fenced revocation heads")
+        recovery = [preview(cp, identity) for identity in tasks]
     identity, pods = identities(cp)
     ready_pods(pods, active["image"])
     record = {
@@ -497,7 +514,7 @@ if __name__ == "__main__":
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--security-directory", type=Path)
     parser.add_argument("--approve-plan")
-    parser.add_argument("--fenced-recovery-task")
+    parser.add_argument("--fenced-recovery-task", action="append")
     args = parser.parse_args()
     value = (
         prepare(

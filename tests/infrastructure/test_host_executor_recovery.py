@@ -59,6 +59,15 @@ def test_fenced_never_joined_chain_preserves_each_input_and_terminal_owner(chain
     assert recovery.fenced_chain(root, head.id) == result
 
 
+def test_upgrade_cannot_count_two_heads_for_one_provider_instance(chain):
+    import host_executor_upgrade as upgrade
+
+    root, head = chain
+    evidence = recovery.fenced_chain(root, head.id)
+    with pytest.raises(ValueError, match="distinct fenced instance"):
+        upgrade.guard_program("a" * 64, [evidence, evidence])
+
+
 @pytest.mark.parametrize(
     "change", ["active-owner", "input-hash", "job-owner", "running", "joined", "identity"]
 )
@@ -85,7 +94,9 @@ def test_unproven_or_changed_recovery_chain_is_rejected(chain, change):
         recovery.fenced_chain(root, head.id)
 
 
-@pytest.mark.parametrize("problem", [None, "extra-pending", "tampered-bytes", "node-present"])
+@pytest.mark.parametrize(
+    "problem", [None, "list-input", "extra-pending", "tampered-bytes", "node-present"]
+)
 def test_actual_upgrade_guard_requires_exact_fenced_proof_and_absent_node(
     chain, monkeypatch, problem
 ):
@@ -133,8 +144,9 @@ def test_actual_upgrade_guard_requires_exact_fenced_proof_and_absent_node(
     elif problem == "tampered-bytes":
         path = root / "executions" / head.id / "observation.json"
         path.write_bytes(path.read_bytes() + b" ")
-    program = upgrade.guard_program("a" * 64, evidence).replace("/executor/state", str(root))
-    if problem:
+    proof = [evidence] if problem == "list-input" else evidence
+    program = upgrade.guard_program("a" * 64, proof).replace("/executor/state", str(root))
+    if problem not in {None, "list-input"}:
         with pytest.raises(ValueError):
             exec(compile(program, "fenced-upgrade-guard", "exec"), {})
         assert not (root / "upgrades" / ("a" * 64) / "guard.json").exists()

@@ -105,7 +105,14 @@ def dependency_issues(expected):
     )
     issues = sorted(line.strip() for line in check.stdout.splitlines() if line.strip())
     if check.returncode != 1 or issues != sorted(expected) or check.stderr.strip():
-        raise ValueError("Dependency check differs from the exact recorded upstream exceptions")
+        # This fixed offline build command emits public package diagnostics only.
+        # Retain them so an unexpected dependency cannot become a blind allowlist change.
+        raise ValueError(
+            "Dependency check differs from the exact recorded upstream exceptions: "
+            + json.dumps(
+                {"exit_code": check.returncode, "issues": issues, "diagnostic": check.stderr[:2000]}
+            )
+        )
     return {"exit_code": check.returncode, "issues": issues}
 
 

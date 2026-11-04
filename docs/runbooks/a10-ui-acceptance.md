@@ -128,3 +128,20 @@ by the host Job NetworkPolicy; Lambda's SSH source restrictions and strict host
 key verification remain required. Both platform-compute mock tests passed.
 This removes a confirmed network prerequisite; a new native preparation must
 still establish SSH, OS compatibility and GPU readiness.
+
+`writer-a10-20261104-e` / `op-f019050d74804951` subsequently allocated at
+12:04:33 UTC. Preparation established strict SSH, accepted the plain Ubuntu
+profile, found no preinstalled NVIDIA stack, installed and booted the pinned
+GA kernel, and observed an NVIDIA PCI device. The later base-host preflight
+failed because the freshly rebooted host had not yet reported NTP synchronization.
+These native task outcomes establish progress beyond SSH, not Kubernetes or
+GPU Operator readiness. Management initiated its safety/termination workflow.
+
+Base preparation now enables the image's existing native NTP service and waits
+at most 24 five-second retry intervals for `NTPSynchronized=yes` before the
+unchanged identity/network/clock/storage preflight. It does not remove the
+clock requirement, choose arbitrary time servers or join an unsynchronized host.
+Image-only upgrades can accept repeated `--fenced-recovery-task` arguments for
+distinct already-fenced, never-joined instances. Every complete chain is
+independently rechecked under both native locks and every corresponding Node
+must be absent; an unrelated pending task still blocks the upgrade.
