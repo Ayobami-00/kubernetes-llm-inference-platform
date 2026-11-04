@@ -50,7 +50,7 @@ def test_grafana_uses_shared_postgres_and_retained_encryption_key_without_api_ac
     import yaml
 
     dashboards = yaml.safe_load(v["extraObjects"][0])
-    assert dashboards["kind"] == "ConfigMap" and len(dashboards["data"]) == 5
+    assert dashboards["kind"] == "ConfigMap" and len(dashboards["data"]) == 6
     assert v["dashboardsConfigMaps"] == {"klip": "klip-grafana-dashboards"}
     assert not v.get("dashboards")  # The chart otherwise launches a download container.
 

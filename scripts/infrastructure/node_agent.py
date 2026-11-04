@@ -475,8 +475,15 @@ def validate_pod_mtu(links: list[dict], routes: list[dict]) -> dict:
     return {"pod_interface_mtu": 1420, "pod_route_mtu": 1370}
 
 
-def pod_network(pod_uid: str | None = None) -> dict:
-    endpoint = "--runtime-endpoint=unix:///run/containerd/containerd.sock"
+def pod_network(
+    pod_uid: str | None = None, *, cri_socket: str = "unix:///run/containerd/containerd.sock"
+) -> dict:
+    if cri_socket not in {
+        "unix:///run/containerd/containerd.sock",
+        "unix:///run/klip-containerd/containerd.sock",
+    }:
+        raise ValueError("Unreviewed CRI socket for Pod-network inspection")
+    endpoint = "--runtime-endpoint=" + cri_socket
     if pod_uid is not None:
         if not re.fullmatch(r"[a-f0-9-]{36}", pod_uid):
             raise ValueError("Invalid Pod-network sandbox UID")
@@ -530,7 +537,10 @@ def main() -> None:
     config = json.loads(CONFIG.read_text())
     STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     if args.action == "pod-network":
-        result = pod_network(args.pod_uid)
+        result = pod_network(
+            args.pod_uid,
+            cri_socket=config.get("cri_socket", "unix:///run/containerd/containerd.sock"),
+        )
     elif args.action == "firewall":
         result = apply_firewall()
     elif args.action == "wg-key":

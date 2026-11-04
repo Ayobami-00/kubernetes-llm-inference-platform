@@ -81,7 +81,7 @@ spec:
             - {{ dict "max_new_tokens" .Values.engine.maxOutputTokens | toJson | quote }}
             - --default-chat-template-kwargs
             - {{ .Values.engine.chatTemplateKwargs | toJson | quote }}
-            - --disable-log-requests
+            - --no-enable-log-requests
             - --shutdown-timeout
             - "45"
           ports: [{name: http, containerPort: 8000}]

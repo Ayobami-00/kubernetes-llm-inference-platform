@@ -267,7 +267,77 @@ def retain_active_release(root):
         frozen_file(destination / "deployment.json", receipt.read_bytes())
 
 
-def prepare(receipts: Path) -> dict:
+def external_capacity_guard():
+    """An explicit read-only mode may disable allocation only after quiescence."""
+    from cluster import Host, kubectl, load_hosts
+
+    nodes = json.loads(kubectl("get", "nodes", "-o", "json"))["items"]
+    gpu = [n for n in nodes if str(n["spec"].get("providerID", "")).startswith("lambda:///")]
+    if (
+        len(gpu) != 1
+        or gpu[0]["spec"]["providerID"] != "lambda:///8f2e29b7279b42148ffaaed4a4dcdd8e"
+    ):
+        raise ValueError("External-only mode requires exactly the user-retained A10")
+    pods = json.loads(
+        kubectl(
+            "-n",
+            "klip",
+            "get",
+            "pods",
+            "-l",
+            "app.kubernetes.io/name=klip,app.kubernetes.io/component=api",
+            "-o",
+            "json",
+        )
+    )["items"]
+    ready = [
+        p
+        for p in pods
+        if any(
+            c["type"] == "Ready" and c["status"] == "True"
+            for c in p.get("status", {}).get("conditions", [])
+        )
+    ]
+    if not ready:
+        raise ValueError("Read-only management inspection requires a healthy API")
+    program = """import json
+from sqlalchemy import select
+from platform_management.db.models import Resource
+from platform_management.db.session import session
+with session() as db:
+    rows=[]
+    for r in db.scalars(select(Resource).where(Resource.kind=='worker_group')):
+        if r.payload.get('mode')=='real' and r.payload.get('ownership')!='external':
+            state=r.payload['group']['status']
+            if r.active_operation_id or state['counts']['allocated_instances']:
+                raise ValueError('Managed GPU operations/capacity must be quiescent')
+            rows.append({'id':r.id,'phase':state['phase'],'allocated':0,'active_operation':False})
+    print(json.dumps(sorted(rows,key=lambda r:r['id'])))
+"""
+    rows = json.loads(
+        Host(load_hosts()["cp-01"]).run(
+            [
+                "sudo",
+                "kubectl",
+                "--kubeconfig=/etc/kubernetes/admin.conf",
+                "-n",
+                "klip",
+                "exec",
+                ready[0]["metadata"]["name"],
+                "-c",
+                "api",
+                "--",
+                "python",
+                "-c",
+                program,
+            ],
+            secret=True,
+        )
+    )
+    return {"retained_node_uid": gpu[0]["metadata"]["uid"], "managed_groups": rows}
+
+
+def prepare(receipts: Path, *, external_capacity_only=False) -> dict:
     from cluster import kubectl
     from lambda_lifecycle_activation import configuration as lifecycle_configuration
 
@@ -305,9 +375,18 @@ def prepare(receipts: Path) -> dict:
         raise ValueError("Management namespace changed")
     targets = healthy_targets()
     values = values_for(assessed)
-    lifecycle = lifecycle_configuration()
+    external_guard = external_capacity_guard() if external_capacity_only else None
+    lifecycle = None if external_capacity_only else lifecycle_configuration()
     if lifecycle is not None:
         values["lifecycle"] = lifecycle["chart_values"]
+    elif external_capacity_only:
+        values["lifecycle"] = {"enabled": False}
+        # Explicit A10-only experiment overlay; ordinary management installations
+        # keep their generic runner and need no experiment-specific Secret.
+        overlay = yaml.safe_load(
+            (ROOT / "deploy/environments/lab/experiments/a10/management-values.yaml").read_text()
+        )
+        values["runner"].update(overlay["runner"])
     manifest = render(values)
     guard_workloads([d for d in yaml.safe_load_all(manifest) if d])
     retain_active_release(folder())
@@ -320,6 +399,8 @@ def prepare(receipts: Path) -> dict:
         "namespace_uid": staged["namespace_uid"],
         "credential_uids": staged["secret_uids"],
         "lifecycle_binding": lifecycle,
+        "external_capacity_only": external_capacity_only,
+        "external_capacity_guard": external_guard,
         "targets": targets,
         "values_sha256": hashlib.sha256(yaml.safe_dump(values).encode()).hexdigest(),
         "manifest_sha256": hashlib.sha256(manifest.encode()).hexdigest(),
@@ -352,7 +433,17 @@ def deploy(approval: str) -> dict:
     fresh = assess(Path(plan["receipts"]), plan["image_assessment"]["source_commit"])
     if fresh != plan["image_assessment"]:
         raise ValueError("Image scan/assessment changed after review")
-    if lifecycle_configuration() != plan.get("lifecycle_binding"):
+    if plan.get("external_capacity_only"):
+        if plan.get("lifecycle_binding") is not None or external_capacity_guard() != plan.get(
+            "external_capacity_guard"
+        ):
+            raise ValueError("External capacity guard changed after planning")
+        if (
+            yaml.safe_load((root / "values.yaml").read_text()).get("lifecycle", {}).get("enabled")
+            is not False
+        ):
+            raise ValueError("External-only release must disable provider lifecycle mutations")
+    elif lifecycle_configuration() != plan.get("lifecycle_binding"):
         raise ValueError("Lifecycle custody or runtime approval changed after planning")
     credentials = stage()  # Recheck every value/UID without rewriting any Secret.
     if credentials["secret_uids"] != plan["credential_uids"]:
@@ -416,6 +507,7 @@ if __name__ == "__main__":
     parser.add_argument("action", choices=["init-admin", "stage", "prepare", "deploy"])
     parser.add_argument("--receipts", type=Path)
     parser.add_argument("--approve-plan")
+    parser.add_argument("--external-capacity-only", action="store_true")
     args = parser.parse_args()
     with (private_dir(state_home() / "cluster") / "operator.lock").open("a") as lock:
         fcntl.flock(lock, fcntl.LOCK_EX)
@@ -424,7 +516,7 @@ if __name__ == "__main__":
             if args.action == "init-admin"
             else stage()
             if args.action == "stage"
-            else prepare(args.receipts)
+            else prepare(args.receipts, external_capacity_only=args.external_capacity_only)
             if args.action == "prepare"
             else deploy(args.approve_plan)
         )

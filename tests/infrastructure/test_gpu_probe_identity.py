@@ -17,7 +17,11 @@ from platform_management.host_executor.inspection_probes import (
 UID = "11111111-2222-3333-4444-555555555555"
 
 
-def test_mtu_check_selects_the_exact_ready_pod_uid(monkeypatch):
+@pytest.mark.parametrize(
+    "socket",
+    ["unix:///run/containerd/containerd.sock", "unix:///run/klip-containerd/containerd.sock"],
+)
+def test_mtu_check_selects_the_exact_ready_pod_uid(monkeypatch, socket):
     calls = []
 
     def command(*args):
@@ -41,8 +45,17 @@ def test_mtu_check_selects_the_exact_ready_pod_uid(monkeypatch):
         raise AssertionError(args)
 
     monkeypatch.setattr(node_agent, "command", command)
-    assert node_agent.pod_network(UID) == {"pod_interface_mtu": 1420, "pod_route_mtu": 1370}
+    assert node_agent.pod_network(UID, cri_socket=socket) == {
+        "pod_interface_mtu": 1420,
+        "pod_route_mtu": 1370,
+    }
     assert all("old" not in args for args in calls)
+    assert all("--runtime-endpoint=" + socket in args for args in calls if args[0] == "crictl")
+
+
+def test_mtu_check_rejects_unreviewed_runtime_socket():
+    with pytest.raises(ValueError, match="CRI socket"):
+        node_agent.pod_network(UID, cri_socket="unix:///tmp/untrusted.sock")
 
 
 def test_mtu_check_rejects_a_sandbox_replaced_after_listing(monkeypatch):

@@ -1,0 +1,39 @@
+{
+  "schema_version": "klip-retained-a10-gateway-review.v1",
+  "scope": "private-authenticated-writerassist-experiment",
+  "reviewed_at": "2026-11-04T14:56:27.779217+00:00",
+  "expires_at": "2026-11-05T14:56:27.779217+00:00",
+  "components": {
+    "proxy": {
+      "image": "docker.io/envoyproxy/envoy:distroless-v1.39.5@sha256:00c38048aeb4bb4b49d9ec6f3d7742a7c9f3d4d33f0371632a76734c02bebb7d",
+      "directory": "artifacts/security/inference-a85630c/inference-proxy-a85630c961616c7988142397aa343e5a2e060c6a",
+      "report_sha256": "184af8e857adf0bc89c18c84d246a8f6bbf7d143e7a59f0ad583f83479890315",
+      "high_findings": []
+    },
+    "llmd-epp": {
+      "image": "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0@sha256:8c6b24302ed21a1c4aa6ba2306187236519a8fdc92282998b33e65c6a446c516",
+      "directory": "artifacts/security/inference-a85630c/inference-llmd-epp-a85630c961616c7988142397aa343e5a2e060c6a",
+      "report_sha256": "638c58eac75edbb495424e43931b20816e8db4f8842cc903a3161eeaf5d03e2c",
+      "high_findings": [
+        [
+          "CVE-2026-111943",
+          "stdlib",
+          "v1.27.2"
+        ]
+      ]
+    }
+  },
+  "conditions": {
+    "private-entry": "Only a ClusterIP listener, authenticated with a high-entropy API key; no public Service or DNS entry.",
+    "fixed-model": "Only gec-small routes to the one identity-verified WriterAssist pool. No provider fallbacks, arbitrary backends, JWT/JWKS, custom plugins or model-supplied code.",
+    "private-ca": "The EPP x509 High finding remains. Its TLS peers are the fixed private Kubernetes API and gateway services, without attacker-supplied intermediate certificates. Model metric scraping is private HTTP.",
+    "resource-isolation": "Proxy replicas are spread across protected CPU hosts, the EPP is CPU-affined and bounded, and Cilium restricts API/model/metric flows. Admission permits private host/remote-node identities on port 9443 for the self-managed API servers. Endpoint-picker selectors use the pinned chart Pod label. The fixed gateway may reach controller xDS on 18000/18002. Scrape monitors use separate named, port-scoped policies."
+  },
+  "configuration": {
+    "deploy/environments/lab/experiments/a10/router-values.yaml": "a926dc61b42346925ccfc40ddb82118a0e943b26e78dc0e155e3123095bab996",
+    "deploy/environments/lab/experiments/a10/gateway.yaml": "8b7af31bac6097e88edc436a5686d6784e47985ffbb6d0dadd818c16ee80b55e"
+  },
+  "limitations": [
+    "One EPP and one A10 model; no serving HA claim. One EPP High finding is retained. Public exposure needs a separate review."
+  ]
+}

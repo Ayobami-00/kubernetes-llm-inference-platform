@@ -1,0 +1,62 @@
+provider: {name: none}
+httpRoute: {create: false}
+router:
+  inferencePool: {create: true, failureMode: FailClose}
+  modelServers:
+    type: vllm
+    protocol: http
+    targetPorts: [{number: 8000}]
+    matchLabels: {klip.dev/serving-deployment: writer-assist-a10}
+  proxy: {enabled: false}
+  tokenizer: {enabled: false}
+  latencyPredictor: {enabled: false}
+  tracing: {enabled: false}
+  monitoring:
+    prometheus:
+      enabled: false
+      auth: {enabled: false}
+  epp:
+    replicas: 1
+    image:
+      registry: ghcr.io/llm-d
+      repository: llm-d-router-endpoint-picker
+      tag: v1.0.0@sha256:8c6b24302ed21a1c4aa6ba2306187236519a8fdc92282998b33e65c6a446c516
+      pullPolicy: IfNotPresent
+    resources:
+      requests: {cpu: 250m, memory: 256Mi}
+      limits: {cpu: '1', memory: 1Gi}
+    podSecurityContext:
+      runAsNonRoot: true
+      runAsUser: 10001
+      runAsGroup: 10001
+      fsGroup: 10001
+      seccompProfile: {type: RuntimeDefault}
+    securityContext:
+      allowPrivilegeEscalation: false
+      capabilities: {drop: [ALL]}
+    affinity:
+      nodeAffinity:
+        requiredDuringSchedulingIgnoredDuringExecution:
+          nodeSelectorTerms:
+            - matchExpressions:
+                - key: klip.dev.node-restriction.kubernetes.io/platform
+                  operator: In
+                  values: ['true']
+    metricsDataSource: {scheme: http, path: /metrics, insecureSkipVerify: false}
+    pluginsConfig:
+      apiVersion: llm-d.ai/v1
+      kind: EndpointPickerConfig
+      plugins:
+        - {type: queue-scorer}
+        - {type: kv-cache-utilization-scorer}
+        - type: metrics-data-source
+          parameters: {scheme: http, path: /metrics, insecureSkipVerify: false}
+        - {type: core-metrics-extractor}
+        - {type: openai-parser}
+      requestHandler:
+        parsers: [{pluginRef: openai-parser}]
+      schedulingProfiles:
+        - name: default
+          plugins:
+            - {pluginRef: queue-scorer, weight: 1}
+            - {pluginRef: kv-cache-utilization-scorer, weight: 1}

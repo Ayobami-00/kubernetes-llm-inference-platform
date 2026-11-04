@@ -263,14 +263,19 @@ def image_credentials(evidence):
     return {"status": "configured", "match_images": provider["providers"][0]["matchImages"]}
 
 
-def probe(evidence):
+def probe(evidence, previous=None):
     from cluster import Host, kubectl, load_hosts
 
     value = json.loads((evidence / "prepared.json").read_text())
+    native_program(previous)  # Validate any explicit failed-result checksum.
+    value["previous_failed_result"] = previous
     node = json.loads(kubectl("get", "node", NAME, "-o", "json"))
     if node["metadata"]["uid"] != json.loads((evidence / "candidate.json").read_text())["uid"]:
         raise ValueError("Retained Node UID changed after admission")
     value["node_uid"] = node["metadata"]["uid"]
+    value["helper_sha256"] = hashlib.sha256(
+        (ROOT / "scripts/infrastructure/node_agent.py").read_bytes()
+    ).hexdigest()
     namespace = json.loads(kubectl("get", "namespace", "klip-acceptance", "-o", "json"))
     if (
         namespace["metadata"].get("labels", {}).get("klip.dev/project")
@@ -422,8 +427,8 @@ if __name__ == "__main__":
         "probe": probe,
     }[args.action]
     result = (
-        join(args.evidence.resolve(), args.previous_failed_result)
-        if args.action == "join"
+        action(args.evidence.resolve(), args.previous_failed_result)
+        if args.action in {"join", "probe"}
         else action(args.evidence.resolve())
     )
     print(json.dumps(result, indent=2))

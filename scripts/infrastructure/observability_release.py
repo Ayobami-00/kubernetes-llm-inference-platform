@@ -296,7 +296,14 @@ def backend_values(component):
         }
         if (
             set(dashboards)
-            != {"platform.json", "cluster.json", "storage.json", "network.json", "telemetry.json"}
+            != {
+                "platform.json",
+                "cluster.json",
+                "storage.json",
+                "network.json",
+                "telemetry.json",
+                "a10.json",
+            }
             or sum(len(v.encode()) for v in dashboards.values()) > 750000
         ):
             raise ValueError("Unexpected provisioned dashboard set or ConfigMap size")

@@ -85,7 +85,8 @@ def test_initial_model_chart_renders_exact_runtime_and_network_boundaries():
     assert json.loads(args[args.index("--default-chat-template-kwargs") + 1]) == {
         "enable_thinking": False
     }
-    assert "--no-enable-prefix-caching" in args and "--disable-log-requests" in args
+    assert "--no-enable-prefix-caching" in args and "--no-enable-log-requests" in args
+    assert "--disable-log-requests" not in args
     assert not any("speculat" in str(a) or "trust-remote-code" in str(a) for a in args)
     assert container["resources"]["limits"]["nvidia.com/gpu"] == 1
     assert container["securityContext"]["readOnlyRootFilesystem"]

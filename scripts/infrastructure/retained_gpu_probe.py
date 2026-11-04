@@ -45,9 +45,46 @@ with ExitStack() as stack:
     write_private(result_path, result)
     try:
         inputs, registry, cp = scope(root)
+        prior_sha = value.get("previous_failed_result")
+        prior_paths = [p for p in directory.parent.glob("*/result.json") if p != result_path]
+        if prior_paths:
+            matches = [
+                p for p in prior_paths if hashlib.sha256(p.read_bytes()).hexdigest() == prior_sha
+            ]
+            require(
+                len(matches) == 1 and json.loads(matches[0].read_text()).get("status") == "failed",
+                "Explicit prior failed probe checksum required",
+            )
+            owner = json.loads((matches[0].parent / "owner.json").read_text())
+            old_job = json.loads(
+                cp.run(
+                    [
+                        "sudo",
+                        "kubectl",
+                        "--kubeconfig=/etc/kubernetes/admin.conf",
+                        "-n",
+                        "platform-ops",
+                        "get",
+                        "job",
+                        "retained-a10-" + matches[0].parent.name[:20],
+                        "-o",
+                        "json",
+                    ]
+                )
+            )
+            require(
+                old_job["metadata"]["uid"] == owner["job_uid"]
+                and old_job.get("status", {}).get("failed", 0) > 0,
+                "Prior probe owner has not terminated",
+            )
         from cluster import load_hosts
 
         host = Host(load_hosts()[value["node"]["name"]])
+        require(
+            host.run(["sudo", "sha256sum", "/usr/local/sbin/klip-node"]).split()[0]
+            == value["helper_sha256"],
+            "Host helper differs from probe inputs",
+        )
         require(
             host.run(["cat", "/proc/sys/kernel/random/boot_id"]).strip()
             == value["retained"]["boot_id"],

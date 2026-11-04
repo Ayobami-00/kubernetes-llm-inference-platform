@@ -160,7 +160,14 @@ def test_replanning_retains_original_plan_and_manifest_bytes(tmp_path, monkeypat
     assert json.loads((tmp_path / "plan.json").read_text()) == second
 
 
-def test_extension_reader_covers_only_the_configured_namespace_watch():
+def test_extension_reader_covers_only_the_configured_namespace_watch(tmp_path, monkeypatch):
+    # The offline namespace-scope check needs only this upstream input shape;
+    # full pinned chart rendering is covered by the opt-in artifact tests.
+    monkeypatch.setattr(platform, "CACHE", tmp_path)
+    (tmp_path / "envoy-ai-integration.yaml").write_text(
+        "config:\n  envoyGateway:\n    extensionManager:\n      service:\n"
+        "        fqdn:\n          hostname: upstream.example\n"
+    )
     documents = [v for v in yaml.safe_load_all(platform.boundary()) if v]
     roles = [v for v in documents if v["kind"] == "Role"]
     bindings = [v for v in documents if v["kind"] == "RoleBinding"]
