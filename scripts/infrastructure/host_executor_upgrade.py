@@ -40,10 +40,13 @@ with ExitStack() as stack:
     peers=json.loads((root/'cluster/peers.json').read_text())
     if set(peers['peers'])!={'cp-01','cp-02','cp-03','platform-01','platform-02','platform-03'}:
         raise ValueError('CPU-only upgrade requires no allocated GPU peers')
+    recovered=set()
+    # FENCED_RECOVERY_PROOF
     for path in (root/'executions').glob('host-*/task.json'):
         observed=path.parent/'observation.json'
         value=json.loads(observed.read_text()) if observed.is_file() else {}
-        if value.get('status') not in ('completed','failed') or value.get('cleanup_pending'):
+        if value.get('status') not in ('completed','failed') or (
+            value.get('cleanup_pending') and path.parent.name not in recovered):
             raise ValueError('Unfinished host task prevents an executor upgrade')
     # NATIVE_PREFLIGHT
     from platform_management.integrations.job_runner import frozen_file
@@ -83,7 +86,7 @@ def preflight_program(approval):
     )
 
 
-def guard_program(approval):
+def guard_program(approval, recovery=None):
     # Keep SSH/STS and lock custody in the same native Job process. kubectl exec
     # only reads the resulting receipts; it never owns nested SSM subprocesses.
     path = "/executor/state/upgrades/" + approval + "/preflight.json"
@@ -93,7 +96,28 @@ def guard_program(approval):
         "    if proof.get('status')!='verified':\n"
         "        raise ValueError('Native preflight failed; redacted evidence retained')"
     )
-    return GUARD_PROGRAM.replace("    # NATIVE_PREFLIGHT", replacement)
+    program = GUARD_PROGRAM.replace("    # NATIVE_PREFLIGHT", replacement)
+    if recovery is not None:
+        extra = (
+            "    from host_executor_recovery import fenced_chain\n"
+            + "    expected="
+            + repr(recovery)
+            + "\n"
+            "    if fenced_chain(root,expected['head'])!=expected:\n"
+            "        raise ValueError('Fenced task evidence changed after planning')\n"
+            "    recovered=set(expected['tasks'])"
+        )
+        program = program.replace("    # FENCED_RECOVERY_PROOF", extra)
+        program = program.replace(
+            "    from platform_management.integrations.job_runner import frozen_file",
+            "    from cluster import Host,load_hosts\n"
+            "    cp=Host(load_hosts()['cp-01'])\n"
+            "    node=cp.run(['sudo','kubectl','--kubeconfig=/etc/kubernetes/admin.conf',\n"
+            "        'get','node',expected['node_name'],'--ignore-not-found','-o','json'])\n"
+            "    if node.strip(): raise ValueError('Fenced recovery node is still registered')\n"
+            "    from platform_management.integrations.job_runner import frozen_file",
+        )
+    return program
 
 
 def mapped(text):
@@ -198,7 +222,7 @@ def observe_ready(cp, expected_identities, image, *, timeout=90):
             time.sleep(2)
 
 
-def prepare(receipt, directory):
+def prepare(receipt, directory, *, fenced_recovery_task=None):
     from cluster import Host, load_hosts
 
     review = assess(receipt, directory)
@@ -217,6 +241,11 @@ def prepare(receipt, directory):
     candidate, _ = rendered(temporary)
     validate_delta(old, candidate, active["image"], review["image"])
     cp = Host(load_hosts()["cp-01"])
+    recovery = None
+    if fenced_recovery_task:
+        from host_executor_recovery import preview
+
+        recovery = preview(cp, fenced_recovery_task)
     identity, pods = identities(cp)
     ready_pods(pods, active["image"])
     record = {
@@ -226,6 +255,7 @@ def prepare(receipt, directory):
         "active_sha256": sha(active_body),
         "identities": identity,
         "custody_fingerprints": custody(),
+        "fenced_recovery": recovery,
         "image_assessment": review,
         "receipt_path": str(receipt.resolve()),
         "security_directory": str(directory.resolve()),
@@ -301,7 +331,7 @@ def apply(approval):
         raise ValueError("Executor cluster, deployment, storage or credential identities changed")
     job = bootstrap_job(plan, list(mapped((root / "rendered.yaml").read_text()).values()))
     container = job["spec"]["template"]["spec"]["containers"][0]
-    container["command"] = ["python", "-c", guard_program(approval)]
+    container["command"] = ["python", "-c", guard_program(approval, plan.get("fenced_recovery"))]
     container["env"] += [
         {"name": "KLIP_UPGRADE_ID", "value": approval},
         {"name": "POD_UID", "valueFrom": {"fieldRef": {"fieldPath": "metadata.uid"}}},
@@ -467,9 +497,12 @@ if __name__ == "__main__":
     parser.add_argument("--receipt", type=Path)
     parser.add_argument("--security-directory", type=Path)
     parser.add_argument("--approve-plan")
+    parser.add_argument("--fenced-recovery-task")
     args = parser.parse_args()
     value = (
-        prepare(args.receipt, args.security_directory)
+        prepare(
+            args.receipt, args.security_directory, fenced_recovery_task=args.fenced_recovery_task
+        )
         if args.action == "prepare"
         else apply(args.approve_plan)
     )

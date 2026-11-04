@@ -143,6 +143,9 @@ def install_artifact(*, opener=urllib.request.urlopen):
             stream.flush()
             os.fsync(stream.fileno())
         verify(Path(temporary), artifact)
+        # This is a public, checksum-verified release archive. Image builds run
+        # as root; the unprivileged executor must be able to read it later.
+        os.chmod(temporary, 0o644)
         # A concurrent staging process cannot replace different retained content.
         try:
             os.link(temporary, destination)

@@ -292,6 +292,7 @@ def checked_image_source(review):
         "scripts/infrastructure/image_release.py",
         "scripts/infrastructure/publish_images.py",
         "scripts/infrastructure/host_executor_image.py",
+        "scripts/infrastructure/host_executor_recovery.py",
         "scripts/infrastructure/host_executor_openssh.py",
         "infra/ansible",
         "deploy/artifacts.lock.json",

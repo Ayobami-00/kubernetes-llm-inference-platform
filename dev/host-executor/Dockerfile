@@ -37,4 +37,5 @@ RUN python scripts/infrastructure/host_executor_image.py \
     && mkdir -p /executor/state /app/artifacts/ansible \
     && chown 20002:20002 /executor/state /app/artifacts/ansible
 USER 20002:20002
+RUN python -c "from host_executor_image import verify_installed; verify_installed()"
 CMD ["python", "-m", "platform_management.host_executor.api"]

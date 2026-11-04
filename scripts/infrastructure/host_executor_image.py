@@ -70,6 +70,7 @@ def verify_installed():
     """
     from gpu_operator import settings as operator_settings
     from gpu_runtime import settings, verify
+    from host_executor_recovery import fenced_chain  # noqa: F401
     from platform_management.host_executor import inspection, worker  # noqa: F401
     from workload_identity import configuration
 

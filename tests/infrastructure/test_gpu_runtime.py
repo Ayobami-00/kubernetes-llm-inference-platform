@@ -155,6 +155,7 @@ def test_atomic_download_validates_before_install_and_reuses_verified_cache(tmp_
 
     path = gpu_runtime.install_artifact(opener=opener)
     assert path.read_bytes() == payload
+    assert path.stat().st_mode & 0o777 == 0o644
     assert gpu_runtime.install_artifact(opener=opener) == path
     assert len(calls) == 1 and not list(path.parent.glob(".gpu-containerd-*"))
 

@@ -89,3 +89,26 @@ replace an accepted key and triggers the existing cleanup workflow. If cloud-ini
 or outbound connectivity fails before that report is possible, the bounded
 attestation deadline still applies. An absent callback never authorizes blind
 SSH host-key acceptance.
+
+The next operation, `op-178da799f9bb4c56` / `writer-a10-20261104-c`,
+successfully attested its host key at 10:57:13 UTC. Its native preparation Job
+failed before changing that host: the image's public containerd archive was
+owned by root with mode `0600`, unreadable by UID 20002. The image now verifies
+its installed artifacts again after switching to that unprivileged UID, and
+newly staged public runtime archives use `0644`.
+
+Cleanup confirmed the provider fence but initially could not complete mesh
+reconciliation because the CPU handoff intentionally omits operator-local
+firewall file paths. Mesh now requires a scoped firewall file for new workers;
+only the six named AWS CPU peers can preserve an existing regular, root-owned
+`0600` firewall. It does not replace those retained CPU firewalls.
+
+When this exact never-joined failure prevents an image repair, prepare the normal
+image-only executor upgrade with `--fenced-recovery-task <failed-revocation-id>`.
+The helper binds all task/observation/receipt bytes, native Job UIDs and the
+original provider fence. Its native guard repeats those checks while holding
+both writer locks, requires exactly the six CPU peers and proves the GPU Node
+is absent. Running tasks, another allocation's pending cleanup, changed evidence,
+joined Nodes and unfenced recovery remain forbidden. It neither clears the
+reservation nor rewrites failed history. After repair, submit a new management
+cleanup operation and confirm its completed revocation before a fresh rental.
