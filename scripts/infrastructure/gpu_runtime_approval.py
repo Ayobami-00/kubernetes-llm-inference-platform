@@ -4,7 +4,7 @@ import argparse
 import json
 from pathlib import Path
 
-from common import source_digest, state_home, utc_now, write_private
+from common import state_home, utc_now, write_private
 from gpu_runtime_security import REVIEW, assess, configuration, digest, sha
 from host_executor_upgrade import identities, ready_pods
 from platform_management.integrations.job_runner import frozen_file
@@ -12,6 +12,11 @@ from platform_management.integrations.job_runner import frozen_file
 
 def folder():
     return state_home() / "cluster/gpu-runtime-approval"
+
+
+def source_identity():
+    paths = [REVIEW, Path(__file__), Path(__file__).with_name("gpu_runtime_security.py")]
+    return digest({str(p.name): sha(p.read_bytes()) for p in paths})
 
 
 def observe_cluster():
@@ -64,7 +69,7 @@ def prepare(images, host):
     plan = {
         "schema_version": "klip-gpu-runtime-stage.v1",
         "prepared_at": utc_now(),
-        "source_sha256": source_digest([REVIEW, Path(__file__)]),
+        "source_sha256": source_identity(),
         "observed": observed,
         "approval": receipt,
         "assessment": evidence,
@@ -116,7 +121,7 @@ def apply(identity):
         raise ValueError("Exact approval plan required")
     path = folder() / identity
     plan = json.loads((path / "plan.json").read_text())
-    if digest(plan) != identity or source_digest([REVIEW, Path(__file__)]) != plan["source_sha256"]:
+    if digest(plan) != identity or source_identity() != plan["source_sha256"]:
         raise ValueError("Approval plan or versioned source changed")
     if datetime.now(UTC) >= datetime.fromisoformat(plan["approval"]["expires_at"]):
         raise ValueError("GPU runtime review expired")
