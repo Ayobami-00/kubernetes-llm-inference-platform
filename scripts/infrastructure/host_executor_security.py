@@ -163,7 +163,7 @@ def assess(path, directory, *, now=None):
         "source_commit": image["source_commit"],
         "scan_sha256": summary["scan_sha256"],
         "review_sha256": hashlib.sha256(REVIEW.read_bytes()).hexdigest(),
-        "high_findings": findings(report),
+        "high_findings": [list(value) for value in findings(report)],
         "critical_findings": 0,
     }
 

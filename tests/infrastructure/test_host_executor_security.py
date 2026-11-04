@@ -72,6 +72,25 @@ def test_full_coverage_and_current_independent_review_pass(evidence):
     assert result["image"] == IMAGE and result["critical_findings"] == 0
 
 
+def test_assessment_survives_saved_release_plan_json_roundtrip(evidence):
+    path, directory, now, report, summary, save = evidence
+    value = {
+        "Severity": "HIGH",
+        "VulnerabilityID": "synthetic-CVE",
+        "PkgName": "fixture",
+        "InstalledVersion": "1",
+    }
+    report["Results"][0]["Vulnerabilities"].append(value)
+    save(report, summary)
+    review = json.loads(security.REVIEW.read_text())
+    review["high_findings"] = [
+        {"finding": ["synthetic-CVE", "fixture", "1"], "rationale": "Synthetic runtime review"}
+    ]
+    security.REVIEW.write_text(json.dumps(review))
+    result = security.assess(path, directory, now=now)
+    assert result == json.loads(json.dumps(result))
+
+
 @pytest.mark.parametrize(
     "change",
     ["critical", "new-high", "missing-coverage", "old-db", "old-scan", "other-image", "altered"],
