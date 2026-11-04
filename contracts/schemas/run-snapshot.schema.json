@@ -1760,6 +1760,15 @@
     "WorkerGroupSpec": {
       "additionalProperties": false,
       "properties": {
+        "capacity_lifecycle": {
+          "default": "leased",
+          "enum": [
+            "leased",
+            "externally_retained"
+          ],
+          "title": "Capacity Lifecycle",
+          "type": "string"
+        },
         "desired_instances": {
           "default": 1,
           "minimum": 0,
@@ -1844,10 +1853,17 @@
           "type": "string"
         },
         "ttl_minutes": {
+          "anyOf": [
+            {
+              "exclusiveMinimum": 0,
+              "type": "integer"
+            },
+            {
+              "type": "null"
+            }
+          ],
           "default": 90,
-          "exclusiveMinimum": 0,
-          "title": "Ttl Minutes",
-          "type": "integer"
+          "title": "Ttl Minutes"
         },
         "worker_class": {
           "pattern": "^[a-z][a-z0-9]*(?:-[a-z0-9]+)*$",

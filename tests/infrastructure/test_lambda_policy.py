@@ -57,6 +57,7 @@ def test_draft_or_incompatible_group_cannot_use_real_policy():
         {"region": None},
         {"desired_instances": 2},
         {"ttl_minutes": 120},
+        {"capacity_lifecycle": "externally_retained", "ttl_minutes": None},
     ):
         with pytest.raises(AppError):
             policy().check_group(document.model_copy(update=change))

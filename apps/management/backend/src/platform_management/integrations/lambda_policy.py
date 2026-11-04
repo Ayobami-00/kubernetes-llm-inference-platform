@@ -48,7 +48,9 @@ class LambdaLifecyclePolicy(ContractModel):
 
     def check_group(self, spec: WorkerGroupSpec):
         if (
-            spec.provider != "lambda"
+            spec.capacity_lifecycle != "leased"
+            or spec.ttl_minutes is None
+            or spec.provider != "lambda"
             or spec.instance_type != self.instance_type
             or spec.region != self.region
             or spec.desired_instances != 1

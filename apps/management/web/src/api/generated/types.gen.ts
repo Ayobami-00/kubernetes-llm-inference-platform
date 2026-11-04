@@ -2447,6 +2447,10 @@ export type WorkerGroup = {
  */
 export type WorkerGroupSpec = {
     /**
+     * Capacity Lifecycle
+     */
+    capacity_lifecycle?: 'leased' | 'externally_retained';
+    /**
      * Desired Instances
      */
     desired_instances?: number;
@@ -2490,7 +2494,7 @@ export type WorkerGroupSpec = {
     /**
      * Ttl Minutes
      */
-    ttl_minutes?: number;
+    ttl_minutes?: number | null;
     /**
      * Worker Class
      */
@@ -2509,6 +2513,10 @@ export type WorkerGroupStatus = {
      * Allocated At
      */
     allocated_at?: string | null;
+    /**
+     * Capacity Lifecycle
+     */
+    capacity_lifecycle?: 'leased' | 'externally_retained';
     counts: WorkerCounts;
     /**
      * Expires At

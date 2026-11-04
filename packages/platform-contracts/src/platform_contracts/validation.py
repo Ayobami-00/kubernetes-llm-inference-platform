@@ -257,7 +257,10 @@ def validate_for_execution(snapshot: RunSnapshot) -> None:
             + snapshot.scenario.measurement_duration_s
             + snapshot.scenario.drain_timeout_s
         )
-        if group.ttl_minutes * 60 < minimum_s + group.drain_timeout_s:
+        if (
+            group.ttl_minutes is not None
+            and group.ttl_minutes * 60 < minimum_s + group.drain_timeout_s
+        ):
             errors.append(f"{group.ref}: lease is shorter than run plus cleanup")
     for dataset in snapshot.datasets:
         if dataset.prepared is None:

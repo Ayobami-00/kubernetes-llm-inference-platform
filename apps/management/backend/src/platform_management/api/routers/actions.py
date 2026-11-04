@@ -111,6 +111,10 @@ def create_group(body: CreateGroup, db: Db, response: Response, key: Idempotency
         if db.get(Resource, body.id):
             raise AppError(409, "Resource ID already exists")
         spec = catalog(db).get("worker-group", body.spec_ref)
+        if spec.capacity_lifecycle != "leased":
+            raise AppError(
+                422, "Externally retained capacity must be imported; it cannot be allocated"
+            )
         if body.mode == "real":
             from platform_management.integrations.lambda_policy import checked_binding
             from platform_management.integrations.registry import configuration

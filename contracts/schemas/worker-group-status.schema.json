@@ -231,6 +231,15 @@
       "default": null,
       "title": "Allocated At"
     },
+    "capacity_lifecycle": {
+      "default": "leased",
+      "enum": [
+        "leased",
+        "externally_retained"
+      ],
+      "title": "Capacity Lifecycle",
+      "type": "string"
+    },
     "counts": {
       "$ref": "#/$defs/WorkerCounts"
     },

@@ -439,6 +439,14 @@ def test_offline_execution_completeness_accepts_resolved_metadata(complete_snaps
     validate_for_execution(complete_snapshot)
 
 
+def test_explicit_retained_capacity_needs_no_invented_lease(complete_snapshot):
+    groups = tuple(
+        g.model_copy(update={"capacity_lifecycle": "externally_retained", "ttl_minutes": None})
+        for g in complete_snapshot.worker_groups
+    )
+    validate_for_execution(complete_snapshot.model_copy(update={"worker_groups": groups}))
+
+
 @pytest.mark.parametrize(
     "mutation,match",
     [

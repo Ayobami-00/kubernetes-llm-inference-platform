@@ -157,8 +157,21 @@ def assess(db, body, snap):
         )
         lease_ready = bool(
             sim_ready
-            and state.get("expires_at")
-            and (datetime.fromisoformat(state["expires_at"]) - now()).total_seconds() >= minimum
+            and (
+                (
+                    spec.capacity_lifecycle == "externally_retained"
+                    and row.payload.get("ownership") == "external"
+                    and state.get("capacity_lifecycle") == "externally_retained"
+                    and state.get("allocated_at")
+                    and state.get("expires_at") is None
+                )
+                or (
+                    spec.capacity_lifecycle == "leased"
+                    and state.get("expires_at")
+                    and (datetime.fromisoformat(state["expires_at"]) - now()).total_seconds()
+                    >= minimum
+                )
+            )
         )
         real_group = bool(
             matches
@@ -174,9 +187,9 @@ def assess(db, body, snap):
             real_group = row.payload.get("inventory_id") == (inv.snapshot_id if inv else None)
         check(
             "lease-" + spec.id,
-            "Observed capacity and remaining lease",
+            "Observed capacity ownership and availability",
             real_group and lease_ready,
-            "Real execution requires matching measured capacity with enough remaining lease",
+            "Requires fresh measured external retained capacity, or sufficient remaining lease",
             spec.ref,
         )
         nodes = [n for n in inv.nodes if n.worker_group_ref == spec.ref] if inv else []
