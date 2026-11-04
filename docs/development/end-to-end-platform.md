@@ -593,3 +593,10 @@ At 00:41, a Thanos query restricted to both healthy object-store gateways still
 returned no historical metrics, matching zero sidecar block uploads. Its negative
 store-selection control was also empty. This is recorded as pending cold-history
 verification; successful live sidecar queries are not substituted for this gate.
+
+At 01:09:58 UTC the repeated check passed: both Prometheus sidecars reported two
+successful block uploads. Selecting only the two healthy object-store gateways
+returned three deduplicated API-server targets at 23:45 UTC, while selecting a
+nonexistent gateway returned no series. The retained `cold-history-proof.json`
+therefore records `cold_history_verified: true`. This demonstrates cold history
+retrieval for those uploaded blocks, not a completed retention/failure rehearsal.

@@ -127,3 +127,13 @@ def test_failed_download_cleans_partial_file(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="bound"):
         gpu_runtime.install_artifact(opener=lambda *_a, **_kw: io.BytesIO(b"oversized"))
     assert not list((tmp_path / "artifacts/platform").iterdir())
+
+
+def test_actual_ansible_templates_render_for_cpu_and_gpu_runtime_profiles(monkeypatch):
+    pytest.importorskip("ansible")
+    import cluster_checks
+    from common import ROOT
+
+    monkeypatch.setenv("ANSIBLE_CONFIG", str(ROOT / "infra/ansible/ansible.cfg"))
+    monkeypatch.setenv("ANSIBLE_HOME", str(ROOT / "artifacts/ansible"))
+    cluster_checks.render_role_templates()

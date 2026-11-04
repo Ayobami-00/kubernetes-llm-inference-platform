@@ -18,7 +18,20 @@ def render_role_templates() -> None:
 
     init_plugin_loader()
     variables = {
-        "klip_node": {"role": "control_plane", "backup_recipient": "age1example"},
+        "klip_node": {
+            "role": "control_plane",
+            "provider": "aws",
+            "containerd_version": VERSIONS["containerd"],
+            "runtime_profile": "standard",
+            "backup_recipient": "age1example",
+            "quarantine": False,
+        },
+        "ansible_facts": {
+            "distribution": "Ubuntu",
+            "distribution_version": "24.04",
+            "architecture": "x86_64",
+            "kernel": "6.8.0-101-generic",
+        },
         "inventory_hostname": "cp-01",
         "item": {"item": "/example/path", "stat": {"exists": False}},
         "klip_repository": str(ROOT),
@@ -36,20 +49,32 @@ def render_role_templates() -> None:
         "klip_image_credentials_provider_yaml": "apiVersion: kubelet.config.k8s.io/v1\n",
         "index": 0,
     }
-    templar = Templar(variables=variables)
 
-    def visit(value):
+    def visit(value, templar):
         if isinstance(value, dict):
             for nested in value.values():
-                visit(nested)
+                visit(nested, templar)
         elif isinstance(value, list):
             for nested in value:
-                visit(nested)
+                visit(nested, templar)
         elif isinstance(value, str) and "{{" in value:
             templar.template(trust_as_template(value))
 
-    for path in (ROOT / "infra/ansible/roles").rglob("*.yaml"):
-        visit(yaml.safe_load(path.read_text()))
+    from gpu_runtime import settings as gpu_settings
+
+    for profile in ("standard", "nvidia-operator"):
+        context = {**variables, "klip_node": {**variables["klip_node"]}}
+        if profile == "nvidia-operator":
+            context["klip_node"].update(
+                role="worker",
+                provider="lambda",
+                runtime_profile=profile,
+                containerd_version=gpu_settings()["containerd_version"],
+                quarantine=True,
+            )
+        templar = Templar(variables=context)
+        for path in (ROOT / "infra/ansible/roles").rglob("*.yaml"):
+            visit(yaml.safe_load(path.read_text()), templar)
 
 
 def main() -> None:

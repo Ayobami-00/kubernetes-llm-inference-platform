@@ -22,11 +22,15 @@
   ansible.builtin.slurp:
     src: /proc/modules
   register: klip_gpu_host_loaded_modules
+- name: Observe installed packages before taking GPU software ownership
+  ansible.builtin.package_facts:
+    manager: apt
 - name: Reject a preinstalled or loaded NVIDIA stack
   ansible.builtin.assert:
     that:
       - klip_gpu_host_existing_userspace.results | selectattr('stat.exists') | list | length == 0
       - (klip_gpu_host_loaded_modules.content | b64decode) is not regex('(?m)^nvidia')
+      - ansible_facts.packages.keys() | select('match', '^(nvidia-|libnvidia|cuda-)') | list | length == 0
     fail_msg: Use a plain image; driver/toolkit removal requires explicit recovery
 - name: Install matching kernel headers and PCI inspection tools
   ansible.builtin.apt:
