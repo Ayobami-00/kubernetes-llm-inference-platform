@@ -421,6 +421,12 @@ def bootstrap_job(plan, documents):
     pod.update(restartPolicy="Never", serviceAccountName="klip-host-job")
     container = pod["containers"][0]
     container["name"] = "custody-preflight"
+    # The API itself needs less memory than AWS CLI + SSM + SSH. Exercise the
+    # actual host-Job envelope, rather than inheriting the API's smaller limit.
+    container["resources"] = {
+        "requests": {"cpu": "500m", "memory": "512Mi"},
+        "limits": {"cpu": "2", "memory": "2Gi"},
+    }
     for probe in ("startupProbe", "readinessProbe", "livenessProbe", "ports"):
         container.pop(probe, None)
     done = f"/executor/state/bootstrap/{identity}/done"

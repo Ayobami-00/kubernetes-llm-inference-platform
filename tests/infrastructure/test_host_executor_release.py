@@ -148,6 +148,10 @@ def test_preflight_job_has_no_cluster_token_or_api_client_key():
         and actual["automountServiceAccountToken"] is False
     )
     assert job["spec"]["backoffLimit"] == 0
+    assert actual["containers"][0]["resources"] == {
+        "requests": {"cpu": "500m", "memory": "512Mi"},
+        "limits": {"cpu": "2", "memory": "2Gi"},
+    }
     secrets = [v["secret"]["secretName"] for v in actual["volumes"] if "secret" in v]
     assert secrets == ["klip-host-credentials"]
     tokens = [v for v in actual["volumes"] if "projected" in v]
