@@ -7,10 +7,25 @@ import subprocess
 import tarfile
 import tempfile
 import urllib.request
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 
 URL = "https://cdn.openbsd.org/pub/OpenBSD/OpenSSH/portable/openssh-10.6p1.tar.gz"
 SHA256 = "a9dc9565dffe8640f64d863cd29a32bc4a3dbdec0566a7fc44c5d6ee767d5f39"
+
+
+def validate_archive(members):
+    if len(members) > 5000 or sum(member.size for member in members) > 64 * 1024 * 1024:
+        raise ValueError("OpenSSH source archive exceeds unpacking bounds")
+    for member in members:
+        path = PurePosixPath(member.name)
+        if (
+            path.is_absolute()
+            or ".." in path.parts
+            or not path.parts
+            or path.parts[0] != "openssh-10.6p1"
+            or not (member.isfile() or member.isdir())
+        ):
+            raise ValueError("Unexpected upstream OpenSSH source layout")
 
 
 def build():
@@ -20,10 +35,7 @@ def build():
         raise ValueError("OpenSSH source differs from the upstream release checksum")
     with tempfile.TemporaryDirectory() as temporary:
         with tarfile.open(fileobj=io.BytesIO(data)) as archive:
-            if any(
-                not member.name.startswith("openssh-10.6p1/") for member in archive.getmembers()
-            ):
-                raise ValueError("Unexpected upstream OpenSSH source layout")
+            validate_archive(archive.getmembers())
             archive.extractall(temporary, filter="data")
         folder = Path(temporary) / "openssh-10.6p1"
         subprocess.run(
