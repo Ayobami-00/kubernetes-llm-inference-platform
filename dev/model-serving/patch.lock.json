@@ -1,0 +1,46 @@
+{
+  "schema_version": "klip-vllm-security-patch.v1",
+  "base": "docker.io/vllm/vllm-openai@sha256:6ee133356d49ed24cee03dd0cda3d3980279a11c107ce3e752c89e76540f41c9",
+  "protected_versions": {
+    "vllm": "0.32.0",
+    "torch": "2.13.0+cu130",
+    "transformers": "5.19.0",
+    "tokenizers": "0.23.3"
+  },
+  "pip_vendored_certifi": "2026.10.23",
+  "wheels": [
+    {
+      "name": "certifi",
+      "version": "2026.10.18",
+      "filename": "certifi-2026.10.18-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/08/ba/95dd616042484f7c83a06974388b37b837732740ee70bc5dc715b5fcd55a/certifi-2026.10.18-py3-none-any.whl",
+      "sha256": "73191c47aaa79da394e8fee2dbc2ec827432cab56311122c9e47abf79e390f62",
+      "size": 134093
+    },
+    {
+      "name": "uv",
+      "version": "0.13.4",
+      "filename": "uv-0.13.4-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "url": "https://files.pythonhosted.org/packages/4b/a1/de02c0913726728eca56ee258875cbba9c7b0572c63f494fd9f55c7852e3/uv-0.13.4-py3-none-manylinux_2_17_x86_64.manylinux2014_x86_64.whl",
+      "sha256": "05e4332791b4d55b6dde8695b7fa6079b26991519f44760887c5dfbd5ca4fe53",
+      "size": 17181168
+    },
+    {
+      "name": "pip",
+      "version": "26.3",
+      "filename": "pip-26.3-py3-none-any.whl",
+      "url": "https://files.pythonhosted.org/packages/07/25/ee8c38ae72d66b844ce8eb9711ba905dba21ca1a8a0c960057c41cd23337/pip-26.3-py3-none-any.whl",
+      "sha256": "f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13",
+      "size": 1950951
+    }
+  ],
+  "evidence": [
+    "https://github.com/advisories/GHSA-6q48-6c7w-9gw2",
+    "https://github.com/advisories/GHSA-hq85-5cpj-mr62",
+    "https://pypi.org/pypi/pip/26.3/json"
+  ],
+  "limitations": [
+    "Only CA/tooling packages change; CUDA, model libraries and kernel headers are retained.",
+    "Native full-image scanning and exact finding review remain required before deployment."
+  ]
+}

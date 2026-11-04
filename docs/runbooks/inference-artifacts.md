@@ -43,3 +43,31 @@ and nine in Python dependencies. It is retained as a superseded, unapproved
 candidate. Revision 2 selects upstream's newer stable 0.32.0 for a separate scan;
 that selection is not a finding waiver or a readiness claim. Both model candidate
 documents remain draft and retain the same Qwen/tokenizer pins.
+
+The upstream 0.32.0 scan retained 18 unique Critical tuples: 15 kernel-header
+findings and three CA/tooling findings. `dev/model-serving/` derives an image
+from that exact AMD64 digest and updates only certifi, pip (including its
+vendored certifi) and uv, using checksum-locked PyPI wheels. It compares the
+complete Python distribution inventory before and after; CUDA, vLLM, Torch,
+Transformers and Tokenizers remain unchanged. The build also runs `pip check`
+and repeats verification as UID 10001. Runtime Python/Requests/curl CA settings
+point to the patched bundle. No compiler/header removal is attempted because
+upstream uses runtime JIT compilation.
+
+The **Pinned model serving image** workflow builds on a disposable CPU runner,
+publishes an immutable source tag, extracts native patch/header inventories
+without starting serving, and retains a complete Trivy scan. Any Critical
+findings still fail its scan gate; neither the patch nor its inventories waive
+findings. Exact applicability review and hardware readiness remain separate.
+
+Terraform's retained `klip/model-serving` repository is private, encrypted,
+immutable and scans pushes. Tagged historical images survive rebuilds; only
+untagged images expire after 30 days. The applied plan was
+`825112c2124e13fb66de2b4f442e6c972a4fe1ed199452752c0f68a893a92af5`.
+It added the repository/retention and the exact
+`system:serviceaccount:llm-d:klip-model-release` read-only role, and extended
+the existing repository-bound CI publisher to this one repository. Existing
+application pull identities retain their original three-repository scope.
+The new role can read model and release-helper images, cannot publish, and
+does not give model Pods Kubernetes credentials. One approximately 9 GB image
+costs roughly $1/month in registry storage, excluding transfer and later images.

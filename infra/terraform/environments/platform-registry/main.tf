@@ -1,15 +1,22 @@
 locals {
-  config          = jsondecode(file("${path.module}/../../project.json"))
-  github          = jsondecode(file("${path.module}/../../registry.json")).github
-  identity        = data.terraform_remote_state.identity.outputs.identity_manifest
-  images          = toset(["management-backend", "management-web", "workload-runner"])
-  repository_arns = [for name in sort(tolist(local.images)) : "arn:aws:ecr:${local.config.region}:${local.config.account_id}:repository/${local.config.cluster_id}/${name}"]
+  config             = jsondecode(file("${path.module}/../../project.json"))
+  github             = jsondecode(file("${path.module}/../../registry.json")).github
+  identity           = data.terraform_remote_state.identity.outputs.identity_manifest
+  application_images = toset(["management-backend", "management-web", "workload-runner"])
+  images             = setunion(local.application_images, toset(["model-serving"]))
+  repository_arns    = { for name in local.images : name => "arn:aws:ecr:${local.config.region}:${local.config.account_id}:repository/${local.config.cluster_id}/${name}" }
   subjects = {
     pull = concat(
       [for name in ["klip-api", "klip-worker", "klip-web", "klip-migrate", "klip-runner", "klip-image-pull-probe"] : "system:serviceaccount:klip:${name}"],
       [for name in ["klip-host-api", "klip-host-job"] : "system:serviceaccount:platform-ops:${name}"]
     )
-    push = [for ref in local.github.refs : "repo:${split("/", local.github.repository)[0]}@${local.github.owner_id}/${split("/", local.github.repository)[1]}@${local.github.repository_id}:ref:${ref}"]
+    model-pull = ["system:serviceaccount:llm-d:klip-model-release"]
+    push       = [for ref in local.github.refs : "repo:${split("/", local.github.repository)[0]}@${local.github.owner_id}/${split("/", local.github.repository)[1]}@${local.github.repository_id}:ref:${ref}"]
+  }
+  role_repositories = {
+    pull       = [for name in sort(tolist(local.application_images)) : local.repository_arns[name]]
+    model-pull = [local.repository_arns["management-backend"], local.repository_arns["model-serving"]]
+    push       = [for name in sort(tolist(local.images)) : local.repository_arns[name]]
   }
   tags = {
     Project     = local.config.project, Cluster = local.config.cluster_id,
@@ -86,10 +93,10 @@ resource "aws_iam_role" "images" {
   max_session_duration = 3600
   assume_role_policy = jsonencode({ Version = "2012-10-17", Statement = [{
     Effect    = "Allow", Action = "sts:AssumeRoleWithWebIdentity",
-    Principal = { Federated = each.key == "pull" ? local.identity.provider_arn : aws_iam_openid_connect_provider.github.arn },
+    Principal = { Federated = each.key != "push" ? local.identity.provider_arn : aws_iam_openid_connect_provider.github.arn },
     Condition = { StringEquals = {
-      "${each.key == "pull" ? "oidc.${local.config.domain}" : "token.actions.githubusercontent.com"}:sub" = each.value,
-      "${each.key == "pull" ? "oidc.${local.config.domain}" : "token.actions.githubusercontent.com"}:aud" = "sts.amazonaws.com"
+      "${each.key != "push" ? "oidc.${local.config.domain}" : "token.actions.githubusercontent.com"}:sub" = each.value,
+      "${each.key != "push" ? "oidc.${local.config.domain}" : "token.actions.githubusercontent.com"}:aud" = "sts.amazonaws.com"
     } }
   }] })
   tags       = local.tags
@@ -109,7 +116,7 @@ resource "aws_iam_role_policy" "images" {
       Effect = "Allow",
       Action = concat(["ecr:BatchCheckLayerAvailability", "ecr:BatchGetImage", "ecr:GetDownloadUrlForLayer"],
       each.key == "push" ? ["ecr:InitiateLayerUpload", "ecr:UploadLayerPart", "ecr:CompleteLayerUpload", "ecr:PutImage", "ecr:DescribeImages", "ecr:DescribeImageScanFindings"] : []),
-      Resource = local.repository_arns
+      Resource = local.role_repositories[each.key]
     }
   ] })
 }

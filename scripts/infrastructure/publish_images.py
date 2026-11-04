@@ -19,6 +19,7 @@ COMPONENTS = {
 }
 ADDITIONAL_COMPONENTS = {
     "host-executor": ("management-backend", "dev/host-executor/Dockerfile"),
+    "model-serving": ("model-serving", "dev/model-serving/Dockerfile"),
 }
 ALL_COMPONENTS = COMPONENTS | ADDITIONAL_COMPONENTS
 REGISTRY = "127811062476.dkr.ecr.eu-west-2.amazonaws.com"

@@ -21,7 +21,12 @@ def verify() -> dict:
         for x in json.loads(tf("registry", "show", "-json"))["values"]["root_module"]["resources"]
     }
     names = [x["name"] for x in allocation["repositories"].values()]
-    if sorted(names) != ["klip/management-backend", "klip/management-web", "klip/workload-runner"]:
+    if sorted(names) != [
+        "klip/management-backend",
+        "klip/management-web",
+        "klip/model-serving",
+        "klip/workload-runner",
+    ]:
         raise ValueError("Unexpected registry repository scope")
     actual = aws.call("ecr", "describe-repositories", "--repository-names", *names)["repositories"]
     if {x["repositoryName"] for x in actual} != set(names):

@@ -19,6 +19,10 @@ def test_repeated_resolution_reuses_one_exact_digest(monkeypatch):
         images.identity("runner", "main")
 
 
+def test_model_build_uses_its_separate_retained_repository():
+    assert images.identity("model-serving", SHA) == ("klip/model-serving", "model-serving-" + SHA)
+
+
 def test_only_image_not_found_allows_a_new_publication(monkeypatch):
     monkeypatch.setattr(
         images.subprocess,

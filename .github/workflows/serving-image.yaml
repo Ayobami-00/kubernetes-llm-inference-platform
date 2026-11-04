@@ -1,0 +1,89 @@
+name: Pinned model serving image
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/end-to-end-platform]
+    paths:
+      - '.github/workflows/serving-image.yaml'
+      - 'dev/model-serving/**'
+      - 'scripts/infrastructure/model_image_scan.py'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: model-serving-image-${{ github.sha }}
+  cancel-in-progress: false
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    timeout-minutes: 45
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - name: Reclaim unused tools on this disposable builder
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+      - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
+        with:
+          aws-region: eu-west-2
+          role-to-assume: arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-images-push
+          allowed-account-ids: '127811062476'
+          role-duration-seconds: 3600
+          role-session-name: model-image-${{ github.run_id }}
+          unset-current-credentials: true
+      - name: Reconcile the immutable source tag
+        id: existing
+        run: python3 scripts/infrastructure/publish_images.py resolve model-serving
+      - name: Authenticate to the project registry
+        run: aws ecr get-login-password --region eu-west-2 | docker login --username AWS --password-stdin 127811062476.dkr.ecr.eu-west-2.amazonaws.com
+      - name: Build the bounded security patch
+        if: steps.existing.outputs.exists != 'true'
+        env:
+          MODEL_IMAGE: ${{ steps.existing.outputs.image }}
+        run: |
+          docker build --platform linux/amd64 --file dev/model-serving/Dockerfile \
+            --label org.opencontainers.image.revision="$GITHUB_SHA" \
+            --label org.opencontainers.image.source="https://github.com/$GITHUB_REPOSITORY" \
+            --tag "$MODEL_IMAGE" .
+          docker push "$MODEL_IMAGE"
+      - name: Retain immutable registry receipt
+        run: python3 scripts/infrastructure/publish_images.py record model-serving
+      - name: Extract native patch and package evidence without starting serving
+        run: |
+          set -euo pipefail
+          image=$(python3 -c "import json; print(json.load(open('artifacts/releases/model-serving.json'))['pinned_image'])")
+          docker pull --platform linux/amd64 "$image"
+          container=$(docker create --platform linux/amd64 --entrypoint python3 "$image" -V)
+          trap 'docker rm "$container" >/dev/null' EXIT
+          mkdir -p artifacts/security/model-serving
+          docker cp "$container:/opt/klip/model-image/." artifacts/security/model-serving/
+      - name: Install checksum-verified scanner
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/klip-model-trivy"
+          mkdir -p "$scanner_dir"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_dir/trivy.tar.gz"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_dir/trivy.tar.gz" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_dir/trivy.tar.gz" --directory "$scanner_dir" trivy
+          printf '%s\n' "$scanner_dir" >> "$GITHUB_PATH"
+      - name: Scan the complete derived image
+        run: python3 scripts/infrastructure/model_image_scan.py
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: model-serving-${{ github.sha }}
+          path: |
+            artifacts/releases/model-serving.json
+            artifacts/security/model-serving/
+          if-no-files-found: error
+          retention-days: 90
+      - name: Remove the temporary registry credential
+        if: always()
+        run: docker logout 127811062476.dkr.ecr.eu-west-2.amazonaws.com
