@@ -2,8 +2,8 @@
   "schema_version": "klip-host-risk-review.v1",
   "reviewed_at": "2026-11-04",
   "expires_at": "2026-11-11",
-  "source_commit": "882d555cd44189c1468f6b11ab7fb39d7cfbc5d9",
-  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:801675f662503eb9b9bd9bcdadce585e657b8cc4d9ab54f6579f92c80b3714cb",
+  "source_commit": "05d0add857c75f87014538d87bae75f9e9ca29fe",
+  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:63205b6b4199f6b5222ee55c07906220f83aed5a943ebbf51e70e3a90012799c",
   "scope": "Restricted CPU executor only; not a general platform or GPU-runtime security approval.",
   "critical_policy": "Any Critical finding blocks deployment. No suppressed findings.",
   "conditions": [
