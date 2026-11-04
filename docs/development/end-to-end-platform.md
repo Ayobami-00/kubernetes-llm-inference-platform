@@ -625,3 +625,18 @@ all six nodes were ready and CNPG reported continuous archiving and a successful
 application outage or silently erased. The verifier now records failed status
 and safe error class/status metadata without retaining credential-bearing errors
 or adding authentication retries.
+
+On 4 November at 03:03:42 UTC, the explicitly approved encrypted Grafana recovery
+bundle was uploaded, read back by its exact S3 version and successfully decrypted
+and compared. Its age key remains off S3. The new isolated host-executor service
+then passed live storage/identity/SSH preflight and deployed two API replicas on
+distinct platform hosts. Verification `e4fa9b7102cc` passed at 04:09:53 UTC,
+covering real mutual-TLS positive/negative cases, restricted Kubernetes API access,
+RBAC denials and exclusion of SSH keys from the management-namespace probe.
+The original failed preflights (mount alias and OOM), the CIDR-policy connectivity
+failure and their corrections remain preserved. Full offline verification passed
+821 tests with 17 optional skips; Ruff/formatting and 21 schemas remain current.
+The exact deployed image and seven-day residual-risk review are documented in
+`lambda-lifecycle-integration.md`. Management's real lifecycle is not enabled and
+no GPU has been rented. UI-driven allocation, GPU/software readiness, serving,
+live inference and full recovery gates remain unfinished.

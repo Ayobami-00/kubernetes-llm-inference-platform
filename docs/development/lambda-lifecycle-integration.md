@@ -113,12 +113,10 @@ is revoked afterward. SSH control sockets also use local scratch when configured
 durable receipts and peer state remain on shared storage. Generic host success
 cannot mark GPU/connectivity checks ready.
 
-The worker's transport/ownership wrapper has cloud-free tests. Actual SSH/Ansible
-execution through this new worker is not yet live-verified. Connectivity/CUDA
-inspection, dedicated storage/IAM, deployment, state
-handoff and management adapters still require implementation and verification.
-The fixed template/core is not an enabled service. Its executor image must include
-the pinned operator tools and infrastructure dependencies before deployment.
+The worker's transport/ownership wrapper has cloud-free tests. The isolated API,
+storage/IAM, image and CPU transport preflight are now deployed and live-verified
+as described below. Actual GPU-host Ansible execution, connectivity/CUDA inspection
+and management lifecycle adapters still require implementation and verification.
 
 The internal API and image definition now exist. The only production listener
 requires a client certificate signed by the dedicated executor CA; there is no
@@ -127,7 +125,7 @@ proxy environment variables and refuses redirects. Only typed task submission,
 observation and public bootstrap metadata are exposed. Request bodies are bounded
 to 8 KiB, including chunked input; errors never echo submitted values. Repeated
 submissions and an ambiguous native Job response preserve the original task/Job.
-This API has offline tests but is not deployed or live-verified yet. The image
+This API passes offline and live authentication/RBAC checks. The image
 uses pinned Python, uv and AWS CLI bases and installs checksum-locked SSM/runtime
 artifacts plus the workspace's locked Ansible dependencies. It has a separate
 CI image receipt; the existing four-image management release set is unchanged.
@@ -188,8 +186,8 @@ scan directory; `stage` and `deploy` require its printed approval digest:
 ```sh
 .venv/bin/python scripts/infrastructure/host_executor_release.py handoff
 .venv/bin/python scripts/infrastructure/host_executor_release.py prepare \
-  --receipt artifacts/platform/host-executor-6cfd742/host-executor.json \
-  --security-directory artifacts/security/host-executor-6cfd742
+  --receipt artifacts/platform/host-executor-4ed4402/host-executor.json \
+  --security-directory artifacts/security/host-executor-4ed4402
 .venv/bin/python scripts/infrastructure/host_executor_release.py stage --approve-plan <digest>
 .venv/bin/python scripts/infrastructure/host_executor_release.py deploy --approve-plan <digest>
 ```
@@ -216,3 +214,34 @@ directories and an image-bound AWS profile. Regression tests normalize `/var/run
 to `/run` before checking mount uniqueness. The existing immutable credential
 Secret keeps its original unused profile field; execution uses the new profile
 in the reviewed image, so retries do not rotate or overwrite credentials.
+
+The following attempt inherited the API's 512 MiB container limit and was
+OOM-killed. Native Job `c474707c-7f3f-4b0f-882e-f6298ebb3a53` failed without retry.
+The preflight now uses the real host-Job envelope (500m CPU/512 MiB requests,
+2 CPU/2 GiB limits). Attempt `0554d01912f6dcc73a4740ebb6e961476012d061f67290c22b02b9829d1ef95a`
+passed at 03:59:38 UTC on 4 November: EFS, scoped STS identity, expected Kubernetes
+namespace UID and strict SSH/sudo on all six CPUs were verified. Its native Job UID
+is `978ded93-6130-43df-ab73-84ff6a359d41`. The old operator's peer writer is now
+fenced; the authoritative registry is the executor filesystem, revision 12.
+
+The two API replicas deployed at 04:00:50 UTC on `platform-02` and `platform-03`.
+Live boundary verification first found CIDR-only API egress blocked by Cilium's
+default exclusion of node identities. The chart now supplements it with the
+`kube-apiserver` entity on TCP 443/6443, following the
+[Cilium policy model](https://docs.cilium.io/en/stable/security/policy/layer3/).
+The policy-only saved update `00634089010e13baa2d75fc8908332dbcfba9666359503a02147403ed9f427b2`
+left every existing resource unchanged, added that single rule, and deployed at
+04:09:01 UTC. The original release, update and failed verification remain retained.
+
+Verification `e4fa9b7102cc` passed at 04:09:53 UTC. A credential-minimal Job in `klip`
+accepted the valid client certificate, rejected absent client identity and an
+untrusted server CA, rejected malformed tasks without echoing input, and had no
+SSH credentials mounted. The actual API workload token read the expected native
+Job; authorization denied Secret reads, Job creation in `klip` and Node patches.
+Both unchanged API Pods remained ready on distinct CPU hosts. The private receipt
+is `cluster/host-executor/acceptance/e4fa9b7102cc/result.json` under operator state.
+
+Management's real lifecycle bindings remain disabled. No GPU has been rented and
+this checkpoint does not establish Ansible/GPU readiness or complete platform
+production readiness. Next work is durable management integration, actual GPU
+inspection, failure cleanup and the UI-driven single-A10 lifecycle.
