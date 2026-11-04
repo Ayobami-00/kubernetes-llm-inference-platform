@@ -217,8 +217,8 @@ function ExperimentCard({
         >
           Open A10 Grafana diagnostics
         </a>{' '}
-        (this experiment's time range; requires the private access tunnel). Exact warmup and
-        scoring boundaries are retained in the stage timeline and child reports.
+        (this experiment's time range; requires the private access tunnel). Exact warmup and scoring
+        boundaries are retained in the stage timeline and child reports.
       </p>
     </article>
   );
