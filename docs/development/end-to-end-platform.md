@@ -689,3 +689,35 @@ new attempt; no provider mutation occurred in that failed attempt. The successfu
 setup allocates no GPU. Lambda's unchanged global SSH rule broadens effective
 ingress; source-restricted bootstrap authentication and the later host firewall
 are separate checks. No actual GPU, CUDA, serving or inference gate is inferred.
+
+At 09:27:14 UTC, executor upgrade
+`c32bfda766d779c8a8fdc95db4e0e724d27771f4931743741c278ed7edae3472`
+completed with both exact new image digests Ready on separate CPU hosts. Its
+native guard retained dispatch/peer-writer custody and verified strict SSH to
+all six CPUs. Keys, TLS identities, peer revision 12 and storage were preserved.
+The native scan retained zero Critical and the same 55 reviewed High tuples;
+review expiry was not extended.
+
+At 09:30:11 UTC, runtime staging
+`c561cbadb37114931fea889118757c637eb05513d9edfeaddf8dde9045ab002e`
+verified the complete assessment bytes on the executor volume. This permits
+bounded A10 bootstrap/readiness, not public serving or a claim that unresolved
+dependencies/kernel advisories are fixed.
+
+Management release
+`684cb6355002fae21e9dc677935a0e31024329140120e3ea18c19af8d49479df`
+deployed at 09:32:41 UTC with the immutable bootstrap seed and provider-resource
+binding. Verification `8aa19145275c` passed at 09:38:10: two replicas per role,
+distinct protected hosts, verified PostgreSQL TLS, 36 retained historical runs,
+authenticated HTTPS and artifact roundtrips through all API/worker replicas.
+The earlier verifier failure counted completed provider setup Jobs under a
+shared worker network label. The corrected check follows Deployment/ReplicaSet
+UID ownership; the original failed evidence remains retained.
+
+The public UI published `latency-workers@2`, preserving revision 1, and verified
+the A10 SKU, region and 90-minute lease. Browser checks exposed operator-test
+label/login/timing assumptions, corrected without changing authorization.
+Virginia stock subsequently disappeared before any worker create was submitted.
+A bounded UI stock watch preserves the approved region, type, price and
+single-instance limits. Profile publication and an available-stock card do not
+establish allocation, GPU readiness, serving or measured SLO results.

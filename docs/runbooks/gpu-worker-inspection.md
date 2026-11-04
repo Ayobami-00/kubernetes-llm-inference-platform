@@ -68,10 +68,14 @@ receipt/member serialization so existing cleanup evidence hashes remain stable.
 
 The inspection implementation and tests use synthetic external observations;
 they do not establish successful execution on a real GPU. Operator/NFD CPU
-controllers and GPU scrape-policy wiring are live. Real provisioning stays
-disabled until the runtime review is complete, its cluster-bound receipt is
-staged, the new executor image is reviewed/upgraded, and provider prerequisites
-and management configuration are deployed.
+controllers and GPU scrape-policy wiring are live. On 4 November at 09:27 UTC,
+the reviewed inspection image was deployed while preserving executor custody.
+At 09:30 its cluster-bound runtime assessment was staged and verified.
+Management's bounded lifecycle configuration deployed at 09:32 and passed
+HA/database/artifact verification at 09:38. The public UI then published and
+verified `latency-workers@2`. Actual allocation, host execution and GPU inspection
+still require their own retained evidence; these setup steps do not imply
+that a GPU is ready.
 
 The opt-in `GPU runtime image security` workflow scans exact public AMD64 images
 on isolated CPU runners, without cloud/registry credentials. Raw reports remain

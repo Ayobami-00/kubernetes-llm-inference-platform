@@ -196,6 +196,29 @@ def verify() -> dict:
         raise
 
 
+def deployment_pods(deployment, pods, replicasets):
+    """Worker-labelled setup Jobs are not replicas of the management Deployment."""
+    owners = {
+        r["metadata"]["uid"]
+        for r in replicasets
+        if any(
+            o.get("controller")
+            and o.get("kind") == "Deployment"
+            and o.get("uid") == deployment["metadata"]["uid"]
+            for o in r["metadata"].get("ownerReferences", [])
+        )
+    }
+    return [
+        p
+        for p in pods
+        if not p["metadata"].get("deletionTimestamp")
+        and any(
+            o.get("controller") and o.get("kind") == "ReplicaSet" and o.get("uid") in owners
+            for o in p["metadata"].get("ownerReferences", [])
+        )
+    ]
+
+
 def _verify(plan, report, root, path):
     from cluster import FOLDER, Host, kubectl, load_hosts
     from database_recovery import sql
@@ -233,6 +256,19 @@ def _verify(plan, report, root, path):
                 "json",
             )
         )["items"]
+        replicasets = json.loads(
+            kubectl(
+                "-n",
+                "klip",
+                "get",
+                "replicasets",
+                "-l",
+                "app.kubernetes.io/name=klip,app.kubernetes.io/component=" + role,
+                "-o",
+                "json",
+            )
+        )["items"]
+        pods = deployment_pods(deployment, pods, replicasets)
         if (
             len(pods) != 2
             or len({p["spec"]["nodeName"] for p in pods}) != 2

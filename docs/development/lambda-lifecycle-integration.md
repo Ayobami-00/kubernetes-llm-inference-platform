@@ -5,9 +5,11 @@ The current single-A10 workflow now includes a separate
 measured device observations and an inspection-configuration gate before a new
 paid dispatch. These paths are covered by synthetic external-I/O tests. The live
 executor has its reviewed inspection-capable image upgrade; the separate GPU
-runtime-approval receipt remains required. Free provider prerequisites were
-registered and verified on 4 November. Real UI provisioning remains disabled
-until runtime approval and the lifecycle configuration are deployed. The earlier
+runtime-approval receipt was staged and verified at 09:30 UTC on 4 November.
+Free provider prerequisites were registered and verified earlier that day.
+The bounded lifecycle configuration is deployed, and the public UI has published
+the verified `latency-workers@2` profile. Actual GPU readiness remains a separate
+live gate. The earlier
 sections below record the component's implementation
 and live integration history, rather than claiming a real GPU has been verified.
 
