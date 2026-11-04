@@ -21,6 +21,76 @@
       "title": "ErrorInfo",
       "type": "object"
     },
+    "GPUCapacityObservation": {
+      "additionalProperties": false,
+      "description": "Observed usable memory, distinct from the provider's advertised hardware.",
+      "properties": {
+        "allocatable_gpu_count": {
+          "minimum": 0,
+          "title": "Allocatable Gpu Count",
+          "type": "integer"
+        },
+        "devices": {
+          "items": {
+            "$ref": "#/$defs/GPUDeviceObservation"
+          },
+          "minItems": 1,
+          "title": "Devices",
+          "type": "array"
+        },
+        "observed_at": {
+          "format": "date-time",
+          "title": "Observed At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "observed_at",
+        "devices",
+        "allocatable_gpu_count"
+      ],
+      "title": "GPUCapacityObservation",
+      "type": "object"
+    },
+    "GPUDeviceObservation": {
+      "additionalProperties": false,
+      "properties": {
+        "driver_version": {
+          "minLength": 1,
+          "title": "Driver Version",
+          "type": "string"
+        },
+        "index": {
+          "minimum": 0,
+          "title": "Index",
+          "type": "integer"
+        },
+        "memory_total_mib": {
+          "exclusiveMinimum": 0,
+          "title": "Memory Total Mib",
+          "type": "integer"
+        },
+        "name": {
+          "minLength": 1,
+          "title": "Name",
+          "type": "string"
+        },
+        "uuid": {
+          "pattern": "^GPU-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+          "title": "Uuid",
+          "type": "string"
+        }
+      },
+      "required": [
+        "index",
+        "uuid",
+        "name",
+        "memory_total_mib",
+        "driver_version"
+      ],
+      "title": "GPUDeviceObservation",
+      "type": "object"
+    },
     "WorkerCounts": {
       "additionalProperties": false,
       "properties": {
@@ -61,6 +131,17 @@
           "anyOf": [
             {
               "$ref": "#/$defs/ErrorInfo"
+            },
+            {
+              "type": "null"
+            }
+          ],
+          "default": null
+        },
+        "gpu_observation": {
+          "anyOf": [
+            {
+              "$ref": "#/$defs/GPUCapacityObservation"
             },
             {
               "type": "null"

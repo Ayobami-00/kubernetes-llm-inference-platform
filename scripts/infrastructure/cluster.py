@@ -171,16 +171,23 @@ finally:
 """
         self.run(["sudo", "python3", "-c", program, path], data=data, secret=True)
 
-    def agent(self, action: str) -> dict:
-        return json.loads(self.run(["sudo", "python3", "/usr/local/sbin/klip-node", action]))
+    def agent(self, action: str, *, pod_uid: str | None = None) -> dict:
+        arguments = ["sudo", "python3", "/usr/local/sbin/klip-node", action]
+        if pod_uid is not None:
+            if action != "pod-network" or not re.fullmatch(r"[a-f0-9-]{36}", pod_uid):
+                raise ValueError("A Pod UID is accepted only for Pod-network inspection")
+            arguments += ["--pod-uid", pod_uid]
+        return json.loads(self.run(arguments))
 
 
-def delete_owned_resource(path: str, uid: str) -> None:
+def delete_owned_resource(path: str, uid: str, *, host=None) -> None:
     """Delete an allowlisted test resource with an API-side UID precondition."""
     if not re.fullmatch(
         r"/(?:api/v1/namespaces/[a-z0-9-]+|apis/batch/v1/namespaces/[a-z0-9-]+/jobs/[a-z0-9-]+"
         r"|api/v1/namespaces/klip/pods/klip-api-[a-z0-9]+-[a-z0-9]+"
         r"|api/v1/namespaces/platform-data/pods/klip-db-[0-9]+"
+        r"|api/v1/namespaces/(?:klip-acceptance|gpu-system)/(?:pods|services)/"
+        r"smoke-host-[a-f0-9]{24}(?:-(?:cp-0[1-3]|platform-0[1-3]|gpu|cuda))?"
         r"|apis/postgresql.cnpg.io/v1/namespaces/platform-data/clusters/klip-db-restore)",
         path,
     ) or not re.fullmatch(r"[a-f0-9-]{36}", uid):
@@ -217,7 +224,8 @@ with tempfile.TemporaryDirectory() as folder:
     if response.status not in (200, 202, 404):
         raise RuntimeError('UID-guarded cleanup failed: ' + str(response.status))
 """
-    Host(load_hosts()["cp-01"]).run(
+    target = host or Host(load_hosts()["cp-01"])
+    target.run(
         ["sudo", "python3", "-c", program], data=json.dumps({"path": path, "uid": uid}), secret=True
     )
 

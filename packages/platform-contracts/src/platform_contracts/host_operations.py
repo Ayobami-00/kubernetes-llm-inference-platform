@@ -4,9 +4,10 @@ import base64
 from ipaddress import IPv4Address, IPv4Network
 from typing import Literal, Self
 
-from pydantic import Field, model_validator
+from pydantic import Field, model_serializer, model_validator
 
 from .common import ContractModel, ErrorInfo, NonEmpty, PositiveInt, Sha256, Timestamp
+from .inventory import GPUCapacityObservation
 
 
 def ed25519_host_key(value: str) -> str:
@@ -131,10 +132,18 @@ class HostTaskObservation(ContractModel):
     gpu_canary_verified: bool = False
     evidence_sha256: Sha256 | None = None
     gpu_runtime_ready: bool = False
+    gpu_observation: GPUCapacityObservation | None = None
     cleanup_pending: bool = False
     bootstrap_fence_permitted: bool = False
     bootstrap_cleanup_complete: bool = False
     error: ErrorInfo | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_receipt(self, handler):
+        value = handler(self)
+        if self.gpu_observation is None:
+            value.pop("gpu_observation", None)
+        return value
 
     @model_validator(mode="after")
     def consistent_observation(self) -> Self:
@@ -159,6 +168,10 @@ class HostTaskObservation(ContractModel):
             raise ValueError("GPU readiness requires actual host/network/node readiness")
         if self.status in {"queued", "running"} and self.gpu_runtime_ready:
             raise ValueError("In-flight host work cannot claim completed GPU verification")
+        if self.gpu_observation is not None and (
+            self.node_uid is None or self.gpu_observation.observed_at > self.observed_at
+        ):
+            raise ValueError("GPU observations require a bound node and an ordered timestamp")
         if (self.bootstrap_fence_permitted or self.bootstrap_cleanup_complete) and (
             self.status != "completed" or self.evidence_sha256 is None or self.gpu_runtime_ready
         ):

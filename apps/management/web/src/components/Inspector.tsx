@@ -14,6 +14,7 @@ import {
   X,
 } from 'lucide-react';
 import { useQuery } from '@tanstack/react-query';
+import { WorkerObservations } from '../features/capacity/WorkerObservations';
 import { endpoints as e, message, mutationHeaders, unwrap } from '../api/client';
 import type { GraphNode, GroupView, OperationView, Run, SpecView, SpecWrite } from '../api/client';
 import { icons, names } from './resourceTheme';
@@ -692,6 +693,9 @@ export default function Inspector({
                         <b>{formatDate((node.document.group as Doc).status.expires_at)}</b>
                       </div>
                     </div>
+                    <WorkerObservations
+                      members={(node.document.group as Doc).status.members || []}
+                    />
                     <label>
                       Extend lease (minutes)
                       <input

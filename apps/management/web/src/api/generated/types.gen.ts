@@ -744,6 +744,52 @@ export type FoundationObservation = {
 };
 
 /**
+ * GPUCapacityObservation
+ *
+ * Observed usable memory, distinct from the provider's advertised hardware.
+ */
+export type GpuCapacityObservation = {
+    /**
+     * Allocatable Gpu Count
+     */
+    allocatable_gpu_count: number;
+    /**
+     * Devices
+     */
+    devices: Array<GpuDeviceObservation>;
+    /**
+     * Observed At
+     */
+    observed_at: string;
+};
+
+/**
+ * GPUDeviceObservation
+ */
+export type GpuDeviceObservation = {
+    /**
+     * Driver Version
+     */
+    driver_version: string;
+    /**
+     * Index
+     */
+    index: number;
+    /**
+     * Memory Total Mib
+     */
+    memory_total_mib: number;
+    /**
+     * Name
+     */
+    name: string;
+    /**
+     * Uuid
+     */
+    uuid: string;
+};
+
+/**
  * GPUHardware
  */
 export type GpuHardware = {
@@ -2523,6 +2569,7 @@ export type WorkerLifecycleOptions = {
  */
 export type WorkerMember = {
     error?: ErrorInfo | null;
+    gpu_observation?: GpuCapacityObservation | null;
     /**
      * Node Name
      */

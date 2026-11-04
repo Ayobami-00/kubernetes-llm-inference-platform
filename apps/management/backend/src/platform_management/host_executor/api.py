@@ -48,6 +48,8 @@ def metadata(root):
     """Expose public bootstrap metadata; never transport credentials or private state."""
     from cluster_models import PeerRegistry
 
+    from platform_management.host_executor.gpu_approval import configured
+
     inputs = json.loads((root / "cluster/executor-inputs.json").read_text())
     peers = PeerRegistry.model_validate_json((root / "cluster/peers.json").read_text())
     expected = {"cp-01", "cp-02", "cp-03", "platform-01", "platform-02", "platform-03"}
@@ -72,6 +74,7 @@ def metadata(root):
         "occupied_wireguard_ips": sorted(str(p.wireguard_ip) for p in peers.peers.values()),
         "ssh_source_cidrs": inputs["ssh_source_cidrs"],
         "bootstrap_public_key": public_key,
+        **configured(root, inputs["kube_system_uid"]),
     }
 
 

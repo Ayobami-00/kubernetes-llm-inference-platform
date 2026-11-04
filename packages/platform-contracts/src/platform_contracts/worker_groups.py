@@ -2,7 +2,7 @@
 
 from typing import Literal, Self
 
-from pydantic import model_validator
+from pydantic import model_serializer, model_validator
 
 from .common import (
     ContractModel,
@@ -17,6 +17,7 @@ from .common import (
     Timestamp,
     VersionedSpec,
 )
+from .inventory import GPUCapacityObservation
 
 
 class WorkerGroupSpec(VersionedSpec):
@@ -37,6 +38,14 @@ class WorkerMember(ContractModel):
     node_name: NonEmpty | None = None
     node_uid: NonEmpty | None = None
     error: ErrorInfo | None = None
+    gpu_observation: GPUCapacityObservation | None = None
+
+    @model_serializer(mode="wrap")
+    def preserve_legacy_member(self, handler):
+        value = handler(self)
+        if self.gpu_observation is None:
+            value.pop("gpu_observation", None)
+        return value
 
     @model_validator(mode="after")
     def check_node_identity(self) -> Self:
@@ -46,6 +55,8 @@ class WorkerMember(ContractModel):
             raise ValueError("GPU-ready member requires Kubernetes node identity")
         if self.phase == "failed" and self.error is None:
             raise ValueError("failed member requires an error")
+        if self.gpu_observation is not None and self.node_uid is None:
+            raise ValueError("GPU observations require the member's Kubernetes node identity")
         return self
 
 

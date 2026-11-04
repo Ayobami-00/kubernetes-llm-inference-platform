@@ -90,7 +90,13 @@ def perform(root, task):
 
         return perform_cleanup(root, task, registry, cp)
     if task.action == "inspect":
-        raise ValueError("GPU/connectivity inspection is not configured; readiness remains false")
+        from platform_management.host_executor.inspection import perform_inspection
+
+        return perform_inspection(root, task, inputs, registry, cp)
+    if task.action == "remove":
+        from platform_management.host_executor.inspection_probes import cleanup_chain
+
+        cleanup_chain(root, task, cp)
     alias = access(root, task)
     request = GPUWorkerRequest(
         operation_id=task.id,
@@ -231,13 +237,26 @@ def run_task(root, identity, *, action=perform):
             fcntl.flock(lock, fcntl.LOCK_EX)
             if task.deadline <= datetime.now(UTC):
                 raise ValueError("Host execution deadline expired")
-            result = action(root, task)
+            import cluster
+
+            previous_deadline = cluster.OPERATION_DEADLINE
+            cluster.OPERATION_DEADLINE = task.deadline.timestamp()
+            try:
+                result = action(root, task)
+            finally:
+                cluster.OPERATION_DEADLINE = previous_deadline
         if (
             result.get("status") != "completed"
             or result["provider_instance_id"] != task.provider_instance_id
         ):
             raise ValueError("Host result does not confirm the requested provider identity")
         checks = result["readiness"]
+        if (
+            task.action == "inspect"
+            and checks.get("gpu_runtime")
+            and not result.get("gpu_observation")
+        ):
+            raise ValueError("GPU inspection must include its actual device observation")
         observed = HostTaskObservation(
             **{
                 **common,
@@ -253,8 +272,11 @@ def run_task(root, identity, *, action=perform):
             wireguard_ready=checks["wireguard"],
             kubernetes_ready=checks["kubernetes"],
             cilium_ready=checks["cilium"],
-            # Generic B operations cannot establish GPU or Pod connectivity readiness.
-            gpu_runtime_ready=False,
+            # Only the explicit inspection action may establish GPU/Pod proof.
+            connectivity_verified=task.action == "inspect" and checks.get("connectivity", False),
+            gpu_canary_verified=task.action == "inspect" and checks.get("gpu_canary", False),
+            gpu_runtime_ready=task.action == "inspect" and checks.get("gpu_runtime", False),
+            gpu_observation=result.get("gpu_observation") if task.action == "inspect" else None,
             evidence_sha256=result.get("evidence_sha256")
             or hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest(),
             bootstrap_fence_permitted=result.get("bootstrap_fence_permitted", False),

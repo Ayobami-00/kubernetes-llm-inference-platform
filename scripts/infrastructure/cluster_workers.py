@@ -254,6 +254,7 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
     write_private(operation, result)
     import cluster
 
+    previous_deadline = cluster.OPERATION_DEADLINE
     cluster.OPERATION_DEADLINE = request.deadline.timestamp()
 
     def stage(name: str) -> None:
@@ -504,6 +505,6 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
         write_private(operation, result)
         raise WorkerOperationFailed(result) from error
     finally:
-        cluster.OPERATION_DEADLINE = None
+        cluster.OPERATION_DEADLINE = previous_deadline
     write_private(operation, result)
     return result

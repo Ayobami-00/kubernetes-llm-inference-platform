@@ -2,7 +2,7 @@
 
 from typing import Literal, Self
 
-from pydantic import HttpUrl, IPvAnyAddress, IPvAnyNetwork, model_validator
+from pydantic import Field, HttpUrl, IPvAnyAddress, IPvAnyNetwork, model_validator
 
 from .common import (
     ArtifactURI,
@@ -10,11 +10,38 @@ from .common import (
     Count,
     GPUHardware,
     NonEmpty,
+    PositiveInt,
     RevisionRef,
     RuntimeRecord,
     Slug,
     Timestamp,
 )
+
+
+class GPUDeviceObservation(ContractModel):
+    index: Count
+    uuid: str = Field(pattern=r"^GPU-[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$")
+    name: NonEmpty
+    memory_total_mib: PositiveInt
+    driver_version: NonEmpty
+
+
+class GPUCapacityObservation(ContractModel):
+    """Observed usable memory, distinct from the provider's advertised hardware."""
+
+    observed_at: Timestamp
+    devices: tuple[GPUDeviceObservation, ...] = Field(min_length=1)
+    allocatable_gpu_count: Count
+
+    @model_validator(mode="after")
+    def physical_capacity(self) -> Self:
+        if (
+            self.allocatable_gpu_count > len(self.devices)
+            or len({d.index for d in self.devices}) != len(self.devices)
+            or len({d.uuid for d in self.devices}) != len(self.devices)
+        ):
+            raise ValueError("GPU observation contains duplicate devices or excess capacity")
+        return self
 
 
 class ClusterInfo(ContractModel):

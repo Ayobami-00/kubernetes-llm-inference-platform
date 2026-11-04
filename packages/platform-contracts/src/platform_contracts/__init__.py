@@ -3,7 +3,7 @@
 from .customers import CustomerSpec
 from .datasets import DatasetManifest
 from .host_operations import HostTask, HostTaskObservation, ProviderFence
-from .inventory import InfrastructureInventory
+from .inventory import GPUCapacityObservation, GPUDeviceObservation, InfrastructureInventory
 from .loading import ContractCatalog, load_catalog, load_document
 from .measurements import (
     Admission,
@@ -46,6 +46,8 @@ __all__ = [
     "CustomerSpec",
     "DatasetManifest",
     "ExecutionVersions",
+    "GPUCapacityObservation",
+    "GPUDeviceObservation",
     "HostTask",
     "HostTaskObservation",
     "ProviderFence",

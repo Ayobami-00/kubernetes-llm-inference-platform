@@ -23,7 +23,7 @@ RUN --mount=type=bind,source=.,target=/workspace-context,readonly \
 COPY scripts/infrastructure scripts/infrastructure
 COPY infra/ansible infra/ansible
 COPY infra/terraform/project.json infra/terraform/platform.json infra/terraform/
-COPY deploy/artifacts.lock.json deploy/gpu-host.lock.json deploy/
+COPY deploy/artifacts.lock.json deploy/gpu-host.lock.json deploy/gpu-operator.lock.json deploy/
 COPY deploy/host-executor-aws-config deploy/
 ENV PATH="/app/.venv/bin:/app/artifacts/tools/bin:$PATH" \
     PYTHONPATH=/app/scripts/infrastructure PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1 \

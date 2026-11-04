@@ -1,5 +1,14 @@
 # Real Lambda lifecycle integration
 
+The current single-A10 workflow now includes a separate
+[GPU/network inspection implementation](../runbooks/gpu-worker-inspection.md),
+measured device observations and an inspection-configuration gate before a new
+paid dispatch. These paths are covered by synthetic external-I/O tests. The live
+executor still needs its reviewed image upgrade and runtime-approval receipt;
+real UI provisioning remains disabled until those and provider prerequisites
+are deployed. The earlier sections below record the component's implementation
+and live integration history, rather than claiming a real GPU has been verified.
+
 `lambda_mutations.py` implements the bounded transport for Lambda API 1.10.0.
 `lambda_ledger.py` coordinates it through C's existing PostgreSQL intent table.
 This is an integration component: the deployed real provider/host/cluster/serving

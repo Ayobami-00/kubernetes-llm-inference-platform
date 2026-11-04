@@ -105,6 +105,8 @@ class FakeIO:
             "occupied_wireguard_ips": [f"10.200.0.{i}" for i in (11, 12, 13, 64, 65, 66)]
             + (["10.200.0.67"] if self.joined else []),
             "bootstrap_public_key": HOST_KEY,
+            "gpu_inspection_configured": True,
+            "gpu_runtime_review_sha256": "f" * 64,
         }
 
     def cloud_init(self, identity):
@@ -197,6 +199,21 @@ class FakeIO:
                 connectivity_verified=task.action == "inspect",
                 gpu_canary_verified=task.action == "inspect",
                 gpu_runtime_ready=task.action == "inspect",
+                gpu_observation={
+                    "observed_at": common["observed_at"],
+                    "allocatable_gpu_count": 1,
+                    "devices": [
+                        {
+                            "index": 0,
+                            "uuid": "GPU-11111111-2222-3333-4444-555555555555",
+                            "name": "NVIDIA A10",
+                            "memory_total_mib": 23028,
+                            "driver_version": "595.91.07",
+                        }
+                    ],
+                }
+                if task.action == "inspect"
+                else None,
                 evidence_sha256="b" * 64,
                 bootstrap_fence_permitted=task.action == "cleanup-check",
                 bootstrap_cleanup_complete=task.action == "revoke-bootstrap",

@@ -6,6 +6,7 @@ before external mutations, so a reclaimed management Job resumes the same work.
 
 import copy
 import hashlib
+import re
 from contextlib import contextmanager
 from datetime import datetime, timedelta
 from pathlib import Path
@@ -121,6 +122,18 @@ class RealWorkerWorkflow:
         self.policy.check_metadata(metadata)
         return metadata
 
+    def inspection_metadata(self):
+        metadata = self.metadata()
+        if metadata.get("gpu_inspection_configured") is not True or not re.fullmatch(
+            r"[a-f0-9]{64}", metadata.get("gpu_runtime_review_sha256") or ""
+        ):
+            raise AppError(
+                503,
+                "Executor GPU inspection is not configured; no rental was submitted",
+                "gpu_inspection_unconfigured",
+            )
+        return metadata
+
     def initialize(self):
         with session() as db, db.begin():
             row = db.get(ProviderIntent, self.op["id"], with_for_update=True)
@@ -138,7 +151,7 @@ class RealWorkerWorkflow:
             self.plan = LaunchPlan.model_validate(intent["lambda_launch"]["plan"])
             return None
         # Verify cluster/public bootstrap identity before authorizing paid dispatch.
-        self.metadata()
+        self.inspection_metadata()
         content, sha = self.io.cloud_init(self.op["id"])
         self.plan = LaunchPlan(
             intent_id=self.op["id"],
@@ -263,13 +276,20 @@ class RealWorkerWorkflow:
             if value["state"] in {"pending", "dispatching"}:
                 with self.io.provider() as api:
                     if value["state"] == "pending":
+                        inspection = self.inspection_metadata()
+                        offering = api.check_offering(
+                            self.plan,
+                            self.policy.max_price_cents_per_hour,
+                            image_version=self.policy.image_version,
+                        )
                         self.ledger.record_preflight(
                             self.plan,
-                            api.check_offering(
-                                self.plan,
-                                self.policy.max_price_cents_per_hour,
-                                image_version=self.policy.image_version,
-                            ),
+                            {
+                                **offering,
+                                "gpu_runtime_review_sha256": inspection.get(
+                                    "gpu_runtime_review_sha256"
+                                ),
+                            },
                         )
                     allocate_once(self.plan, content, self.ledger, api)
         except AllocationAmbiguous:
@@ -362,9 +382,17 @@ class RealWorkerWorkflow:
             self.state["members"][0]["phase"] = "joining"
             self.checkpoint["step"] = "inspect"
             return "Checking networking and operator-managed GPU software", False
-        if not observed.gpu_runtime_ready:
+        if (
+            not observed.gpu_runtime_ready
+            or observed.gpu_observation is None
+            or not 0 <= (now() - observed.gpu_observation.observed_at).total_seconds() <= 300
+        ):
             raise ProviderIdentityConflict("Inspection did not establish GPU readiness")
-        self.state["members"][0].update(phase="gpu_ready", error=None)
+        self.state["members"][0].update(
+            phase="gpu_ready",
+            error=None,
+            gpu_observation=observed.gpu_observation.model_dump(mode="json"),
+        )
         self.state["phase"] = "ready"
         return "Ready · verified host, networking and GPU capacity", True
 

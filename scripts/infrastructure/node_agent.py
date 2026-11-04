@@ -471,12 +471,27 @@ def validate_pod_mtu(links: list[dict], routes: list[dict]) -> dict:
     return {"pod_interface_mtu": 1420, "pod_route_mtu": 1370}
 
 
-def pod_network() -> dict:
+def pod_network(pod_uid: str | None = None) -> dict:
     endpoint = "--runtime-endpoint=unix:///run/containerd/containerd.sock"
-    pods = command("crictl", endpoint, "pods", "--name", "smoke", "-q").splitlines()
+    if pod_uid is not None:
+        if not re.fullmatch(r"[a-f0-9-]{36}", pod_uid):
+            raise ValueError("Invalid Pod-network sandbox UID")
+        observed = json.loads(command("crictl", endpoint, "pods", "-o", "json"))
+        pods = [
+            p["id"]
+            for p in observed["items"]
+            if p.get("metadata", {}).get("uid") == pod_uid and p.get("state") == "SANDBOX_READY"
+        ]
+        if len(pods) != 1:
+            raise ValueError("Expected exactly one Ready sandbox with the admitted Pod UID")
+    else:
+        pods = command("crictl", endpoint, "pods", "--name", "smoke", "-q").splitlines()
     if not pods:
         raise ValueError("No smoke Pod sandbox exists on this host")
-    pid = json.loads(command("crictl", endpoint, "inspectp", pods[0]))["info"]["pid"]
+    sandbox = json.loads(command("crictl", endpoint, "inspectp", pods[0]))
+    if pod_uid is not None and sandbox.get("status", {}).get("metadata", {}).get("uid") != pod_uid:
+        raise ValueError("Pod sandbox identity changed during MTU inspection")
+    pid = sandbox["info"]["pid"]
     links = json.loads(command("nsenter", "-t", str(pid), "-n", "ip", "-j", "link", "show", "eth0"))
     routes = json.loads(command("nsenter", "-t", str(pid), "-n", "ip", "-j", "route", "show"))
     return validate_pod_mtu(links, routes)
@@ -504,11 +519,14 @@ def main() -> None:
             "pod-network",
         ],
     )
+    parser.add_argument("--pod-uid")
     args = parser.parse_args()
+    if args.pod_uid is not None and args.action != "pod-network":
+        parser.error("--pod-uid is accepted only for pod-network")
     config = json.loads(CONFIG.read_text())
     STATE.mkdir(mode=0o700, parents=True, exist_ok=True)
     if args.action == "pod-network":
-        result = pod_network()
+        result = pod_network(args.pod_uid)
     elif args.action == "firewall":
         result = apply_firewall()
     elif args.action == "wg-key":

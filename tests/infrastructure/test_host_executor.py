@@ -283,6 +283,82 @@ def test_worker_failure_keeps_private_diagnostics_without_claiming_readiness(tmp
     assert controller.observe(document.id) == result
 
 
+@pytest.mark.parametrize("include_devices", [True, False])
+def test_inspection_wrapper_requires_devices_and_retains_its_deadline(
+    tmp_path, monkeypatch, include_devices
+):
+    import cluster
+    from platform_management.host_executor.worker import run_task
+
+    document = task(
+        action="inspect",
+        previous_task_id="host-" + "2" * 24,
+        node_uid="11111111-2222-3333-4444-555555555555",
+    )
+    directory = tmp_path / "executions" / document.id
+    directory.mkdir(parents=True)
+    (tmp_path / "cluster").mkdir()
+    (directory / "task.json").write_text(document.model_dump_json())
+    (directory / "receipt.json").write_text(
+        json.dumps(
+            {
+                "manifest": {
+                    "metadata": {
+                        "annotations": {
+                            "klip.dev/input-sha256": hashlib.sha256(canonical(document)).hexdigest()
+                        }
+                    }
+                }
+            }
+        )
+    )
+    monkeypatch.setenv("POD_UID", "synthetic-owner")
+    monkeypatch.setenv("JOB_UID", "synthetic-job")
+    monkeypatch.setattr(cluster, "OPERATION_DEADLINE", None)
+
+    def action(root, task):
+        assert cluster.OPERATION_DEADLINE == task.deadline.timestamp()
+        return {
+            "status": "completed",
+            "provider_instance_id": task.provider_instance_id,
+            "registry_revision": task.registry_revision,
+            "node_name": task.node_name,
+            "node_uid": task.node_uid,
+            "readiness": dict.fromkeys(
+                (
+                    "host",
+                    "wireguard",
+                    "kubernetes",
+                    "cilium",
+                    "connectivity",
+                    "gpu_canary",
+                    "gpu_runtime",
+                ),
+                True,
+            ),
+            "gpu_observation": {
+                "observed_at": datetime.now(UTC).isoformat(),
+                "allocatable_gpu_count": 1,
+                "devices": [
+                    {
+                        "index": 0,
+                        "uuid": "GPU-11111111-2222-3333-4444-555555555555",
+                        "name": "NVIDIA A10",
+                        "memory_total_mib": 23028,
+                        "driver_version": "595.91.07",
+                    }
+                ],
+            }
+            if include_devices
+            else None,
+        }
+
+    result = run_task(tmp_path, document.id, action=action)
+    assert cluster.OPERATION_DEADLINE is None
+    assert result.gpu_runtime_ready is include_devices
+    assert result.status == ("completed" if include_devices else "failed")
+
+
 def test_worker_rejects_changed_inputs_before_privileged_action(tmp_path, monkeypatch):
     from platform_management.host_executor.worker import run_task
 
