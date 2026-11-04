@@ -6,7 +6,13 @@
     "torch": "2.13.0+cu130",
     "transformers": "5.19.0",
     "tokenizers": "0.23.3",
-    "nvidia-nccl-cu13": "2.30.7"
+    "nvidia-nccl-cu13": "2.30.7",
+    "lmcache": "0.5.6",
+    "opentelemetry-sdk": "1.40.0",
+    "opentelemetry-api": "1.40.0",
+    "opentelemetry-exporter-otlp": "1.40.0",
+    "opentelemetry-exporter-prometheus": "0.61b0",
+    "opentelemetry-semantic-conventions": "0.61b0"
   },
   "pip_vendored_certifi": "2026.10.23",
   "wheels": [
@@ -33,78 +39,6 @@
       "url": "https://files.pythonhosted.org/packages/07/25/ee8c38ae72d66b844ce8eb9711ba905dba21ca1a8a0c960057c41cd23337/pip-26.3-py3-none-any.whl",
       "sha256": "f3b60b20ffaadd4415ed7957212a38ac63fa4c5fa375bd0f4a797777940fad13",
       "size": 1950951
-    },
-    {
-      "name": "opentelemetry-api",
-      "version": "1.45.1",
-      "filename": "opentelemetry_api-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/1e/41/f7dcf80b81ee8e71c1a2b59f14208bc723edbd89ed027a73b175abf6348e/opentelemetry_api-1.45.1-py3-none-any.whl",
-      "sha256": "b31553efa588ae44bc306f863c785c5333a9ecc091248c6ee68b4b6c87fdedfb",
-      "size": 60256
-    },
-    {
-      "name": "opentelemetry-sdk",
-      "version": "1.45.1",
-      "filename": "opentelemetry_sdk-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/95/3c/87c42b4bd6dd297536f04cd9383d212ac557ecd49f2cbdcd46da1c9ef5c8/opentelemetry_sdk-1.45.1-py3-none-any.whl",
-      "sha256": "c604c11dc429810812348989115fa44bd558772a3d7442afc43d024f2c250ca4",
-      "size": 140063
-    },
-    {
-      "name": "opentelemetry-exporter-otlp",
-      "version": "1.45.1",
-      "filename": "opentelemetry_exporter_otlp-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/36/e1/68c28d7da4482ce882a640b2c61405a78284c0a3a17a4db125647189b0b7/opentelemetry_exporter_otlp-1.45.1-py3-none-any.whl",
-      "sha256": "ef3910d32b36ccbaf62390189759bd43a8109885e2d50b738ed9c9b255bf5cb5",
-      "size": 6730
-    },
-    {
-      "name": "opentelemetry-exporter-otlp-proto-common",
-      "version": "1.45.1",
-      "filename": "opentelemetry_exporter_otlp_proto_common-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/84/aa/92f225d353904e7f70b8b3e3c1b02db0cf56f744c2e83c581dc372e78873/opentelemetry_exporter_otlp_proto_common-1.45.1-py3-none-any.whl",
-      "sha256": "2f446183ae7047b036226f1d846c41a834b0e8755ad13b51a51dd38952eb466c",
-      "size": 15393
-    },
-    {
-      "name": "opentelemetry-exporter-otlp-proto-grpc",
-      "version": "1.45.1",
-      "filename": "opentelemetry_exporter_otlp_proto_grpc-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/4d/46/2d1da202f1e17c81aae7efcf702898d524b46709e4d3e2bf1f7f8ca8fbc6/opentelemetry_exporter_otlp_proto_grpc-1.45.1-py3-none-any.whl",
-      "sha256": "e42ecb789d2fc5d8145e3dadc3e2991c9f18cd166d7c7514e234702540274b76",
-      "size": 19492
-    },
-    {
-      "name": "opentelemetry-exporter-otlp-proto-http",
-      "version": "1.45.1",
-      "filename": "opentelemetry_exporter_otlp_proto_http-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/aa/1f/517eaa0187ba106a9da97160ce2add3a371812681dc440930b267f714e42/opentelemetry_exporter_otlp_proto_http-1.45.1-py3-none-any.whl",
-      "sha256": "24a97cf3753c7fb52fad44a696e452ff371686339e2acf3309e2eda3d0230700",
-      "size": 22180
-    },
-    {
-      "name": "opentelemetry-proto",
-      "version": "1.45.1",
-      "filename": "opentelemetry_proto-1.45.1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/ab/9a/42ec8180a769516ae757e893b69736826efceac7332553915b4528a91c6d/opentelemetry_proto-1.45.1-py3-none-any.whl",
-      "sha256": "f38e2a8413053c180cd3d2637fbb279673ec2f6a6e09c995aafa2f452c52b46e",
-      "size": 72488
-    },
-    {
-      "name": "opentelemetry-semantic-conventions",
-      "version": "0.66b1",
-      "filename": "opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/bc/14/67f8aa798857f8cf686f515bf93d9bb877ce952ddc8efae0fa25b45ce0d6/opentelemetry_semantic_conventions-0.66b1-py3-none-any.whl",
-      "sha256": "d4cddeb4315490b35213f55e2bdc9ac54bb1e4d318927475bed62b35545e581b",
-      "size": 206279
-    },
-    {
-      "name": "opentelemetry-exporter-prometheus",
-      "version": "0.66b1",
-      "filename": "opentelemetry_exporter_prometheus-0.66b1-py3-none-any.whl",
-      "url": "https://files.pythonhosted.org/packages/4d/8a/5e7262d970586a8d69dd159bebc68fbee7457088883b179599a562881a6f/opentelemetry_exporter_prometheus-0.66b1-py3-none-any.whl",
-      "sha256": "a938e6af7295d5bacf82da9ca845cab9a9cb1c5f565abe39f54ef8bf511c05d9",
-      "size": 13222
     }
   ],
   "evidence": [
@@ -113,12 +47,16 @@
     "https://pypi.org/pypi/pip/26.3/json"
   ],
   "limitations": [
-    "Only CA/tooling and OpenTelemetry packages change; CUDA, model libraries, NCCL and kernel headers are retained.",
+    "Only certifi/pip/uv are updated. Two unused newer telemetry extras are removed only after proving no installed package declares them. All model and active telemetry versions remain unchanged.",
     "Native full-image scanning and exact finding review remain required before deployment."
   ],
   "upstream_nccl_override": {
     "source": "https://raw.githubusercontent.com/vllm-project/vllm/v0.32.0/docker/Dockerfile",
     "version": "2.30.7",
     "reason": "Upstream DeepEPv2 GIN requires NCCL >=2.30.4; Torch metadata pins 2.29.7. The exact inherited pip-check conflict is retained, not reported as a clean dependency check."
+  },
+  "removed_unreferenced_packages": {
+    "opentelemetry-exporter-otlp-common": "0.66b1",
+    "opentelemetry-exporter-http-transport": "0.66b1"
   }
 }

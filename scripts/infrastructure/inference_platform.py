@@ -356,6 +356,27 @@ def raw_apis():
     return yaml.safe_dump_all(documents, sort_keys=True)
 
 
+def crd_bundle(rendered):
+    # These upstream schemas exceed Helm's 1 MiB release-Secret limit. Keep
+    # their checked chart bytes, but give static CRDs one explicit SSA owner.
+    documents = []
+    for release in ("klip-gateway-crds", "klip-ai-crds"):
+        for document in yaml.safe_load_all(rendered[release]):
+            if not document:
+                continue
+            if document["kind"] != "CustomResourceDefinition":
+                raise ValueError("CRD bundle contains a non-CRD resource")
+            document["metadata"].setdefault("labels", {}).update(
+                {
+                    "app.kubernetes.io/part-of": "klip",
+                    "app.kubernetes.io/managed-by": "klip-static",
+                    "klip.dev/platform-component": "inference",
+                }
+            )
+            documents.append(document)
+    return yaml.safe_dump_all(documents, sort_keys=True)
+
+
 def native_inputs(kubectl):
     from image_credentials import healthy_targets
 
@@ -607,12 +628,35 @@ def deploy(approval):
     command = ["sudo", "kubectl", "--kubeconfig=/etc/kubernetes/admin.conf"]
     try:
         cp.run([*command, "apply", "-f", "-"], data=boundary())
-        cp.run([*command, "apply", "-f", "-"], data=raw_apis())
+        cp.run(
+            [
+                *command,
+                "apply",
+                "--server-side",
+                "--field-manager=klip-inference-foundation",
+                "-f",
+                "-",
+            ],
+            data=raw_apis(),
+        )
+        cp.run(
+            [
+                *command,
+                "apply",
+                "--server-side",
+                "--field-manager=klip-inference-foundation",
+                "-f",
+                "-",
+            ],
+            data=crd_bundle(render()),
+        )
         receipt["credential"] = stage_seed(cp, plan["seed_sha256"])
         write_private(receipt_path, receipt)
         kubeconfigs()
         with tunnel():
             for name, (key, namespace) in RELEASES.items():
+                if key in {"gateway-crds", "ai-crds"}:
+                    continue
                 path = root / (name + ".values.yaml")
                 write_private(path, yaml.safe_dump(values()[name]))
                 output = checked(

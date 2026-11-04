@@ -1,4 +1,4 @@
-"""Apply bounded CA/tooling and telemetry fixes to an exact upstream vLLM image."""
+"""Patch CA/tooling and remove unreferenced extras from an exact upstream vLLM image."""
 
 import argparse
 import hashlib
@@ -15,19 +15,10 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 DIRECTORY = Path(__file__).resolve().parent
-PATCHED = {
-    "certifi",
-    "pip",
-    "uv",
-    "opentelemetry-api",
-    "opentelemetry-sdk",
-    "opentelemetry-exporter-otlp",
-    "opentelemetry-exporter-otlp-proto-common",
-    "opentelemetry-exporter-otlp-proto-grpc",
-    "opentelemetry-exporter-otlp-proto-http",
-    "opentelemetry-proto",
-    "opentelemetry-semantic-conventions",
-    "opentelemetry-exporter-prometheus",
+PATCHED = {"certifi", "pip", "uv"}
+REMOVED = {
+    "opentelemetry-exporter-otlp-common": "0.66b1",
+    "opentelemetry-exporter-http-transport": "0.66b1",
 }
 # Upstream deliberately overrides Torch's NCCL pin for DeepEPv2. No other
 # dependency-check exception is accepted in the derived image.
@@ -48,6 +39,7 @@ def settings(path):
         or not re.fullmatch(r"docker.io/vllm/vllm-openai@sha256:[a-f0-9]{64}", value["base"])
         or {w["name"] for w in value["wheels"]} != PATCHED
         or len(value["wheels"]) != len(PATCHED)
+        or value.get("removed_unreferenced_packages") != REMOVED
     ):
         raise ValueError("Unexpected serving patch scope")
     for wheel in value["wheels"]:
@@ -88,12 +80,25 @@ def distributions():
 
 
 def assert_unchanged(before, after, protected):
-    if {k: v for k, v in before.items() if k not in PATCHED} != {
+    if {k: v for k, v in before.items() if k not in PATCHED | set(REMOVED)} != {
         k: v for k, v in after.items() if k not in PATCHED
     }:
         raise ValueError("Security patch changed a model/runtime dependency")
     if any(after.get(k) != v for k, v in protected.items()):
         raise ValueError("Unexpected upstream model/runtime version")
+
+
+def assert_unreferenced(requirements):
+    from packaging.requirements import Requirement
+    from packaging.utils import canonicalize_name
+
+    for name, entries in requirements.items():
+        if name in REMOVED:
+            continue
+        # Check even optional/inactive requirements conservatively: this is
+        # removal of orphaned extras, not a change to another installed package.
+        if any(canonicalize_name(Requirement(r).name) in REMOVED for r in entries):
+            raise ValueError("An installed package still requires an orphan candidate: " + name)
 
 
 def dependency_issues(expected):
@@ -175,8 +180,29 @@ def install(value):
     if sys.platform != "linux" or os.geteuid() != 0:
         raise ValueError("Install only during the Linux serving-image build")
     before = distributions()
-    assert_unchanged(before, before, value["protected_versions"])
+    if any(before.get(k) != v for k, v in value["protected_versions"].items()):
+        raise ValueError("Unexpected upstream model/runtime version")
     baseline = dependency_issues([NCCL_ISSUE, UPSTREAM_OTEL_ISSUE])
+    if any(before.get(k) != v for k, v in REMOVED.items()):
+        raise ValueError("Unexpected orphaned telemetry package version")
+    requirements = {
+        d.metadata["Name"].lower().replace("_", "-"): d.requires or []
+        for d in importlib.metadata.distributions()
+    }
+    assert_unreferenced(requirements)
+    subprocess.run(
+        [
+            sys.executable,
+            "-m",
+            "pip",
+            "--disable-pip-version-check",
+            "uninstall",
+            "--yes",
+            *sorted(REMOVED),
+        ],
+        check=True,
+        timeout=60,
+    )
     with tempfile.TemporaryDirectory(prefix="klip-model-wheels-") as temporary:
         wheel_directory = Path(temporary)
         for wheel in value["wheels"]:
@@ -216,6 +242,7 @@ def install(value):
         "after": distributions(),
         "dependency_check_before": baseline,
         "dependency_check_after": dependency_issues([NCCL_ISSUE]),
+        "removed_unreferenced_packages": REMOVED,
         "limitations": ["A patch receipt is not a vulnerability waiver or serving approval."],
     }
     verify(value, receipt)

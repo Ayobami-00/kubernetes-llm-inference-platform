@@ -36,7 +36,7 @@ def test_patch_input_tampering_fails_before_downloading(tmp_path, change):
         patch.settings(lock)
 
 
-def test_only_the_reviewed_tools_and_telemetry_may_change():
+def test_only_reviewed_tools_and_verified_orphans_may_change():
     before = {**settings()["protected_versions"], "certifi": "old", "pip": "old", "uv": "old"}
     after = {**before, "certifi": "new", "pip": "new", "uv": "new"}
     patch.assert_unchanged(before, after, settings()["protected_versions"])
@@ -46,6 +46,26 @@ def test_only_the_reviewed_tools_and_telemetry_may_change():
         patch.assert_unchanged(before, {**after, "unreviewed": "1"}, {})
     with pytest.raises(ValueError, match="version"):
         patch.assert_unchanged(before, after, {"vllm": "unexpected"})
+
+
+def test_an_orphan_candidate_with_any_reverse_dependency_cannot_be_removed():
+    patch.assert_unreferenced(
+        {"vllm": ["opentelemetry-sdk>=1.27"], **{n: [] for n in patch.REMOVED}}
+    )
+    for requirement in (
+        "opentelemetry-exporter-otlp-common>=0.66b1",
+        'opentelemetry_exporter_http_transport; extra == "optional"',
+    ):
+        with pytest.raises(ValueError, match="still requires"):
+            patch.assert_unreferenced({"a-real-dependency": [requirement]})
+
+
+def test_final_inventory_cannot_retain_orphan_candidates():
+    before = {**settings()["protected_versions"], **patch.REMOVED}
+    after = {k: v for k, v in before.items() if k not in patch.REMOVED}
+    patch.assert_unchanged(before, after, settings()["protected_versions"])
+    with pytest.raises(ValueError, match="dependency"):
+        patch.assert_unchanged(before, before, settings()["protected_versions"])
 
 
 def test_cached_wheel_tampering_fails_without_network(tmp_path, monkeypatch):

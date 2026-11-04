@@ -47,8 +47,10 @@ documents remain draft and retain the same Qwen/tokenizer pins.
 The upstream 0.32.0 scan retained 18 unique Critical tuples: 15 kernel-header
 findings and three CA/tooling findings. `dev/model-serving/` derives an image
 from that exact AMD64 digest and updates certifi, pip (including its vendored
-certifi), uv and the OpenTelemetry package family, using checksum-locked PyPI
-wheels. It compares the complete Python distribution inventory before and
+certifi) and uv, using checksum-locked PyPI wheels. It removes only the two
+orphaned newer telemetry extras listed in the patch lock, after checking that
+no remaining installed package declares a dependency on either, including
+optional requirements. It compares the complete Python distribution inventory before and
 after; CUDA, vLLM, Torch, NCCL, Transformers and Tokenizers remain unchanged.
 The build records `pip check` before and after and repeats verification as
 UID 10001. Runtime Python/Requests/curl CA settings
@@ -57,9 +59,12 @@ upstream uses runtime JIT compilation.
 
 The first build failed its unconditional dependency check before publication.
 The pinned upstream image already contains an incompatible OpenTelemetry
-exporter-common 0.66b1 / SDK 1.40.0 combination. The derived image aligns the
-SDK/API/exporter family to 1.45.1 / semantic conventions 0.66b1 and checks actual
-gRPC/HTTP/Prometheus exporter imports plus an offline trace. The remaining
+exporter-common 0.66b1 / SDK 1.40.0 combination. The correction preserves
+LMCache 0.5.6 and the complete active SDK/API/exporter family at their existing
+1.40.0 / semantic conventions 0.61b0 versions. The unrelated newer
+`opentelemetry-exporter-otlp-common` and `opentelemetry-exporter-http-transport`
+extras are removed only after their reverse-dependency check passes. Actual
+gRPC/HTTP/Prometheus exporter imports and an offline trace are checked. The remaining
 exact dependency-check exception is upstream's deliberate NCCL 2.30.7 override
 of Torch's 2.29.7 metadata pin, documented in the pinned upstream Dockerfile
 for DeepEPv2. It is retained in the receipt, not described as a clean
@@ -100,6 +105,15 @@ anti-affinity, the private network boundary, cluster/Node/CRD identities and
 the exact native scan review are bound before deployment. Existing foreign
 CRDs cannot be adopted implicitly. Runtime Pod image IDs, readiness and host
 separation are checked after installation; replica counts alone are insufficient.
+
+The first install reached the upstream CRD chart but Helm rejected its release
+Secret because it exceeded Kubernetes' 1 MiB limit. No controller was installed
+by that failed attempt; its partial API/namespace/credential evidence is retained.
+CRDs and the exact upstream Gateway API upgrade safety policy therefore use
+server-side apply with field manager `klip-inference-foundation`, without forced
+ownership. Their complete rendered manifests and native identities stay in the
+saved plan. Controllers remain separate ordinary Helm releases. This also avoids
+storing large schemas in client-side last-applied annotations or Helm Secrets.
 
 This foundation deliberately creates no Gateway, inference pool, model or
 public Service. Its temporary seven-day review covers private controllers

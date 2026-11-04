@@ -40,6 +40,11 @@ def test_pinned_controller_render_is_deterministic_and_has_no_generated_secrets(
         "ValidatingAdmissionPolicyBinding",
     }
     assert all(v["metadata"]["name"] == "safe-upgrades.gateway.networking.k8s.io" for v in policies)
+    crds = list(yaml.safe_load_all(platform.crd_bundle(rendered)))
+    assert crds and all(v["kind"] == "CustomResourceDefinition" for v in crds)
+    assert all(
+        v["metadata"]["labels"]["app.kubernetes.io/managed-by"] == "klip-static" for v in crds
+    )
 
 
 @pytest.mark.parametrize(
