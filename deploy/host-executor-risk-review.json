@@ -2,8 +2,8 @@
   "schema_version": "klip-host-risk-review.v1",
   "reviewed_at": "2026-11-04",
   "expires_at": "2026-11-11",
-  "source_commit": "2f377fa2bd2dbaea8bc3bb779abebed4271f5196",
-  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:1b8934ea32c61b599bcec6604e78f334ae1e08ae41ab06a066f879b7ba192356",
+  "source_commit": "882d555cd44189c1468f6b11ab7fb39d7cfbc5d9",
+  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:801675f662503eb9b9bd9bcdadce585e657b8cc4d9ab54f6579f92c80b3714cb",
   "scope": "Restricted CPU executor only; not a general platform or GPU-runtime security approval.",
   "critical_policy": "Any Critical finding blocks deployment. No suppressed findings.",
   "conditions": [
@@ -458,11 +458,11 @@
       "rationale": "The Go TLS server ECH parser is not used by the outbound-only SSM client or by the unexecuted runc artifact in this CPU executor. The mTLS listener is Python/OpenSSL. The affected components remain present; this does not establish GPU-host runtime safety."
     }
   ],
-  "runtime_revision_note": "Corrected /run versus /var/run mount alias; static image-bound STS profile reads a separate token directory. Same exact retained findings and restrictions; expiry unchanged.",
+  "runtime_revision_note": "CPU executor custody and network boundary are unchanged. The image now contains the separate, exact single-A10 bootstrap review and verifies retained assessment bytes. This CPU review does not approve serving images or establish GPU readiness.",
   "evidence": {
-    "workflow_run_id": "41793210408",
-    "scan_report_sha256": "a1439e2714d07a4bfbcf845a6eb31ee7c4b4a29480b171b286891d588502bc0c",
-    "previous_review_sha256": "dd1c1d1bc0fa6fff2d5fe2242b58e8fe5134c632ac28f3a2397c8f6ffeffdf00",
-    "review_basis": "Exact High finding tuples are unchanged from the previous CPU-only review; the restricted CPU runtime boundary is retained. GPU runtime admission remains separately gated and unapproved."
+    "workflow_run_id": "41806434789",
+    "scan_report_sha256": "d2e3aff93e36e83370ed11e01533f57068034096e145a9b82b36aa08ba394db1",
+    "previous_review_sha256": "0efd00840030dc1878a0f6fa93467fdcb283d32475325dae7f1cc2e163b8e14e",
+    "review_basis": "All 55 exact High tuples and runtime rationales are unchanged; native Critical count is zero. Existing expiry and CPU custody/network restrictions are retained. GPU admission has its own assessment and live checks."
   }
 }
