@@ -53,6 +53,22 @@ def test_update_allows_exact_image_delta_only():
             upgrade.validate_delta(yaml.safe_dump_all(before), yaml.safe_dump_all(value), OLD, NEW)
 
 
+@pytest.mark.parametrize("succeeds", [True, False])
+def test_native_preflight_retains_redacted_evidence_before_returning(
+    tmp_path, monkeypatch, capsys, succeeds
+):
+    source = (
+        "print('{\"registry_revision\":12}')" if succeeds else "raise ValueError('secret-marker')"
+    )
+    monkeypatch.setattr(upgrade, "PREFLIGHT_PROGRAM", source)
+    program = upgrade.preflight_program("a" * 64).replace("/executor/state", str(tmp_path))
+    exec(compile(program, "native-preflight-observation", "exec"), {})
+    observed = json.loads(capsys.readouterr().out)
+    retained = (tmp_path / "upgrades" / ("a" * 64) / "preflight.json").read_text()
+    assert json.loads(retained) == observed and "secret-marker" not in retained
+    assert observed["status"] == ("verified" if succeeds else "failed")
+
+
 def pods(image):
     return [
         {

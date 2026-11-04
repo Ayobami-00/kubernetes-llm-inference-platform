@@ -58,6 +58,9 @@ All plans, previous values/manifests, original active state, native Job/Pod UIDs
 preflight results, Helm output and final evidence remain under the private
 `cluster/host-executor/upgrades/<approval-sha256>/` directory. Secret contents
 are neither retrieved by the identity check nor retained in these reports.
+Preflight also freezes a redacted result on the executor volume before returning
+its exec response. Failed checks retain exception types and code locations,
+without exception messages, subprocess output or credentials.
 
 An existing attempt is never automatically restarted. After a lost response or
 failed apply, inspect its `result.json`, bound native Job UID, Helm history and

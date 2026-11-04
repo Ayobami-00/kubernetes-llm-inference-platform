@@ -54,6 +54,34 @@ with ExitStack() as stack:
 """
 
 
+def preflight_program(approval):
+    """Retain redacted preflight evidence even if its exec response is lost."""
+    if not re.fullmatch(r"[a-f0-9]{64}", approval):
+        raise ValueError("Exact upgrade identity required")
+    return (
+        "import contextlib,io,json,traceback\n"
+        "from pathlib import Path\n"
+        "from platform_management.integrations.job_runner import frozen_file\n"
+        "output=io.StringIO()\n"
+        "try:\n"
+        "    with contextlib.redirect_stdout(output):\n"
+        + "        exec("
+        + repr(PREFLIGHT_PROGRAM)
+        + ",{})\n"
+        "    value={'status':'verified',**json.loads(output.getvalue())}\n"
+        "except Exception as error:\n"
+        "    value={'status':'failed','error_type':type(error).__name__,\n"
+        "        'program':getattr(error,'program',None),\n"
+        "        'returncode':getattr(error,'returncode',None),\n"
+        "        'frames':[{'file':x.filename.rsplit('/',1)[-1],'line':x.lineno}\n"
+        "            for x in traceback.extract_tb(error.__traceback__)]}\n"
+        + "frozen_file(Path('/executor/state/upgrades/"
+        + approval
+        + "/preflight.json'),json.dumps(value,sort_keys=True).encode())\n"
+        "print(json.dumps(value))\n"
+    )
+
+
 def mapped(text):
     documents = [d for d in yaml.safe_load_all(text) if d]
     result = {(d["kind"], d["metadata"]["name"]): d for d in documents}
@@ -305,7 +333,10 @@ def apply(approval):
             or not guard.get("peer_writer_fenced")
         ):
             raise ValueError("Upgrade does not hold authoritative dispatch and peer-writer custody")
-        proof = json.loads(cp.run([*execute, PREFLIGHT_PROGRAM], secret=True))
+        proof = json.loads(cp.run([*execute, preflight_program(approval)], secret=True))
+        if proof.get("status") != "verified":
+            result["preflight"] = proof
+            raise ValueError("Executor preflight failed; redacted native evidence retained")
         if proof["kube_system_uid"] != identity["/namespace/kube-system"]:
             raise ValueError("Upgrade preflight reached another cluster")
         result.update(preflight=proof, guard=guard, pod_uid=pod["metadata"]["uid"])
