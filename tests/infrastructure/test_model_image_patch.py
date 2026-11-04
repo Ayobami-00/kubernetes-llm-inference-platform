@@ -4,6 +4,7 @@ import hashlib
 import importlib.util
 import json
 from copy import deepcopy
+from subprocess import CompletedProcess
 
 import pytest
 from common import ROOT
@@ -35,7 +36,7 @@ def test_patch_input_tampering_fails_before_downloading(tmp_path, change):
         patch.settings(lock)
 
 
-def test_only_the_three_reviewed_tools_may_change():
+def test_only_the_reviewed_tools_and_telemetry_may_change():
     before = {**settings()["protected_versions"], "certifi": "old", "pip": "old", "uv": "old"}
     after = {**before, "certifi": "new", "pip": "new", "uv": "new"}
     patch.assert_unchanged(before, after, settings()["protected_versions"])
@@ -90,4 +91,18 @@ def test_container_base_and_model_versions_match_the_inspected_source():
     assert value["base"] == lock["images"][lock["scan_components"]["vllm"]]["image"]
     assert "USER 10001:10001" in dockerfile
     assert "patch.py verify" in dockerfile
-    assert "pip check" in dockerfile
+    assert "dependency_issues([NCCL_ISSUE])" in (ROOT / "dev/model-serving/patch.py").read_text()
+
+
+@pytest.mark.parametrize("unexpected", ["extra issue", "", None])
+def test_dependency_check_retains_only_the_exact_upstream_nccl_override(monkeypatch, unexpected):
+    output = patch.NCCL_ISSUE + "\n" + (unexpected or "")
+    code = 0 if unexpected is None else 1
+    monkeypatch.setattr(
+        patch.subprocess, "run", lambda *a, **k: CompletedProcess([], code, output, "")
+    )
+    if unexpected or unexpected is None:
+        with pytest.raises(ValueError, match="exceptions"):
+            patch.dependency_issues([patch.NCCL_ISSUE])
+    else:
+        assert patch.dependency_issues([patch.NCCL_ISSUE])["issues"] == [patch.NCCL_ISSUE]

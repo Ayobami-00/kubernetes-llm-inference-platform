@@ -46,13 +46,25 @@ documents remain draft and retain the same Qwen/tokenizer pins.
 
 The upstream 0.32.0 scan retained 18 unique Critical tuples: 15 kernel-header
 findings and three CA/tooling findings. `dev/model-serving/` derives an image
-from that exact AMD64 digest and updates only certifi, pip (including its
-vendored certifi) and uv, using checksum-locked PyPI wheels. It compares the
-complete Python distribution inventory before and after; CUDA, vLLM, Torch,
-Transformers and Tokenizers remain unchanged. The build also runs `pip check`
-and repeats verification as UID 10001. Runtime Python/Requests/curl CA settings
+from that exact AMD64 digest and updates certifi, pip (including its vendored
+certifi), uv and the OpenTelemetry package family, using checksum-locked PyPI
+wheels. It compares the complete Python distribution inventory before and
+after; CUDA, vLLM, Torch, NCCL, Transformers and Tokenizers remain unchanged.
+The build records `pip check` before and after and repeats verification as
+UID 10001. Runtime Python/Requests/curl CA settings
 point to the patched bundle. No compiler/header removal is attempted because
 upstream uses runtime JIT compilation.
+
+The first build failed its unconditional dependency check before publication.
+The pinned upstream image already contains an incompatible OpenTelemetry
+exporter-common 0.66b1 / SDK 1.40.0 combination. The derived image aligns the
+SDK/API/exporter family to 1.45.1 / semantic conventions 0.66b1 and checks actual
+gRPC/HTTP/Prometheus exporter imports plus an offline trace. The remaining
+exact dependency-check exception is upstream's deliberate NCCL 2.30.7 override
+of Torch's 2.29.7 metadata pin, documented in the pinned upstream Dockerfile
+for DeepEPv2. It is retained in the receipt, not described as a clean
+`pip check`. Any additional conflict fails the build. CUDA inference still
+requires its separate hardware validation.
 
 The **Pinned model serving image** workflow builds on a disposable CPU runner,
 publishes an immutable source tag, extracts native patch/header inventories

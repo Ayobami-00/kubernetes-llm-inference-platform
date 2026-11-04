@@ -1,4 +1,4 @@
-"""Apply a bounded CA/tooling-only patch to an exact upstream vLLM image."""
+"""Apply bounded CA/tooling and telemetry fixes to an exact upstream vLLM image."""
 
 import argparse
 import hashlib
@@ -15,7 +15,30 @@ from datetime import UTC, datetime
 from pathlib import Path
 
 DIRECTORY = Path(__file__).resolve().parent
-PATCHED = {"certifi", "pip", "uv"}
+PATCHED = {
+    "certifi",
+    "pip",
+    "uv",
+    "opentelemetry-api",
+    "opentelemetry-sdk",
+    "opentelemetry-exporter-otlp",
+    "opentelemetry-exporter-otlp-proto-common",
+    "opentelemetry-exporter-otlp-proto-grpc",
+    "opentelemetry-exporter-otlp-proto-http",
+    "opentelemetry-proto",
+    "opentelemetry-semantic-conventions",
+    "opentelemetry-exporter-prometheus",
+}
+# Upstream deliberately overrides Torch's NCCL pin for DeepEPv2. No other
+# dependency-check exception is accepted in the derived image.
+NCCL_ISSUE = (
+    "torch 2.13.0+cu130 has requirement nvidia-nccl-cu13==2.29.7; "
+    'platform_system == "Linux", but you have nvidia-nccl-cu13 2.30.7.'
+)
+UPSTREAM_OTEL_ISSUE = (
+    "opentelemetry-exporter-otlp-common 0.66b1 has requirement "
+    "opentelemetry-sdk~=1.45.1, but you have opentelemetry-sdk 1.40.0."
+)
 
 
 def settings(path):
@@ -30,7 +53,9 @@ def settings(path):
     for wheel in value["wheels"]:
         if (
             not re.fullmatch(r"[a-zA-Z0-9_.-]+\.whl", wheel["filename"])
-            or not wheel["filename"].startswith(wheel["name"] + "-" + wheel["version"] + "-")
+            or not wheel["filename"].startswith(
+                wheel["name"].replace("-", "_") + "-" + wheel["version"] + "-"
+            )
             or not wheel["url"].startswith("https://files.pythonhosted.org/packages/")
             or not wheel["url"].endswith("/" + wheel["filename"])
             or not re.fullmatch(r"[a-f0-9]{64}", wheel["sha256"])
@@ -69,6 +94,19 @@ def assert_unchanged(before, after, protected):
         raise ValueError("Security patch changed a model/runtime dependency")
     if any(after.get(k) != v for k, v in protected.items()):
         raise ValueError("Unexpected upstream model/runtime version")
+
+
+def dependency_issues(expected):
+    check = subprocess.run(
+        [sys.executable, "-m", "pip", "--disable-pip-version-check", "check"],
+        capture_output=True,
+        text=True,
+        timeout=60,
+    )
+    issues = sorted(line.strip() for line in check.stdout.splitlines() if line.strip())
+    if check.returncode != 1 or issues != sorted(expected) or check.stderr.strip():
+        raise ValueError("Dependency check differs from the exact recorded upstream exceptions")
+    return {"exit_code": check.returncode, "issues": issues}
 
 
 def headers():
@@ -113,6 +151,17 @@ def verify(value, receipt):
     for name in ("SSL_CERT_FILE", "REQUESTS_CA_BUNDLE", "CURL_CA_BUNDLE"):
         if name in os.environ and os.environ[name] != certifi.where():
             raise ValueError("Runtime CA bundle differs from the patched bundle")
+    dependency_issues([NCCL_ISSUE])
+    from opentelemetry.exporter.otlp.proto.grpc.trace_exporter import OTLPSpanExporter as GRPC
+    from opentelemetry.exporter.otlp.proto.http.trace_exporter import OTLPSpanExporter as HTTP
+    from opentelemetry.exporter.prometheus import PrometheusMetricReader
+    from opentelemetry.sdk.trace import TracerProvider
+
+    assert GRPC and HTTP and PrometheusMetricReader
+    provider = TracerProvider()
+    with provider.get_tracer("klip-build-check").start_as_current_span("offline-import-check"):
+        pass
+    provider.shutdown()
 
 
 def install(value):
@@ -120,6 +169,7 @@ def install(value):
         raise ValueError("Install only during the Linux serving-image build")
     before = distributions()
     assert_unchanged(before, before, value["protected_versions"])
+    baseline = dependency_issues([NCCL_ISSUE, UPSTREAM_OTEL_ISSUE])
     with tempfile.TemporaryDirectory(prefix="klip-model-wheels-") as temporary:
         wheel_directory = Path(temporary)
         for wheel in value["wheels"]:
@@ -157,6 +207,8 @@ def install(value):
         "base": value["base"],
         "before": before,
         "after": distributions(),
+        "dependency_check_before": baseline,
+        "dependency_check_after": dependency_issues([NCCL_ISSUE]),
         "limitations": ["A patch receipt is not a vulnerability waiver or serving approval."],
     }
     verify(value, receipt)
