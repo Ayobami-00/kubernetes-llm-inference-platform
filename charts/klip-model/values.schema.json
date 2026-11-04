@@ -1,0 +1,190 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "additionalProperties": false,
+  "properties": {
+    "profileRef": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]*@[1-9][0-9]*$"
+    },
+    "profileSHA256": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{64}$"
+    },
+    "deploymentId": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "nodeUID": {
+      "type": "string",
+      "pattern": "^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$"
+    },
+    "workerClass": {
+      "enum": [
+        "latency",
+        "shared",
+        "large"
+      ]
+    },
+    "model": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "repository": {
+          "type": "string",
+          "pattern": "^[A-Za-z0-9_.-]+/[A-Za-z0-9_.-]+$"
+        },
+        "revision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "tokenizerRevision": {
+          "type": "string",
+          "pattern": "^[a-f0-9]{40}$"
+        },
+        "alias": {
+          "type": "string",
+          "pattern": "^[a-z][a-z0-9-]{0,62}$"
+        }
+      },
+      "required": [
+        "repository",
+        "revision",
+        "tokenizerRevision",
+        "alias"
+      ]
+    },
+    "engine": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "image": {
+          "type": "string",
+          "pattern": "^[a-zA-Z0-9./:_-]+@sha256:[a-f0-9]{64}$"
+        },
+        "dtype": {
+          "enum": [
+            "bfloat16",
+            "float16"
+          ]
+        },
+        "maxModelLen": {
+          "type": "integer",
+          "minimum": 128,
+          "maximum": 262144
+        },
+        "maxNumSeqs": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 64
+        },
+        "gpuMemoryUtilization": {
+          "type": "number",
+          "exclusiveMinimum": 0,
+          "exclusiveMaximum": 1
+        },
+        "maxOutputTokens": {
+          "type": "integer",
+          "minimum": 1,
+          "maximum": 8192
+        },
+        "chatTemplateKwargs": {
+          "type": "object",
+          "additionalProperties": false,
+          "properties": {
+            "enable_thinking": {
+              "const": false
+            }
+          },
+          "required": [
+            "enable_thinking"
+          ]
+        }
+      },
+      "required": [
+        "image",
+        "dtype",
+        "maxModelLen",
+        "maxNumSeqs",
+        "gpuMemoryUtilization",
+        "maxOutputTokens",
+        "chatTemplateKwargs"
+      ]
+    },
+    "gpus": {
+      "const": 1
+    },
+    "cpu": {
+      "type": "string",
+      "pattern": "^[1-9][0-9]?$"
+    },
+    "memoryGiB": {
+      "type": "integer",
+      "minimum": 16,
+      "maximum": 1024
+    },
+    "cacheGiB": {
+      "type": "integer",
+      "minimum": 32,
+      "maximum": 800
+    },
+    "gatewayNamespace": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "gatewayLabels": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "monitoringNamespace": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
+    "routerLabels": {
+      "type": "object",
+      "minProperties": 1,
+      "additionalProperties": {
+        "type": "string",
+        "minLength": 1
+      }
+    },
+    "imagePullSecrets": {
+      "type": "array",
+      "items": {
+        "type": "object",
+        "additionalProperties": false,
+        "properties": {
+          "name": {
+            "type": "string",
+            "pattern": "^[a-z][a-z0-9-]{0,62}$"
+          }
+        },
+        "required": [
+          "name"
+        ]
+      }
+    }
+  },
+  "required": [
+    "profileRef",
+    "profileSHA256",
+    "deploymentId",
+    "nodeUID",
+    "workerClass",
+    "model",
+    "engine",
+    "gpus",
+    "cpu",
+    "memoryGiB",
+    "cacheGiB",
+    "gatewayNamespace",
+    "gatewayLabels",
+    "monitoringNamespace",
+    "routerLabels",
+    "imagePullSecrets"
+  ]
+}

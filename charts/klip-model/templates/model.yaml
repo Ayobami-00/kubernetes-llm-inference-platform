@@ -1,0 +1,147 @@
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: {{ required "deploymentId is required" .Values.deploymentId }}
+  labels:
+    klip.dev/serving-deployment: {{ .Values.deploymentId | quote }}
+  annotations:
+    klip.dev/serving-profile: {{ required "profileRef is required" .Values.profileRef | quote }}
+    klip.dev/serving-profile-sha256: {{ .Values.profileSHA256 | quote }}
+spec:
+  replicas: 1
+  # One worker owns the full GPU allocation; a surge cannot reserve another GPU.
+  strategy: {type: Recreate}
+  selector:
+    matchLabels: {klip.dev/serving-deployment: {{ .Values.deploymentId | quote }}}
+  template:
+    metadata:
+      labels:
+        klip.dev/serving-deployment: {{ .Values.deploymentId | quote }}
+        app.kubernetes.io/component: model-server
+      annotations:
+        klip.dev/serving-profile: {{ .Values.profileRef | quote }}
+        klip.dev/serving-profile-sha256: {{ .Values.profileSHA256 | quote }}
+    spec:
+      automountServiceAccountToken: false
+      runtimeClassName: nvidia
+      terminationGracePeriodSeconds: 75
+      nodeSelector:
+        klip.dev.node-restriction.kubernetes.io/gpu-ready: "true"
+        klip.dev.node-restriction.kubernetes.io/gpu-node-uid: {{ required "nodeUID is required" .Values.nodeUID | quote }}
+        klip.dev.node-restriction.kubernetes.io/worker-class: {{ .Values.workerClass | quote }}
+      tolerations:
+        - {key: nvidia.com/gpu, operator: Exists, effect: NoSchedule}
+      {{- with .Values.imagePullSecrets }}
+      imagePullSecrets: {{ . | toYaml | nindent 8 }}
+      {{- end }}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: vllm
+          image: {{ required "engine.image is required" .Values.engine.image | quote }}
+          command: [vllm, serve]
+          args:
+            - {{ .Values.model.repository | quote }}
+            - --revision
+            - {{ .Values.model.revision | quote }}
+            - --tokenizer-revision
+            - {{ .Values.model.tokenizerRevision | quote }}
+            - --served-model-name
+            - {{ .Values.model.alias | quote }}
+            - --host
+            - "0.0.0.0"
+            - --port
+            - "8000"
+            - --dtype
+            - {{ .Values.engine.dtype | quote }}
+            - --max-model-len
+            - {{ .Values.engine.maxModelLen | quote }}
+            - --max-num-seqs
+            - {{ .Values.engine.maxNumSeqs | quote }}
+            - --gpu-memory-utilization
+            - {{ .Values.engine.gpuMemoryUtilization | quote }}
+            - --tensor-parallel-size
+            - {{ .Values.gpus | quote }}
+            - --no-enable-prefix-caching
+            - --generation-config
+            - vllm
+            - --override-generation-config
+            - {{ dict "max_new_tokens" .Values.engine.maxOutputTokens | toJson | quote }}
+            - --default-chat-template-kwargs
+            - {{ .Values.engine.chatTemplateKwargs | toJson | quote }}
+            - --disable-log-requests
+            - --shutdown-timeout
+            - "45"
+          ports: [{name: http, containerPort: 8000}]
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          env:
+            - {name: LANG, value: C.UTF-8}
+            - {name: LC_ALL, value: C.UTF-8}
+            - {name: LANGUAGE, value: C}
+            - {name: HF_HOME, value: /cache/huggingface}
+            - {name: XDG_CACHE_HOME, value: /cache/xdg}
+            - {name: VLLM_CACHE_ROOT, value: /cache/vllm}
+            - {name: TRITON_CACHE_DIR, value: /cache/triton}
+            - {name: CUDA_CACHE_PATH, value: /cache/cuda}
+            - {name: HOME, value: /cache/home}
+            - {name: OMP_NUM_THREADS, value: "2"}
+            - {name: TOKENIZERS_PARALLELISM, value: "false"}
+            - {name: DO_NOT_TRACK, value: "1"}
+            - {name: HF_HUB_DISABLE_TELEMETRY, value: "1"}
+            - {name: AWS_EC2_METADATA_DISABLED, value: "true"}
+          resources:
+            requests:
+              cpu: {{ .Values.cpu | quote }}
+              memory: {{ printf "%dGi" (int .Values.memoryGiB) }}
+              ephemeral-storage: {{ printf "%dGi" (add (int .Values.cacheGiB) 20) }}
+              nvidia.com/gpu: {{ .Values.gpus }}
+            limits:
+              cpu: {{ .Values.cpu | quote }}
+              memory: {{ printf "%dGi" (int .Values.memoryGiB) }}
+              ephemeral-storage: {{ printf "%dGi" (add (int .Values.cacheGiB) 30) }}
+              nvidia.com/gpu: {{ .Values.gpus }}
+          startupProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 10
+            timeoutSeconds: 3
+            failureThreshold: 120
+          readinessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 5
+            timeoutSeconds: 3
+            failureThreshold: 2
+          livenessProbe:
+            httpGet: {path: /health, port: http}
+            periodSeconds: 20
+            timeoutSeconds: 5
+            failureThreshold: 6
+          lifecycle:
+            preStop: {exec: {command: [sleep, "15"]}}
+          volumeMounts:
+            - {name: cache, mountPath: /cache}
+            - {name: scratch, mountPath: /tmp}
+            - {name: shm, mountPath: /dev/shm}
+      volumes:
+        - name: cache
+          emptyDir: {sizeLimit: {{ printf "%dGi" (int .Values.cacheGiB) }}}
+        - name: scratch
+          emptyDir: {sizeLimit: 2Gi}
+        - name: shm
+          emptyDir: {medium: Memory, sizeLimit: 2Gi}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ .Values.deploymentId }}
+  labels: {klip.dev/serving-deployment: {{ .Values.deploymentId | quote }}}
+spec:
+  type: ClusterIP
+  selector: {klip.dev/serving-deployment: {{ .Values.deploymentId | quote }}}
+  ports: [{name: http, port: 8000, targetPort: http}]
