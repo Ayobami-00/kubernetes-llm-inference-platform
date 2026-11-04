@@ -3,6 +3,10 @@
   "type": "object",
   "additionalProperties": false,
   "properties": {
+    "serviceAccountName": {
+      "type": "string",
+      "pattern": "^[a-z][a-z0-9-]{0,62}$"
+    },
     "profileRef": {
       "type": "string",
       "pattern": "^[a-z][a-z0-9-]*@[1-9][0-9]*$"
@@ -98,6 +102,43 @@
           },
           "required": [
             "enable_thinking"
+          ]
+        },
+        "speculativeDecoding": {
+          "oneOf": [
+            {
+              "type": "null"
+            },
+            {
+              "type": "object",
+              "additionalProperties": false,
+              "properties": {
+                "method": {
+                  "const": "ngram"
+                },
+                "num_speculative_tokens": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 8
+                },
+                "prompt_lookup_min": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                },
+                "prompt_lookup_max": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 16
+                }
+              },
+              "required": [
+                "method",
+                "num_speculative_tokens",
+                "prompt_lookup_min",
+                "prompt_lookup_max"
+              ]
+            }
           ]
         }
       },

@@ -23,6 +23,7 @@ spec:
         klip.dev/serving-profile-sha256: {{ .Values.profileSHA256 | quote }}
     spec:
       automountServiceAccountToken: false
+      serviceAccountName: {{ .Values.serviceAccountName | quote }}
       runtimeClassName: nvidia
       terminationGracePeriodSeconds: 75
       nodeSelector:
@@ -67,6 +68,13 @@ spec:
             - --tensor-parallel-size
             - {{ .Values.gpus | quote }}
             - --no-enable-prefix-caching
+            {{- with .Values.engine.speculativeDecoding }}
+            {{- if gt (int .prompt_lookup_min) (int .prompt_lookup_max) }}
+            {{- fail "speculative lookup minimum exceeds maximum" }}
+            {{- end }}
+            - --speculative-config
+            - {{ . | toJson | quote }}
+            {{- end }}
             - --generation-config
             - vllm
             - --override-generation-config

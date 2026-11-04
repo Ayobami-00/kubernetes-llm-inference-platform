@@ -17,6 +17,7 @@ engine:
   gpuMemoryUtilization: 0.8
   maxOutputTokens: 128
   chatTemplateKwargs: {enable_thinking: false}
+  speculativeDecoding: null
 gpus: 1
 cpu: "6"
 memoryGiB: 32
@@ -28,3 +29,4 @@ monitoringNamespace: observability
 routerLabels:
   app.kubernetes.io/name: writer-assist-a10-epp
 imagePullSecrets: []
+serviceAccountName: klip-model-release

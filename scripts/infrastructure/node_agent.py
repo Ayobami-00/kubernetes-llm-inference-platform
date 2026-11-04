@@ -22,11 +22,12 @@ import time
 import urllib.parse
 import urllib.request
 import uuid
-from datetime import UTC, datetime
+from datetime import datetime, timezone
 from pathlib import Path
 
 CONFIG = Path("/etc/klip/node.json")
 STATE = Path("/var/lib/klip")
+UTC = timezone.utc  # noqa: UP017 -- retained Ubuntu 22.04 has Python 3.10
 
 
 def command(*args: str, input_text: str | None = None, allow_failure: bool = False) -> str:
@@ -358,8 +359,11 @@ def etcd(*args: str, allow_failure: bool = False) -> str:
 
 
 def file_sha256(path: Path) -> str:
+    digest = hashlib.sha256()
     with path.open("rb") as stream:
-        return hashlib.file_digest(stream, "sha256").hexdigest()
+        while block := stream.read(1024 * 1024):
+            digest.update(block)
+    return digest.hexdigest()
 
 
 def upload(config: dict, key: str, path: Path) -> dict:

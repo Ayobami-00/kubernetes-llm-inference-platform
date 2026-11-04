@@ -1,0 +1,191 @@
+---
+# Deliberately separate from prepare.yaml: no kernel/driver/runtime replacement,
+# reboot handler, provider operation or automatic removal exists in this path.
+- name: Add Kubernetes prerequisites to an externally retained Lambda Stack host
+  hosts: all
+  become: true
+  serial: 1
+  tasks:
+    - name: Require the inspected external host profile
+      ansible.builtin.assert:
+        that:
+          - klip_retained.ownership == 'external-user-retained'
+          - not klip_retained.automatic_termination
+          - not klip_retained.automatic_restart
+          - klip_retained.lease is none
+          - ansible_facts.distribution == 'Ubuntu'
+          - ansible_facts.distribution_version == '22.04'
+          - ansible_facts.architecture == 'x86_64'
+          - klip_node.cri_socket == 'unix:///run/klip-containerd/containerd.sock'
+    - name: Observe the retained boot and GPU identities
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - >-
+            import json,subprocess; from pathlib import Path;
+            print(json.dumps({"boot_id":Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+            "gpu":subprocess.check_output(["nvidia-smi","--query-gpu=name,driver_version,memory.total,compute_cap",
+            "--format=csv,noheader"],text=True).strip(),
+            "processes":subprocess.check_output(["nvidia-smi","--query-compute-apps=pid","--format=csv,noheader"],text=True).strip()}))
+      register: klip_retained_before
+      changed_when: false
+    - name: Refuse a changed host or an occupied GPU
+      ansible.builtin.assert:
+        that:
+          - (klip_retained_before.stdout | from_json).boot_id == klip_retained.boot_id
+          - (klip_retained_before.stdout | from_json).gpu == klip_retained.gpu
+          - (klip_retained_before.stdout | from_json).processes == ''
+    - name: Create project-owned host directories
+      ansible.builtin.file:
+        path: '{{ item }}'
+        state: directory
+        mode: '0700'
+      loop: [/etc/klip, /var/lib/klip, /etc/wireguard, /var/lib/klip-containerd]
+    - name: Retain external ownership and host configuration
+      ansible.builtin.copy:
+        content: '{{ item.value | to_nice_json }}'
+        dest: '{{ item.path }}'
+        mode: '0600'
+      loop:
+        - {path: /etc/klip/retained-owner.json, value: '{{ klip_retained }}'}
+        - {path: /etc/klip/node.json, value: '{{ klip_node }}'}
+    - name: Install the existing host network helper
+      ansible.builtin.copy:
+        src: '{{ klip_repository }}/scripts/infrastructure/node_agent.py'
+        dest: /usr/local/sbin/klip-node
+        mode: '0700'
+    - name: Validate networks, clock and disk before changes
+      ansible.builtin.command: python3 /usr/local/sbin/klip-node preflight
+      changed_when: false
+    - name: Install network prerequisites without upgrading the installed GPU stack
+      ansible.builtin.apt:
+        name: [ca-certificates, curl, wireguard-tools, iptables, conntrack, socat]
+        state: present
+        update_cache: true
+        cache_valid_time: 3600
+    - name: Create the package signing directory
+      ansible.builtin.file:
+        path: /etc/apt/keyrings
+        state: directory
+        mode: '0755'
+    - name: Install the verified Kubernetes repository key
+      ansible.builtin.copy:
+        src: '{{ klip_repository }}/artifacts/platform/kubernetes-release-key'
+        dest: /etc/apt/keyrings/klip-kubernetes.asc
+        mode: '0644'
+    - name: Configure the signed Kubernetes minor repository
+      ansible.builtin.copy:
+        dest: /etc/apt/sources.list.d/klip-kubernetes.sources
+        mode: '0644'
+        content: |
+          Types: deb
+          URIs: https://pkgs.k8s.io/core:/stable:/v1.36/deb/
+          Suites: /
+          Signed-By: /etc/apt/keyrings/klip-kubernetes.asc
+    - name: Install exact Kubernetes packages
+      ansible.builtin.apt:
+        name: [kubelet=1.36.5-1.1, kubeadm=1.36.5-1.1, kubectl=1.36.5-1.1, cri-tools=1.36.0-1.1, kubernetes-cni=1.9.1-1.1]
+        state: present
+        update_cache: true
+    - name: Hold the new Kubernetes packages
+      ansible.builtin.dpkg_selections:
+        name: '{{ item }}'
+        selection: hold
+      loop: [kubelet, kubeadm, kubectl, cri-tools, kubernetes-cni]
+    - name: Load routing modules without changing the kernel
+      ansible.builtin.command:
+        argv: [modprobe, '{{ item }}']
+      loop: [overlay, br_netfilter, wireguard]
+      changed_when: false
+    - name: Persist project routing modules
+      ansible.builtin.copy:
+        dest: /etc/modules-load.d/klip.conf
+        content: "overlay\nbr_netfilter\nwireguard\n"
+        mode: '0644'
+    - name: Set routing sysctls
+      ansible.builtin.command:
+        argv: [sysctl, -w, net.ipv4.ip_forward=1, net.bridge.bridge-nf-call-iptables=1, net.ipv4.conf.all.rp_filter=2, net.ipv4.conf.default.rp_filter=2]
+      changed_when: false
+    - name: Require swap already disabled
+      ansible.builtin.assert:
+        that: ansible_facts.swaptotal_mb == 0
+        fail_msg: Inspect existing swap use rather than changing a retained host silently
+    - name: Configure an isolated Kubernetes containerd without touching Docker's runtime
+      ansible.builtin.copy:
+        dest: /etc/klip/containerd.toml
+        mode: '0600'
+        content: |
+          version = 3
+          root = "/var/lib/klip-containerd"
+          state = "/run/klip-containerd"
+          [grpc]
+            address = "/run/klip-containerd/containerd.sock"
+          [plugins.'io.containerd.cri.v1.images'.pinned_images]
+            sandbox = "registry.k8s.io/pause:3.10.1"
+          [plugins.'io.containerd.cri.v1.runtime'.containerd]
+            default_runtime_name = "nvidia"
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc]
+            runtime_type = "io.containerd.runc.v2"
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.runc.options]
+            SystemdCgroup = true
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.nvidia]
+            runtime_type = "io.containerd.runc.v2"
+          [plugins.'io.containerd.cri.v1.runtime'.containerd.runtimes.nvidia.options]
+            BinaryName = "/usr/bin/nvidia-container-runtime"
+            SystemdCgroup = true
+      register: klip_retained_cri
+    - name: Install the independent runtime service
+      ansible.builtin.copy:
+        dest: /etc/systemd/system/klip-containerd.service
+        mode: '0644'
+        content: |
+          [Unit]
+          Description=KLIP Kubernetes containerd (independent of Lambda Docker)
+          After=network.target
+          [Service]
+          ExecStart=/usr/bin/containerd --config /etc/klip/containerd.toml
+          Delegate=yes
+          KillMode=process
+          Restart=no
+          LimitNOFILE=1048576
+          TasksMax=infinity
+          [Install]
+          WantedBy=multi-user.target
+      register: klip_retained_unit
+    - name: Observe the dedicated service before starting it
+      ansible.builtin.command: systemctl is-active klip-containerd # noqa: command-instead-of-module -- observation only
+      register: klip_retained_service
+      failed_when: klip_retained_service.rc not in [0, 3, 4]
+      changed_when: false
+    - name: Refuse live runtime configuration changes instead of restarting it
+      ansible.builtin.assert:
+        that: klip_retained_service.rc != 0 or not (klip_retained_cri.changed or klip_retained_unit.changed)
+        fail_msg: Dedicated runtime is active; inspect configuration drift without restarting it
+    - name: Start only the new isolated runtime
+      ansible.builtin.systemd_service:
+        name: klip-containerd
+        state: started
+        enabled: true
+        daemon_reload: true
+    - name: Verify the dedicated CRI endpoint
+      ansible.builtin.command:
+        argv: [crictl, --runtime-endpoint=unix:///run/klip-containerd/containerd.sock, info]
+      changed_when: false
+    - name: Prove the VM and installed driver remained unchanged
+      ansible.builtin.command:
+        argv:
+          - python3
+          - -c
+          - >-
+            import json,subprocess; from pathlib import Path;
+            print(json.dumps({"boot_id":Path("/proc/sys/kernel/random/boot_id").read_text().strip(),
+            "gpu":subprocess.check_output(["nvidia-smi","--query-gpu=name,driver_version,memory.total,compute_cap",
+            "--format=csv,noheader"],text=True).strip()}))
+      register: klip_retained_after
+      changed_when: false
+    - name: Require the retained boot and driver identities
+      ansible.builtin.assert:
+        that:
+          - (klip_retained_after.stdout | from_json).boot_id == klip_retained.boot_id
+          - (klip_retained_after.stdout | from_json).gpu == klip_retained.gpu

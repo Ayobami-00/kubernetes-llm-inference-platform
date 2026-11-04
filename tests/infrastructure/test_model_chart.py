@@ -96,3 +96,46 @@ def test_initial_model_chart_renders_exact_runtime_and_network_boundaries():
         "namespaceSelector" in peer and "podSelector" in peer for peer in ingress
     )
     assert all("runner" not in str(peer) for peer in ingress)
+
+
+@pytest.mark.skipif(not (ROOT / "artifacts/tools/bin/helm").is_file(), reason="Helm required")
+def test_ngram_chart_preserves_bounded_settings_and_rejects_reversed_window():
+    value = values()
+    speculation = {
+        "method": "ngram",
+        "num_speculative_tokens": 5,
+        "prompt_lookup_min": 2,
+        "prompt_lookup_max": 5,
+    }
+    value["engine"]["speculativeDecoding"] = speculation
+    command = [
+        tool("helm"),
+        "template",
+        "test-model",
+        str(ROOT / "charts/klip-model"),
+        "-n",
+        "llm-d",
+        "--values",
+        "-",
+    ]
+    rendered = subprocess.run(
+        command, input=yaml.safe_dump(value), text=True, capture_output=True, check=True, timeout=20
+    )
+    deployment = next(
+        d for d in yaml.safe_load_all(rendered.stdout) if d and d["kind"] == "Deployment"
+    )
+    args = deployment["spec"]["template"]["spec"]["containers"][0]["args"]
+    assert json.loads(args[args.index("--speculative-config") + 1]) == speculation
+    assert "--no-enable-prefix-caching" in args
+    speculation["method"] = "draft_model"
+    assert (
+        subprocess.run(
+            command, input=yaml.safe_dump(value), text=True, capture_output=True, timeout=20
+        ).returncode
+        != 0
+    )
+    speculation.update(method="ngram", prompt_lookup_min=6)
+    bad = subprocess.run(
+        command, input=yaml.safe_dump(value), text=True, capture_output=True, timeout=20
+    )
+    assert bad.returncode != 0 and "lookup minimum exceeds maximum" in bad.stderr
