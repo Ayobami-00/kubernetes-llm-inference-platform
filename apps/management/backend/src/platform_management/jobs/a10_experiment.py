@@ -79,6 +79,41 @@ def compile_variant(frozen, variant, output, inventory):
     )
 
 
+def planning_inputs(data, variant, root, evidence):
+    """Recover an uncommitted plan without changing its measured inventory timestamp."""
+    path = root / variant / "planning-inputs.json"
+    identity = {
+        "experiment_id": data["id"],
+        "definition_sha256": data["definition_sha256"],
+        "variant": variant,
+    }
+    if path.exists():
+        saved = json.loads(path.read_text())
+        if saved["identity"] != identity or saved["sha256"] != digest(saved["inputs"]):
+            raise ValueError("Frozen child planning inputs changed")
+        previous = saved["inputs"]["evidence"]
+        for key in ("node_uid", "boot_id", "deployment_uid", "generation", "pods"):
+            if previous[key] != evidence[key]:
+                raise ValueError("Serving/client identity changed before child admission")
+        for key in ("name", "uid", "boot_id"):
+            if previous["client_node"][key] != evidence["client_node"][key]:
+                raise ValueError("Serving/client identity changed before child admission")
+        return saved["inputs"]
+    stamp = now().isoformat()
+    inventory = copy.deepcopy(data["definition"]["inventory_template"])
+    inventory.update(snapshot_id=data["id"] + "-" + variant, captured_at=stamp)
+    gpu_node = next(n for n in inventory["nodes"] if n["id"] == NODE)
+    gpu_node["observed_at"] = stamp
+    # Facts come from fresh Kubernetes/Cilium checks and the authenticated gateway
+    # probe. Existing readiness age checks still reject stale recovered inputs.
+    gpu_node["readiness"] = dict.fromkeys(
+        ("host", "wireguard", "kubernetes", "cilium", "gpu_runtime"), True
+    )
+    inputs = {"inventory": inventory, "evidence": copy.deepcopy(evidence)}
+    save(path, {"identity": identity, "inputs": inputs, "sha256": digest(inputs)})
+    return inputs
+
+
 def start_child(data, variant, checkpoint, config, evidence):
     """Fresh measured readiness precedes snapshot freeze; no launch-time rewriting."""
     with session() as db:
@@ -91,16 +126,9 @@ def start_child(data, variant, checkpoint, config, evidence):
             return existing
     root = directory(data["id"])
     frozen = data["definition"]
-    stamp = now()
-    inventory = copy.deepcopy(frozen["inventory_template"])
-    inventory.update(snapshot_id=data["id"] + "-" + variant, captured_at=stamp.isoformat())
-    gpu_node = next(n for n in inventory["nodes"] if n["id"] == NODE)
-    gpu_node["observed_at"] = stamp.isoformat()
-    # Fresh facts below come from Node readiness/GPU allocation, Cilium Pod readiness,
-    # and an authenticated CPU-to-GPU gateway probe, not a declaration-only import.
-    gpu_node["readiness"] = dict.fromkeys(
-        ("host", "wireguard", "kubernetes", "cilium", "gpu_runtime"), True
-    )
+    inputs = planning_inputs(data, variant, root, evidence)
+    inventory, evidence = inputs["inventory"], inputs["evidence"]
+    stamp = datetime.fromisoformat(inventory["captured_at"])
     inv = InfrastructureInventory.model_validate(inventory)
     snap = compile_variant(frozen, variant, root / variant / "plan", inventory)
     schedule = list(read_jsonl(root / variant / "plan/admission-schedule.jsonl"))
@@ -372,7 +400,10 @@ def step_experiment(op, payload, checkpoint, config, owner=None):
             actuator.client_node(data["definition"]["client_placement"])
             gateway = actuator.gateway()
             save(root / "definition.json", data["definition"])
-            save(root / "initial-gateway.json", gateway)
+            # Keep the first verified proof after a preflight checkpoint crash.
+            # The live proof above is still required on every recovery.
+            if not (root / "initial-gateway.json").exists():
+                save(root / "initial-gateway.json", gateway)
             template = compile_variant(
                 data["definition"],
                 "baseline",

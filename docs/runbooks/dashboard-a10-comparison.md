@@ -80,6 +80,11 @@ snapshots are never rewritten. A lost child is terminal failure, not an invitati
 to restart. An unsafe model container restart stops the experiment-owned serving
 deployment rather than entering a retry loop.
 
+Measured planning inputs are frozen before compilation. A crash after writing a
+plan but before database admission reuses that inventory timestamp and readiness
+record. Recovery still requires the same serving Pod, GPU/CPU boot identities and
+fresh evidence; stale inputs fail normal preflight instead of being rewritten.
+
 If cleanup cannot contact Kubernetes, the deployment reservation remains until
 cleanup can be verified. Inspect the existing parent/Job; do not clear the lock or
 launch a replacement. Normal operator model releases also refuse an active
