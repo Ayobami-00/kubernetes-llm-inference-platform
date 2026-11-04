@@ -2,8 +2,8 @@
   "schema_version": "klip-host-risk-review.v1",
   "reviewed_at": "2026-11-04",
   "expires_at": "2026-11-11",
-  "source_commit": "6cfd74287079e98a0e28d121ac3d735dc76c677e",
-  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:88f39bd246d70bb16f532d21df18cf1c9428536e0baafb041bf20ac058b58d85",
+  "source_commit": "4ed4402ad48f964a5e6e21294d0f1d2b10c0f4c6",
+  "image": "127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/management-backend@sha256:94f2d83fd4243f66a4bcaffb075cea03a77517db782a05e9fc286882a12e21a7",
   "scope": "Restricted CPU executor only; not a general platform or GPU-runtime security approval.",
   "critical_policy": "Any Critical finding blocks deployment. No suppressed findings.",
   "conditions": [
@@ -457,5 +457,6 @@
       ],
       "rationale": "The Go TLS server ECH parser is not used by the outbound-only SSM client or by the unexecuted runc artifact in this CPU executor. The mTLS listener is Python/OpenSSL. The affected components remain present; this does not establish GPU-host runtime safety."
     }
-  ]
+  ],
+  "runtime_revision_note": "Corrected /run versus /var/run mount alias; static image-bound STS profile reads a separate token directory. Same exact retained findings and restrictions; expiry unchanged."
 }

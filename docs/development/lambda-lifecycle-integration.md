@@ -204,3 +204,15 @@ the two-replica API be deployed. These scripts currently implement initial custo
 installation; upgrades and fresh-cluster recovery require a separate explicit,
 history-preserving procedure. Running `prepare` cannot erase a staged/live release.
 Management adapters, GPU inspection and failure cleanup remain separate gates.
+
+The first live preflight mounted the dedicated EFS volume on `platform-03` as UID
+20002 and retained the public handoff files, but failed before SSH because Debian's
+`/var/run` symlink caused its projected token mount to shadow the credential mount.
+Job UID `cb124d6c-8b38-4aa3-b108-b4df2dedc19e` was retired with a UID-checked deadline
+update and reached native failure. Its original plan, Job and failure receipt are
+preserved. No GPU allocation or host configuration occurred, and the operator's
+registry was not transferred. The correction uses distinct credential/identity
+directories and an image-bound AWS profile. Regression tests normalize `/var/run`
+to `/run` before checking mount uniqueness. The existing immutable credential
+Secret keeps its original unused profile field; execution uses the new profile
+in the reviewed image, so retries do not rotate or overwrite credentials.
