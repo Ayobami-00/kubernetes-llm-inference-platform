@@ -181,6 +181,23 @@ def identities(cp):
     return value, pods
 
 
+def observe_ready(cp, expected_identities, image, *, timeout=90):
+    """Wait for both exact new Pod digests; Helm can finish at minimum availability."""
+    deadline = time.monotonic() + timeout
+    while True:
+        observed, pods = identities(cp)
+        if observed != expected_identities:
+            raise ValueError("Executor custody identities changed during rollout observation")
+        try:
+            return ready_pods(pods, image)
+        except ValueError:
+            if time.monotonic() >= deadline:
+                raise ValueError(
+                    "Both executor replicas did not become verified Ready in time"
+                ) from None
+            time.sleep(2)
+
+
 def prepare(receipt, directory):
     from cluster import Host, load_hosts
 
@@ -392,10 +409,9 @@ def apply(approval):
                     timeout=360,
                 )
             write_private(root / "helm.log", output)
-            after, pods = identities(cp)
-            if after != identity or custody() != plan["custody_fingerprints"]:
+            result["api_pods"] = observe_ready(cp, identity, plan["image_assessment"]["image"])
+            if custody() != plan["custody_fingerprints"]:
                 raise ValueError("Executor custody changed during its rolling upgrade")
-            result["api_pods"] = ready_pods(pods, plan["image_assessment"]["image"])
             native = json.loads(
                 kubectl("-n", NAMESPACE, "get", "job", result["job_name"], "-o", "json")
             )

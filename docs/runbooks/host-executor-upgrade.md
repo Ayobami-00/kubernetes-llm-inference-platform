@@ -73,3 +73,20 @@ files. Preserve evidence before preparing a separately identified recovery.
 
 This runbook describes implementation and acceptance requirements. A deployment
 is verified only by the retained live release and boundary evidence.
+
+Verified on 2026-11-04 at 07:51:58 UTC: source image `2f377fa`, digest
+`sha256:1b8934ea32c61b599bcec6604e78f334ae1e08ae41ab06a066f879b7ba192356`.
+Upgrade `3199d27cedbc5318e94b9a7fd9ee6669b96db6ed9d3ef6940434af2fa4d4355c`
+retained the original handoff and credential/storage UIDs. Both actual image
+digests became Ready on `platform-02` and `platform-03`. Native preflight
+verified all six strict CPU SSH paths and registry revision 12. Boundary probe
+`b9c06f43d812` verified mutual TLS, both certificate rejection cases, typed task
+rejection, native API identity and RBAC denials. This establishes the CPU
+executor boundary; GPU admission remains separately unconfigured.
+
+The evidence retains two terminal pre-deployment failures and their reconciled,
+unchanged original releases. After moving preflight under native Job ownership,
+Helm completed successfully. An immediate observation preceded both new Pods
+becoming Ready; the same release was subsequently reconciled against its exact
+live manifest without reapplying Helm. The implementation now performs a bounded
+post-Helm observation for both new digests, while refusing custody identity drift.

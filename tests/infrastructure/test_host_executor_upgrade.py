@@ -105,6 +105,33 @@ def test_observed_replicas_require_actual_digest_and_distinct_cpu_hosts(change):
         upgrade.ready_pods(value, NEW)
 
 
+def test_rollout_observation_waits_for_both_new_ready_replicas(monkeypatch):
+    value = pods(NEW)
+    value[1]["status"]["conditions"] = []
+    observations = iter([({"uid": "same"}, value), ({"uid": "same"}, pods(NEW))])
+    monkeypatch.setattr(upgrade, "identities", lambda *_: next(observations))
+    waits = []
+    monkeypatch.setattr(upgrade.time, "sleep", waits.append)
+    assert len(upgrade.observe_ready(None, {"uid": "same"}, NEW)) == 2
+    assert waits == [2]
+
+
+@pytest.mark.parametrize("changed_identity", [True, False])
+def test_rollout_observation_never_promotes_identity_drift_or_expired_readiness(
+    monkeypatch, changed_identity
+):
+    monkeypatch.setattr(
+        upgrade, "identities", lambda *_: ({"uid": "changed" if changed_identity else "same"}, [])
+    )
+    monkeypatch.setattr(
+        upgrade.time,
+        "sleep",
+        lambda *_: pytest.fail("Must not wait after deadline or identity drift"),
+    )
+    with pytest.raises(ValueError):
+        upgrade.observe_ready(None, {"uid": "same"}, NEW, timeout=0)
+
+
 @pytest.fixture
 def guard(tmp_path, monkeypatch):
     (tmp_path / "cluster").mkdir()
