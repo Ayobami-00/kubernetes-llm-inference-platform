@@ -104,3 +104,13 @@ def test_failed_storage_and_missing_final_receipt_can_never_pass(tmp_path):
     assert journal_status(tmp_path)["status"] == "failed"
     assert journal_status(tmp_path)["journals"][0]["status"] == "missing"
     assert journal_status(tmp_path / "empty")["status"] == "failed"
+
+
+def test_late_emission_cannot_leave_a_healthy_final_receipt(tmp_path):
+    journal = BoundedJournal(tmp_path / "events", tmp_path / "journal-receipts")
+    journal.emit({"n": 1})
+    journal.close()
+    assert journal_status(tmp_path)["status"] == "drained"
+    with pytest.raises(RuntimeError, match="unavailable"):
+        journal.emit({"n": 2})
+    assert journal_status(tmp_path)["status"] == "failed"

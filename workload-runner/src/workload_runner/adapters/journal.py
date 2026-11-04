@@ -70,6 +70,19 @@ class BoundedJournal:
     def emit(self, value):
         payload = (json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n").encode()
         with self.condition:
+            if self.closed:
+                self.failure = RuntimeError("Transport event arrived after journal shutdown")
+                # Local receipt only: fail closed even if a lifecycle bug emits
+                # after the background thread already wrote a healthy receipt.
+                atomic_json(
+                    self.receipts / (self.identity + ".finished.json"),
+                    {
+                        "status": "failed",
+                        "accepted_events": self.accepted,
+                        "written_events": self.written,
+                        "error_type": "LateEmission",
+                    },
+                )
             if self.closed or self.failure:
                 raise RuntimeError("Transport journal is unavailable")
             if (
