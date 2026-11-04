@@ -81,7 +81,7 @@ def test_feature_discovery_cannot_bootstrap_itself_on_cpu_or_unadmitted_hosts():
 
 
 def test_privilege_exception_and_metric_access_are_confined_to_gpu_namespace():
-    namespace, policy, driver = yaml.safe_load_all(gpu.boundary())
+    namespace, policy, driver, prometheus = yaml.safe_load_all(gpu.boundary())
     assert namespace["metadata"]["name"] == policy["metadata"]["namespace"] == "gpu-system"
     assert namespace["metadata"]["labels"]["pod-security.kubernetes.io/enforce"] == "privileged"
     metrics = policy["spec"]["ingress"][1]
@@ -93,6 +93,16 @@ def test_privilege_exception_and_metric_access_are_confined_to_gpu_namespace():
     assert not any("toCIDR" in rule for rule in policy["spec"]["egress"])
     assert not any("world" in rule.get("toEntities", []) for rule in policy["spec"]["egress"])
     assert driver["spec"]["endpointSelector"] == {"matchLabels": {"app": "nvidia-driver-daemonset"}}
+    assert prometheus["metadata"]["namespace"] == "observability"
+    assert prometheus["spec"]["endpointSelector"] == {
+        "matchLabels": {"app.kubernetes.io/name": "prometheus"}
+    }
+    assert prometheus["spec"]["egress"][0]["toPorts"] == [
+        {"ports": [{"port": "9400", "protocol": "TCP"}]}
+    ]
+    assert gpu.values()["dcgmExporter"]["serviceMonitor"]["additionalLabels"] == {
+        "release": "klip-monitoring"
+    }
 
 
 @pytest.mark.parametrize(

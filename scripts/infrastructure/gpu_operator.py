@@ -242,7 +242,12 @@ def values():
             "resources": resources("50m", "128Mi", "512Mi"),
         }
     result["dcgmExporter"].update(
-        serviceMonitor={"enabled": True, "honorLabels": False}, enablePodUID=True
+        serviceMonitor={
+            "enabled": True,
+            "honorLabels": False,
+            "additionalLabels": {"release": "klip-monitoring"},
+        },
+        enablePodUID=True,
     )
     return result
 
@@ -360,7 +365,28 @@ def boundary():
             ],
         },
     }
-    return yaml.safe_dump_all([namespace, network, driver_network])
+    prometheus_network = {
+        "apiVersion": "cilium.io/v2",
+        "kind": "CiliumNetworkPolicy",
+        "metadata": {"name": "prometheus-gpu-exporters", "namespace": "observability"},
+        "spec": {
+            "endpointSelector": {"matchLabels": {"app.kubernetes.io/name": "prometheus"}},
+            "egress": [
+                {
+                    "toEndpoints": [
+                        {
+                            "matchLabels": {
+                                "k8s:io.kubernetes.pod.namespace": NAMESPACE,
+                                "app": "nvidia-dcgm-exporter",
+                            }
+                        }
+                    ],
+                    "toPorts": [{"ports": [{"port": "9400", "protocol": "TCP"}]}],
+                }
+            ],
+        },
+    }
+    return yaml.safe_dump_all([namespace, network, driver_network, prometheus_network])
 
 
 def render():

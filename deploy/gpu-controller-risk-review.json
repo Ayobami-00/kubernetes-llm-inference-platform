@@ -4,8 +4,8 @@
   "expires_at": "2026-11-11T05:51:29.185387+00:00",
   "configuration": {
     "lock_sha256": "f043710f0d5e24de65d5c6df0336007e3097cc34a10788841887554dbf4d7866",
-    "values_sha256": "9e899b5b243242bfbf32b77e3749e34e9c7eb076d48d5aeb6b036d1c6e82c671",
-    "boundary_sha256": "c9a70fa6215d989812a2811abff121fe5c19c925e1f9e26c0999fa346d74383f"
+    "values_sha256": "89a4a8467c371dbbe9303b49e248aa10dc574cda69493d280fbc781ae143c5c3",
+    "boundary_sha256": "27aae6f38130e3476da903e3d1cc5c7fd174a3e1d2283d058d01fbd878b253c2"
   },
   "scope": "GPU Operator and NFD CPU controllers only. This is not approval of the driver/toolkit/device runtime on GPU hosts.",
   "conditions": [
@@ -13,7 +13,8 @@
     "GPU/NFD controller ingress is private, world egress is denied, and CPU placement excludes control-plane hosts.",
     "Only driver operands may download packages on ports 80/443; no GPU candidate label has yet been assigned.",
     "NFD topology updater, image-compatibility CLI, GPU sandbox/vGPU/DRA/RDMA/MIG and automatic driver upgrades are disabled.",
-    "New images, changed boundaries, changed findings or expiry require a new review."
+    "New images, changed boundaries, changed findings or expiry require a new review.",
+    "Prometheus exporter egress is limited to GPU-system DCGM endpoints on TCP 9400; no CPU-controller public exposure is added."
   ],
   "images": {
     "nvcr.io/nvidia/gpu-operator:v26.7.2@sha256:e118f631813f93a43fa17332fb2060d3d1f3f150359dd6744f3a9b2f7b7c5707": {

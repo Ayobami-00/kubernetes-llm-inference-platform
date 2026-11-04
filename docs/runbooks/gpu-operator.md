@@ -41,6 +41,12 @@ CPU controllers have no public egress. Only Prometheus in `observability` can
 scrape DCGM port 9400 across this boundary. The existing cluster-wide metadata
 deny remains in force.
 
+The DCGM ServiceMonitor carries `release: klip-monitoring`, matching the actual
+Prometheus discovery selector. A separate Cilium policy in `observability`
+permits only Prometheus egress to `gpu-system` DCGM endpoints on TCP 9400.
+Both ingress and egress must allow the scrape; an exporter Pod being Ready is
+not evidence that Prometheus received its measurements.
+
 ## Install from a saved plan
 
 Run from the repository root after the persistent CPU platform and Prometheus
@@ -83,6 +89,27 @@ Helm/controller readiness proves only that the CPU controllers run. Management
 must not mark a worker GPU-ready from this receipt. Operator validation, observed
 GPU capacity/memory, a real CUDA computation, DNS/Service/cross-host connectivity
 and DCGM telemetry must be verified separately against the exact Node UID.
+
+## Upgrade the first installation's telemetry wiring
+
+The initial installation at source `238b40a` predates those discovery/egress
+settings. Its retained receipt stays immutable. For that installation only:
+
+```sh
+uv run --locked --group infrastructure python scripts/infrastructure/gpu_telemetry.py prepare \
+  --security-directory artifacts/security/gpu-operator-26.7.2
+uv run --locked --group infrastructure python scripts/infrastructure/gpu_telemetry.py apply \
+  --approve-plan <approval_sha256>
+```
+
+This transition validates the complete old/new chart delta, unchanged six CPU
+Node UIDs, actual Prometheus selectors and current ClusterPolicy identity. It
+adds the egress policy and changes only the monitor label through Helm. It
+retains both Helm revisions, previous inputs, the original active receipt and an
+append-only update record. It rejects replays, foreign resources and unrelated
+image/placement/policy changes. Fresh installations already include the wiring
+and must not use this migration. Ingestion remains unproven until real DCGM
+samples from the admitted GPU are observed.
 
 ## References
 
