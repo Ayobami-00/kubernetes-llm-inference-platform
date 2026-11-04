@@ -4,15 +4,16 @@
   "reviewed_at": "2026-11-04T12:08:36.747173+00:00",
   "expires_at": "2026-11-11T12:08:36.747173+00:00",
   "configuration": {
-    "values": "3ce260ca3b5da1fb506e2ae4b20fab5e5c91645770129224609773cfc2d92e06",
-    "boundary": "99b6d2d1a54c3c40f98ff0fa2d558cc4fea541b7bc2b6a1e10592274ccb4d21f",
+    "values": "6df325602df2d24907ab73ca7c4ae9fd1bccddc23a57850cacf51adfffda6e4a",
+    "boundary": "de3502c6ab28f57bc513c654f050d133f30f91ec889abe8e889fa9d2da6baa6b",
     "lock": "4ebacaf0bf3e7d8af54d3799d1502d358671421f6908874b6cb81d8777d75954"
   },
   "conditions": {
     "no-public-serving": "Install controllers/CRDs only. No Gateway, InferencePool, HTTPRoute, AIGatewayRoute or model is installed; this review does not authorize public or tenant traffic.",
     "private-peers": "Cilium restricts ingress to the cluster API, fixed controller namespaces and Prometheus; no controller Service is public. CPU/memory are bounded; administrative Kubernetes writes require authenticated RBAC.",
     "no-jwks": "No JWT/OIDC/OAuth/JWKS policies or untrusted JWK input are configured. Subsequent authentication policy changes require another review.",
-    "private-ca": "Controller TLS clients use the private cluster/API roots and fixed cluster peers; arbitrary public issuer/backends and tenant-controlled certificates are not enabled."
+    "private-ca": "Controller TLS clients use the private cluster/API roots and fixed cluster peers; arbitrary public issuer/backends and tenant-controlled certificates are not enabled.",
+    "inference-pool-reader": "Envoy watches only llm-d, inference-gateway and its automatically included own namespace. Its extra InferencePool permission is get/list/watch in exactly those three namespaces, without mutation or secret access."
   },
   "components": {
     "gateway": {

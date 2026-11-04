@@ -54,7 +54,10 @@ def values():
     ]
     gateway["config"]["envoyGateway"]["provider"] = {
         "type": "Kubernetes",
-        "kubernetes": {"deploy": {"type": "GatewayNamespace"}},
+        "kubernetes": {
+            "deploy": {"type": "GatewayNamespace"},
+            "watch": {"type": "Namespaces", "namespaces": ["llm-d", "inference-gateway"]},
+        },
     }
     gateway.update(
         crds={"enabled": False},
@@ -132,7 +135,7 @@ def values():
 
 def boundary():
     documents = []
-    for namespace in ("envoy-gateway-system", "envoy-ai-gateway-system"):
+    for namespace in ("envoy-gateway-system", "envoy-ai-gateway-system", "inference-gateway"):
         documents.append(
             {
                 "apiVersion": "v1",
@@ -248,6 +251,48 @@ def boundary():
                     ],
                 },
             }
+        )
+    for namespace in ("llm-d", "inference-gateway", "envoy-gateway-system"):
+        documents.extend(
+            [
+                {
+                    "apiVersion": "rbac.authorization.k8s.io/v1",
+                    "kind": "Role",
+                    "metadata": {
+                        "name": "klip-gateway-pools",
+                        "namespace": namespace,
+                        "labels": {"klip.dev/platform-component": "inference"},
+                    },
+                    "rules": [
+                        {
+                            "apiGroups": ["inference.networking.k8s.io"],
+                            "resources": ["inferencepools"],
+                            "verbs": ["get", "list", "watch"],
+                        }
+                    ],
+                },
+                {
+                    "apiVersion": "rbac.authorization.k8s.io/v1",
+                    "kind": "RoleBinding",
+                    "metadata": {
+                        "name": "klip-gateway-pools",
+                        "namespace": namespace,
+                        "labels": {"klip.dev/platform-component": "inference"},
+                    },
+                    "roleRef": {
+                        "apiGroup": "rbac.authorization.k8s.io",
+                        "kind": "Role",
+                        "name": "klip-gateway-pools",
+                    },
+                    "subjects": [
+                        {
+                            "kind": "ServiceAccount",
+                            "name": "envoy-gateway",
+                            "namespace": "envoy-gateway-system",
+                        }
+                    ],
+                },
+            ]
         )
     return yaml.safe_dump_all(documents, sort_keys=True)
 
@@ -505,6 +550,7 @@ def stage_seed(cp, expected):
         "--kubeconfig=/etc/kubernetes/admin.conf",
         "-n",
         "envoy-ai-gateway-system",
+        "inference-gateway",
     ]
     present = cp.run(
         [*command, "get", "secret", "klip-ai-mcp-seed", "--ignore-not-found", "-o", "json"],

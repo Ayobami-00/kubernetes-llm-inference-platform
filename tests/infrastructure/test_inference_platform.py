@@ -158,3 +158,37 @@ def test_replanning_retains_original_plan_and_manifest_bytes(tmp_path, monkeypat
     assert (directory / "plan.json").read_bytes() == original
     assert (directory / "controller.yaml").read_text() == "original fixture manifest"
     assert json.loads((tmp_path / "plan.json").read_text()) == second
+
+
+def test_extension_reader_covers_only_the_configured_namespace_watch():
+    documents = [v for v in yaml.safe_load_all(platform.boundary()) if v]
+    roles = [v for v in documents if v["kind"] == "Role"]
+    bindings = [v for v in documents if v["kind"] == "RoleBinding"]
+    assert {v["metadata"]["namespace"] for v in roles} == {
+        "llm-d",
+        "inference-gateway",
+        "envoy-gateway-system",
+    }
+    assert len(bindings) == len(roles) == 3
+    assert all(
+        v["rules"]
+        == [
+            {
+                "apiGroups": ["inference.networking.k8s.io"],
+                "resources": ["inferencepools"],
+                "verbs": ["get", "list", "watch"],
+            }
+        ]
+        for v in roles
+    )
+    assert all(
+        v["subjects"]
+        == [
+            {"kind": "ServiceAccount", "name": "envoy-gateway", "namespace": "envoy-gateway-system"}
+        ]
+        for v in bindings
+    )
+    watch = platform.values()["klip-envoy"]["config"]["envoyGateway"]["provider"]["kubernetes"][
+        "watch"
+    ]
+    assert watch == {"type": "Namespaces", "namespaces": ["llm-d", "inference-gateway"]}
