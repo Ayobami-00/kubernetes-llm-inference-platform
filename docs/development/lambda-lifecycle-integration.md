@@ -138,3 +138,27 @@ revision checks reject stale/conflicting revisions, but they are not a replaceme
 for one authoritative registry and serialized updates. Fresh-cluster rebuild and
 manual reconciliation must first recover that authoritative state. Failed or lost
 host work remains cleanup-pending rather than releasing the mutation slot blindly.
+
+The infrastructure plan was applied on 4 November 2026: a separately encrypted,
+retained EFS filesystem/access point (UID/GID 20002, path mode 0700), three mount
+targets restricted to the existing platform CPU security group, and a workload
+role bound only to `platform-ops:klip-host-job`. Its only permissions start SSH
+sessions on the six allocated CPU hosts and end sessions with the same federated
+owner tag. This follows AWS's [federated session ownership policy](https://docs.aws.amazon.com/systems-manager/latest/userguide/getting-started-restrict-access-examples.html).
+The management namespace has no binding for this role or claim. Image-pull trust
+adds exactly the two executor service accounts; publisher permissions are unchanged.
+Saved plan digests: storage `a1accdbd77ecd68a719137915f06b286c87e25ee4351bd97e1afddb8acbb62fa`,
+access `f55e4b45e3da72c9fe28366e0b80ae03fc9c5bcabdfdb198199b812f9188f8b2`,
+registry `68c570f229a3802e7801f5ba62a620c47b801a7fba4ee1fd18d59673b9867b12`.
+Allocation does not establish successful mounts or executor deployment.
+
+The first executor image (`0bd844d`) passed ECR's scan with eight High findings
+and no Critical findings. A separate Trivy 0.76.1 full-image scan also inspected
+Python, Go and Rust packages and found four Critical findings. That image is
+rejected for deployment. The replacement removes uv from runtime, moves to a
+verified Python Trixie base and builds only the checksum-verified OpenSSH 10.6p1
+client binaries. Debian stable's client remains vulnerable to the host-key
+re-exchange issue according to its [security tracker](https://security-tracker.debian.org/tracker/CVE-2026-60002);
+the upstream [OpenSSH release](https://www.openssh.org/releasenotes.html) and checksum
+are recorded in the build helper. A new full scan and an independent exact-image
+runtime review must pass before deployment. No finding is silently suppressed.

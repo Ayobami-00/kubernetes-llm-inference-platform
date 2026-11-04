@@ -1,0 +1,5 @@
+image: ""
+fileSystemId: ""
+accessPointId: ""
+imagePullRoleArn: arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-images-pull
+replicas: 2

@@ -195,6 +195,9 @@ with tempfile.TemporaryDirectory() as folder:
 
 
 def operate_worker(action: str, request_path: Path | None) -> dict:
+    from cluster import assert_peer_writer
+
+    assert_peer_writer()
     from cluster import FOLDER, Host, ansible, kubectl, load_hosts
 
     if action == "probe-register":

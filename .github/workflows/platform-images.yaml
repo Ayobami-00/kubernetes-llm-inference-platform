@@ -7,6 +7,7 @@ on:
       - '.github/workflows/platform-images.yaml'
       - 'scripts/infrastructure/publish_images.py'
       - 'scripts/infrastructure/host_executor_image.py'
+      - 'scripts/infrastructure/host_executor_openssh.py'
       - 'scripts/infrastructure/cluster*.py'
       - 'dev/host-executor/**'
       - 'infra/ansible/**'

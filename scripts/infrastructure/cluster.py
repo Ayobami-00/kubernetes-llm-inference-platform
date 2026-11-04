@@ -230,6 +230,22 @@ def load_hosts() -> dict[str, dict]:
     return result
 
 
+def assert_peer_writer() -> None:
+    """A handed-off operator checkout cannot write an independent mesh registry."""
+    marker = FOLDER / "peer-owner.json"
+    if marker.exists():
+        value = json.loads(marker.read_text())
+        if (
+            value.get("schema_version") != "klip-peer-owner.v1"
+            or value.get("owner") != "host-executor"
+            or value.get("writer_root") != str(FOLDER)
+        ):
+            raise ValueError(
+                "Peer registry belongs to the isolated executor; recover authoritative state "
+                "before an explicit operator ownership transfer"
+            )
+
+
 def ansible(
     playbook: str,
     *,
@@ -238,6 +254,8 @@ def ansible(
     limit: str | None = None,
     log_path: Path | None = None,
 ) -> None:
+    if playbook == "mesh":
+        assert_peer_writer()
     arguments = [
         str(ROOT / ".venv/bin/ansible-playbook"),
         "-i",
@@ -311,6 +329,7 @@ def preflight() -> dict:
 
 
 def collect_peers() -> dict:
+    assert_peer_writer()
     old_path = FOLDER / "peers.json"
     previous = (
         json.loads(old_path.read_text()) if old_path.exists() else {"revision": 0, "peers": {}}

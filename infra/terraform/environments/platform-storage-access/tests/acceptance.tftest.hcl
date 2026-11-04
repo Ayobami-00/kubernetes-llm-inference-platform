@@ -8,6 +8,7 @@ override_data {
   values = { outputs = { foundation_manifest = {
     account_id = "127811062476", region = "eu-west-2", project = "kubernetes-llm-inference-platform", cluster_id = "klip",
     network    = { vpc_id = "vpc-00000000000000001", cpu_subnet_ids = { cp-01 = "subnet-00000000000000001", cp-02 = "subnet-00000000000000002", cp-03 = "subnet-00000000000000003" } }
+    nodes      = { cp-01 = { instance_id = "i-00000000000000011" }, cp-02 = { instance_id = "i-00000000000000012" }, cp-03 = { instance_id = "i-00000000000000013" } }
   } } }
 }
 override_data {
@@ -21,8 +22,9 @@ override_data {
 override_data {
   target = data.terraform_remote_state.storage
   values = { outputs = { storage_manifest = {
-    account_id = "127811062476", region = "eu-west-2", project = "kubernetes-llm-inference-platform", cluster_id = "klip",
-    artifacts  = { file_system_id = "fs-00000000000000001" }
+    account_id    = "127811062476", region = "eu-west-2", project = "kubernetes-llm-inference-platform", cluster_id = "klip",
+    artifacts     = { file_system_id = "fs-00000000000000001" }
+    host_executor = { file_system_id = "fs-00000000000000002" }
   } } }
 }
 run "only_scoped_cpu_nfs_connectivity" {
@@ -45,11 +47,28 @@ run "reject_foreign_storage" {
   override_data {
     target = data.terraform_remote_state.storage
     values = { outputs = { storage_manifest = {
-      account_id = "999999999999", region = "eu-west-2", project = "other", cluster_id = "other",
-      artifacts  = { file_system_id = "fs-00000000000000001" }
+      account_id    = "999999999999", region = "eu-west-2", project = "other", cluster_id = "other",
+      artifacts     = { file_system_id = "fs-00000000000000001" }
+      host_executor = { file_system_id = "fs-00000000000000002" }
     } } }
   }
   expect_failures = [terraform_data.ownership_guard]
+}
+
+run "host_authority_is_separate_and_exact" {
+  command = plan
+  assert {
+    condition     = jsondecode(aws_iam_role.host_executor.assume_role_policy).Statement[0].Condition.StringEquals["oidc.klip-lab.click:sub"] == "system:serviceaccount:platform-ops:klip-host-job"
+    error_message = "Only the isolated execution account may assume SSH transport authority."
+  }
+  assert {
+    condition     = length(jsondecode(aws_iam_role_policy.host_executor.policy).Statement[0].Resource) == 7 && contains(jsondecode(aws_iam_role_policy.host_executor.policy).Statement[0].Resource, "arn:aws:ssm:eu-west-2::document/AWS-StartSSHSession") && jsondecode(aws_iam_role_policy.host_executor.policy).Statement[0].Action == ["ssm:StartSession"]
+    error_message = "Only the six CPU hosts and SSH session document may be targeted."
+  }
+  assert {
+    condition     = jsondecode(aws_iam_role_policy.host_executor.policy).Statement[1].Condition.StringEquals["ssm:resourceTag/aws:ssmmessages:session-id"] == "$${aws:userid}" && length(aws_efs_mount_target.host_executor) == 3 && aws_efs_mount_target.host_executor["platform-01"].file_system_id != aws_efs_mount_target.artifacts["platform-01"].file_system_id
+    error_message = "Session cleanup stays with its federated owner and host state has separate mounts."
+  }
 }
 
 run "ebs_identity_is_bounded_to_the_platform" {

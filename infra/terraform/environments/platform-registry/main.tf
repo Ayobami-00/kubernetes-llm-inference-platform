@@ -5,7 +5,10 @@ locals {
   images          = toset(["management-backend", "management-web", "workload-runner"])
   repository_arns = [for name in sort(tolist(local.images)) : "arn:aws:ecr:${local.config.region}:${local.config.account_id}:repository/${local.config.cluster_id}/${name}"]
   subjects = {
-    pull = [for name in ["klip-api", "klip-worker", "klip-web", "klip-migrate", "klip-runner", "klip-image-pull-probe"] : "system:serviceaccount:klip:${name}"]
+    pull = concat(
+      [for name in ["klip-api", "klip-worker", "klip-web", "klip-migrate", "klip-runner", "klip-image-pull-probe"] : "system:serviceaccount:klip:${name}"],
+      [for name in ["klip-host-api", "klip-host-job"] : "system:serviceaccount:platform-ops:${name}"]
+    )
     push = [for ref in local.github.refs : "repo:${split("/", local.github.repository)[0]}@${local.github.owner_id}/${split("/", local.github.repository)[1]}@${local.github.repository_id}:ref:${ref}"]
   }
   tags = {

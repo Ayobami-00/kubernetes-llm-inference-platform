@@ -479,3 +479,82 @@ def test_production_listener_has_no_plaintext_fallback(tmp_path, monkeypatch):
     with pytest.raises(ValueError, match="mandatory"):
         api.main()
     assert len(calls) == 1
+
+
+def test_chart_keeps_host_custody_outside_management_and_job_rbac():
+    import subprocess
+
+    import yaml
+    from common import ROOT, tool
+    from image_release import guard_workloads
+
+    rendered = subprocess.run(
+        [
+            tool("helm"),
+            "template",
+            "host-executor",
+            str(ROOT / "charts/klip-host-executor"),
+            "--namespace",
+            "platform-ops",
+            "--set",
+            "image=" + IMAGE,
+            "--set",
+            "fileSystemId=fs-" + "a" * 17,
+            "--set",
+            "accessPointId=fsap-" + "a" * 17,
+        ],
+        check=True,
+        capture_output=True,
+        text=True,
+    )
+    documents = [d for d in yaml.safe_load_all(rendered.stdout) if d]
+    guard_workloads(documents)
+    deployment = next(d for d in documents if d["kind"] == "Deployment")
+    pod = deployment["spec"]["template"]["spec"]
+    assert deployment["spec"]["replicas"] == 2 and pod["automountServiceAccountToken"] is False
+    assert pod["securityContext"]["runAsUser"] == 20002
+    assert {v["secret"]["secretName"] for v in pod["volumes"] if "secret" in v} == {
+        "klip-host-server-tls"
+    }
+    role = next(
+        d for d in documents if d["kind"] == "Role" and d["metadata"]["name"] == "klip-host-api"
+    )
+    assert role["rules"] == [
+        {"apiGroups": ["batch"], "resources": ["jobs"], "verbs": ["create", "get"]},
+        {"apiGroups": [""], "resources": ["pods"], "verbs": ["get", "list"]},
+    ]
+    assert not any(d["kind"].startswith("ClusterRole") for d in documents)
+    volume = next(d for d in documents if d["kind"] == "PersistentVolume")
+    assert volume["spec"]["persistentVolumeReclaimPolicy"] == "Retain"
+    assert volume["spec"]["claimRef"]["namespace"] == "platform-ops"
+
+
+def test_mesh_ownership_transfer_fences_the_old_operator_before_transport(tmp_path, monkeypatch):
+    import cluster
+
+    monkeypatch.setattr(cluster, "FOLDER", tmp_path)
+    cluster.assert_peer_writer()  # Legacy CPU setup remains compatible before handoff.
+    marker = tmp_path / "peer-owner.json"
+    marker.write_text(
+        json.dumps(
+            {
+                "schema_version": "klip-peer-owner.v1",
+                "owner": "host-executor",
+                "writer_root": "/executor/state/cluster",
+            }
+        )
+    )
+    with pytest.raises(ValueError, match="authoritative"):
+        cluster.collect_peers()
+    with pytest.raises(ValueError, match="authoritative"):
+        cluster.ansible("mesh")
+    marker.write_text(
+        json.dumps(
+            {
+                "schema_version": "klip-peer-owner.v1",
+                "owner": "host-executor",
+                "writer_root": str(tmp_path),
+            }
+        )
+    )
+    cluster.assert_peer_writer()

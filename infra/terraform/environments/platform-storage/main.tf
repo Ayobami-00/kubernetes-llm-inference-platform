@@ -188,6 +188,7 @@ output "storage_manifest" {
     schema_version = "klip-platform-storage-allocation.v1",
     account_id     = local.config.account_id, region = local.config.region, project = local.config.project, cluster_id = local.config.cluster_id,
     artifacts      = { file_system_id = aws_efs_file_system.artifacts.id, access_point_id = aws_efs_access_point.artifacts.id, file_system_arn = aws_efs_file_system.artifacts.arn, node_role_arn = aws_iam_role.storage["artifacts"].arn, uid = local.storage.artifacts.uid, gid = local.storage.artifacts.gid },
+    host_executor  = { file_system_id = aws_efs_file_system.host_executor.id, access_point_id = aws_efs_access_point.host_executor.id, file_system_arn = aws_efs_file_system.host_executor.arn, node_role_arn = aws_iam_role.storage["artifacts"].arn, uid = 20002, gid = 20002 },
     database       = { bucket = aws_s3_bucket.database.id, archive_prefix = local.storage.database.archive_prefix, role_arn = aws_iam_role.storage["database"].arn, namespace = local.storage.database.namespace, service_accounts = local.storage.database.service_accounts }
   }
 }

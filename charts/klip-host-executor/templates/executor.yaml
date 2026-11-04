@@ -1,0 +1,167 @@
+{{- if ne .Release.Namespace "platform-ops" }}
+{{- fail "Host executor is restricted to platform-ops" }}
+{{- end }}
+{{- if not (regexMatch "^127811062476\\.dkr\\.ecr\\.eu-west-2\\.amazonaws\\.com/klip/management-backend@sha256:[a-f0-9]{64}$" .Values.image) }}
+{{- fail "A reviewed private immutable executor image is required" }}
+{{- end }}
+{{- if or (not (regexMatch "^fs-[a-f0-9]{17}$" .Values.fileSystemId)) (not (regexMatch "^fsap-[a-f0-9]{17}$" .Values.accessPointId)) }}
+{{- fail "Supply verified isolated host-state storage identities" }}
+{{- end }}
+{{- if ne (int .Values.replicas) 2 }}
+{{- fail "The executor API requires two replicas" }}
+{{- end }}
+apiVersion: v1
+kind: PersistentVolume
+metadata:
+  name: klip-host-state
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  capacity: {storage: 5Gi}
+  volumeMode: Filesystem
+  accessModes: [ReadWriteMany]
+  persistentVolumeReclaimPolicy: Retain
+  storageClassName: ""
+  claimRef: {name: klip-host-state, namespace: platform-ops}
+  mountOptions: [tls, iam]
+  csi:
+    driver: efs.csi.aws.com
+    volumeHandle: {{ .Values.fileSystemId }}::{{ .Values.accessPointId }}
+  nodeAffinity:
+    required:
+      nodeSelectorTerms:
+        - matchExpressions:
+            - key: klip.dev.node-restriction.kubernetes.io/platform
+              operator: In
+              values: ["true"]
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: klip-host-state
+  annotations: {helm.sh/resource-policy: keep}
+spec:
+  accessModes: [ReadWriteMany]
+  storageClassName: ""
+  volumeName: klip-host-state
+  resources: {requests: {storage: 5Gi}}
+---
+{{- range $name := list "klip-host-api" "klip-host-job" }}
+apiVersion: v1
+kind: ServiceAccount
+metadata:
+  name: {{ $name }}
+  annotations:
+    eks.amazonaws.com/ecr-role-arn: {{ $.Values.imagePullRoleArn | quote }}
+automountServiceAccountToken: false
+---
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: klip-host-api}
+rules:
+  - apiGroups: [batch]
+    resources: [jobs]
+    verbs: [create, get]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: klip-host-api}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: klip-host-api}
+subjects: [{kind: ServiceAccount, name: klip-host-api, namespace: platform-ops}]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: klip-host-token-audience}
+rules:
+  - apiGroups: [""]
+    resources: [sts.amazonaws.com]
+    resourceNames: [klip-host-api, klip-host-job]
+    verbs: [request-serviceaccounts-token-audience]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: klip-host-token-audience}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: klip-host-token-audience}
+subjects: [{apiGroup: rbac.authorization.k8s.io, kind: Group, name: "system:nodes"}]
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata: {name: host-executor}
+spec:
+  replicas: 2
+  strategy: {type: RollingUpdate, rollingUpdate: {maxSurge: 0, maxUnavailable: 1}}
+  selector: {matchLabels: {app.kubernetes.io/name: klip-host-executor, app.kubernetes.io/component: api}}
+  template:
+    metadata:
+      labels: {app.kubernetes.io/name: klip-host-executor, app.kubernetes.io/component: api}
+    spec:
+      serviceAccountName: klip-host-api
+      automountServiceAccountToken: false
+      terminationGracePeriodSeconds: 30
+      nodeSelector: {klip.dev.node-restriction.kubernetes.io/platform: "true"}
+      affinity:
+        podAntiAffinity:
+          requiredDuringSchedulingIgnoredDuringExecution:
+            - topologyKey: kubernetes.io/hostname
+              labelSelector: {matchLabels: {app.kubernetes.io/name: klip-host-executor, app.kubernetes.io/component: api}}
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 20002
+        runAsGroup: 20002
+        fsGroup: 20002
+        seccompProfile: {type: RuntimeDefault}
+      containers:
+        - name: api
+          image: {{ .Values.image | quote }}
+          command: [python, -m, platform_management.host_executor.api]
+          env:
+            - {name: HOST_EXECUTOR_IMAGE, value: {{ .Values.image | quote }}}
+            - {name: LANG, value: C.UTF-8}
+            - {name: LC_ALL, value: C.UTF-8}
+            - {name: LANGUAGE, value: C}
+          ports: [{name: tls, containerPort: 8443}]
+          resources:
+            requests: {cpu: 100m, memory: 128Mi}
+            limits: {cpu: "1", memory: 512Mi}
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities: {drop: [ALL]}
+          startupProbe: {tcpSocket: {port: tls}, periodSeconds: 5, failureThreshold: 60}
+          readinessProbe: {tcpSocket: {port: tls}, periodSeconds: 5}
+          livenessProbe: {tcpSocket: {port: tls}, periodSeconds: 10, failureThreshold: 6}
+          volumeMounts:
+            - {name: state, mountPath: /executor/state}
+            - {name: tls, mountPath: /run/secrets/host-executor-tls, readOnly: true}
+            - {name: identity, mountPath: /var/run/secrets/kubernetes.io/serviceaccount, readOnly: true}
+            - {name: temporary, mountPath: /tmp}
+      volumes:
+        - {name: state, persistentVolumeClaim: {claimName: klip-host-state}}
+        - name: tls
+          secret: {secretName: klip-host-server-tls, defaultMode: 0440}
+        - name: identity
+          projected:
+            defaultMode: 0440
+            sources:
+              - serviceAccountToken: {expirationSeconds: 900, path: token}
+              - configMap:
+                  name: kube-root-ca.crt
+                  items: [{key: ca.crt, path: ca.crt}]
+        - {name: temporary, emptyDir: {sizeLimit: 64Mi}}
+---
+apiVersion: v1
+kind: Service
+metadata: {name: host-executor}
+spec:
+  selector: {app.kubernetes.io/name: klip-host-executor, app.kubernetes.io/component: api}
+  ports: [{name: tls, port: 8443, targetPort: tls}]
+---
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata: {name: host-executor}
+spec:
+  minAvailable: 1
+  selector: {matchLabels: {app.kubernetes.io/name: klip-host-executor, app.kubernetes.io/component: api}}
