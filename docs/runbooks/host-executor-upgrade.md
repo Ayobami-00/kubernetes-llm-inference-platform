@@ -4,6 +4,13 @@ native task receipts and initial release record. It appends upgrade evidence to
 `active.json`; it never re-runs initial installation or copies old Mac peer state
 over the authoritative executor volume.
 
+The image workflow's manual `component` input can build only `host-executor`
+without waiting for an unrelated runner/stub build. The default remains `all`.
+Each choice still passes signed repository/branch OIDC verification, the fixed
+Dockerfile allowlist, immutable registry receipts and the full executor scan.
+Component builds have separate workflow queue slots. They do not authorize a
+partial management release or skip its four-image assessment.
+
 The current procedure requires only the six persistent CPU peers and no
 unfinished or cleanup-pending host task. Run it before the first GPU admission.
 Extending this procedure to an active GPU fleet needs a separate compatibility

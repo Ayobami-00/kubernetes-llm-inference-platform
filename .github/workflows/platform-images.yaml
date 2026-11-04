@@ -34,12 +34,18 @@ on:
       - 'contracts/fixtures/**'
       - 'scripts/management/stage_workspace.py'
   workflow_dispatch:
+    inputs:
+      component:
+        description: Build all experiment images or one independently reviewed component
+        type: choice
+        default: all
+        options: [all, backend, web, runner, stub, host-executor]
 
 permissions:
   contents: read
 
 concurrency:
-  group: platform-experiment-images-${{ github.ref }}
+  group: platform-experiment-images-${{ github.ref }}-${{ inputs.component || 'all' }}
   cancel-in-progress: false
 
 jobs:
@@ -49,7 +55,31 @@ jobs:
     permissions:
       contents: read
       id-token: write
+    outputs:
+      components: ${{ steps.components.outputs.value }}
     steps:
+      - name: Select the bounded image build set
+        id: components
+        env:
+          SELECTED_COMPONENT: ${{ inputs.component || 'all' }}
+        run: |
+          python3 - <<'PY'
+          import json, os
+          components = [
+              {'component': 'backend', 'file': 'apps/management/backend/Dockerfile', 'target': 'production'},
+              {'component': 'web', 'file': 'apps/management/web/Dockerfile', 'target': 'production'},
+              {'component': 'runner', 'file': 'workload-runner/Dockerfile', 'target': ''},
+              {'component': 'stub', 'file': 'dev/inference-stub/Dockerfile', 'target': ''},
+              {'component': 'host-executor', 'file': 'dev/host-executor/Dockerfile', 'target': ''},
+          ]
+          selected = os.environ['SELECTED_COMPONENT']
+          if selected != 'all':
+              components = [item for item in components if item['component'] == selected]
+          if not components:
+              raise ValueError('Unknown build component')
+          with open(os.environ['GITHUB_OUTPUT'], 'a') as output:
+              output.write('value=' + json.dumps(components) + '\n')
+          PY
       - name: Verify the repository's signed publishing identity
         shell: bash
         run: |
@@ -108,22 +138,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        include:
-          - component: backend
-            file: apps/management/backend/Dockerfile
-            target: production
-          - component: web
-            file: apps/management/web/Dockerfile
-            target: production
-          - component: runner
-            file: workload-runner/Dockerfile
-            target: ''
-          - component: stub
-            file: dev/inference-stub/Dockerfile
-            target: ''
-          - component: host-executor
-            file: dev/host-executor/Dockerfile
-            target: ''
+        include: ${{ fromJSON(needs.identity.outputs.components) }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
       - uses: aws-actions/configure-aws-credentials@e1253824e5c10ff9df46874f81ed3ec929e19cfd # v6.3.0
