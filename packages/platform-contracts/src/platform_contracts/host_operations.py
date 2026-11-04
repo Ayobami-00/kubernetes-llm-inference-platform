@@ -28,11 +28,27 @@ def ed25519_host_key(value: str) -> str:
     return "ssh-ed25519 " + base64.b64encode(blob).decode()
 
 
+class ProviderFence(ContractModel):
+    """Management's authenticated receipt for an owned, confirmed terminated VM."""
+
+    intent_id: str = Field(pattern=r"^op-[a-f0-9]{16,32}$")
+    provider_instance_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    termination_requested_at: Timestamp
+    confirmed_at: Timestamp
+    observation_sha256: Sha256
+
+    @model_validator(mode="after")
+    def ordered(self) -> Self:
+        if self.confirmed_at < self.termination_requested_at:
+            raise ValueError("Provider fence confirmation predates its termination request")
+        return self
+
+
 class HostTask(ContractModel):
     schema_version: Literal["0.1"] = "0.1"
     id: str = Field(pattern=r"^host-[a-f0-9]{24}$")
     cluster_id: Literal["klip"] = "klip"
-    action: Literal["prepare", "join", "inspect", "remove"]
+    action: Literal["prepare", "join", "inspect", "remove", "cleanup-check", "revoke-bootstrap"]
     provider_instance_id: str = Field(pattern=r"^[a-f0-9]{32}$")
     node_name: str = Field(pattern=r"^gpu-[a-f0-9]{12,32}$")
     node_uid: str | None = Field(
@@ -46,6 +62,7 @@ class HostTask(ContractModel):
     deadline: Timestamp
     previous_task_id: str | None = Field(default=None, pattern=r"^host-[a-f0-9]{24}$")
     drain_timeout_s: int = Field(default=120, strict=True, ge=1, le=600)
+    provider_fence: ProviderFence | None = None
 
     @model_validator(mode="after")
     def bounded_identity(self) -> Self:
@@ -81,6 +98,16 @@ class HostTask(ContractModel):
             raise ValueError("Inspection/removal requires the observed node UID")
         if self.previous_task_id == self.id:
             raise ValueError("Host task cannot refer to itself")
+        if self.action == "revoke-bootstrap":
+            if (
+                self.provider_fence is None
+                or self.provider_fence.provider_instance_id != self.provider_instance_id
+            ):
+                raise ValueError(
+                    "Bootstrap revocation requires this provider instance's fence receipt"
+                )
+        elif self.provider_fence is not None:
+            raise ValueError("Only fenced bootstrap revocation accepts a provider fence")
         return self
 
 
@@ -105,6 +132,8 @@ class HostTaskObservation(ContractModel):
     evidence_sha256: Sha256 | None = None
     gpu_runtime_ready: bool = False
     cleanup_pending: bool = False
+    bootstrap_fence_permitted: bool = False
+    bootstrap_cleanup_complete: bool = False
     error: ErrorInfo | None = None
 
     @model_validator(mode="after")
@@ -130,6 +159,10 @@ class HostTaskObservation(ContractModel):
             raise ValueError("GPU readiness requires actual host/network/node readiness")
         if self.status in {"queued", "running"} and self.gpu_runtime_ready:
             raise ValueError("In-flight host work cannot claim completed GPU verification")
+        if (self.bootstrap_fence_permitted or self.bootstrap_cleanup_complete) and (
+            self.status != "completed" or self.evidence_sha256 is None or self.gpu_runtime_ready
+        ):
+            raise ValueError("Bootstrap cleanup needs completed, non-serving evidence")
         if self.public_wireguard_key is not None:
             try:
                 valid = len(base64.b64decode(self.public_wireguard_key, validate=True)) == 32

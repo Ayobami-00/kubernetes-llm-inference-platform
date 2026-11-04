@@ -17,7 +17,11 @@ from platform_management.services.common import AppError
 
 
 def canonical(task):
-    return json.dumps(task.model_dump(mode="json"), sort_keys=True).encode()
+    document = task.model_dump(mode="json")
+    # Preserve v0.1 digests for tasks authored before fenced cleanup was added.
+    if document.get("provider_fence") is None:
+        document.pop("provider_fence", None)
+    return json.dumps(document, sort_keys=True).encode()
 
 
 class HostController:
@@ -219,10 +223,22 @@ class HostController:
                 or str(task.private_ip) in self.protected_ips
             ):
                 raise AppError(409, "GPU host operations cannot target persistent CPU addresses")
+            recovery = False
             if task.previous_task_id:
                 previous_task = self.task(task.previous_task_id)
                 previous_result = self.observe(task.previous_task_id)
-                if previous_result.status != "completed" or any(
+                recovery = previous_result.status == "failed" and (
+                    (
+                        task.action == "cleanup-check"
+                        and previous_task.action in {"prepare", "join", "inspect", "cleanup-check"}
+                    )
+                    or (task.action == "remove" and previous_task.action == "remove")
+                    or (
+                        task.action == "revoke-bootstrap"
+                        and previous_task.action == "revoke-bootstrap"
+                    )
+                )
+                if (previous_result.status != "completed" and not recovery) or any(
                     getattr(task, field) != getattr(previous_task, field)
                     for field in (
                         "provider_instance_id",
@@ -236,15 +252,45 @@ class HostController:
                     raise AppError(
                         409, "Host follow-up differs from its completed trusted task chain"
                     )
-                if previous_result.node_uid and task.node_uid not in {
-                    None,
-                    previous_result.node_uid,
-                }:
+                known_uid = previous_result.node_uid or previous_task.node_uid
+                if known_uid and task.node_uid != known_uid:
                     raise AppError(409, "Host follow-up changed the observed Kubernetes UID")
+                permitted = {
+                    "prepare": {"join", "cleanup-check"},
+                    "join": {"inspect", "cleanup-check"},
+                    "inspect": {"inspect", "remove", "cleanup-check"},
+                    "remove": {"remove"},
+                    "cleanup-check": {"cleanup-check", "revoke-bootstrap"},
+                    "revoke-bootstrap": {"revoke-bootstrap"},
+                }
+                if task.action not in permitted[previous_task.action]:
+                    raise AppError(409, "Invalid host lifecycle transition")
+                if task.action == "revoke-bootstrap" and not (
+                    (
+                        previous_task.action == "cleanup-check"
+                        and previous_result.bootstrap_fence_permitted
+                    )
+                    or (recovery and previous_task.provider_fence == task.provider_fence)
+                ):
+                    raise AppError(
+                        409, "Fenced cleanup requires the completed bootstrap safety check"
+                    )
             active = self.root / "active-task.json"
             if active.exists():
                 previous = json.loads(active.read_text())["id"]
-                if previous != task.id and self.observe(previous).status != "completed":
+                if (
+                    previous != task.id
+                    and self.task(previous).action == "cleanup-check"
+                    and task.previous_task_id != previous
+                ):
+                    raise AppError(
+                        409, "Bootstrap fence/cleanup chain remains reserved", "host_busy"
+                    )
+                if (
+                    previous != task.id
+                    and self.observe(previous).status != "completed"
+                    and not (recovery and previous == task.previous_task_id)
+                ):
                     raise AppError(
                         409,
                         "Previous host operation needs completion or reconciliation",
@@ -283,11 +329,19 @@ class HostController:
                 or not uid_file.is_file()
                 or result.job_uid != uid_file.read_text()
                 or (result.node_name is not None and result.node_name != task.node_name)
-                or (task.node_uid is not None and result.node_uid != task.node_uid)
+                or (
+                    task.node_uid is not None
+                    and result.node_uid != task.node_uid
+                    and (result.status == "completed" or result.node_uid is not None)
+                )
                 or result.registry_revision < task.registry_revision
             ):
                 raise AppError(409, "Host observation differs from its durable task")
             if result.status in {"completed", "failed"}:
+                if result.bootstrap_fence_permitted and task.action != "cleanup-check":
+                    raise AppError(409, "Unexpected bootstrap fence permission")
+                if result.bootstrap_cleanup_complete and task.action != "revoke-bootstrap":
+                    raise AppError(409, "Unexpected bootstrap cleanup completion")
                 return result  # Terminal idempotence does not need credentials or new API access.
         job = self.client.job(identity)
         common = {

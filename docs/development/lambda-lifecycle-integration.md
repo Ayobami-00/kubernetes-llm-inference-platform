@@ -263,3 +263,32 @@ The private metadata receipt is `cluster/host-executor/lambda-catalog.json` unde
 operator state. These are candidates for the next integration step; availability,
 image compatibility and price must be rechecked before launch. No provider resource
 was created by the catalog query.
+
+Failed bootstrap cleanup now has separate typed safety and revocation actions.
+`cleanup-check` requires the exact Lambda node identity, its bootstrap taint and
+no active non-DaemonSet workloads. It cordons with UID/resource-version tests.
+A ready/unquarantined worker must use normal drain/removal instead. Completed
+safety checks retain the executor's mutation slot for their cleanup chain.
+
+Management persists trusted safety/removal evidence before termination intent.
+`terminate_once` checks a complete provider list and the exact-instance read;
+only mutually consistent terminal states or documented exact-object absence
+produce a `ProviderFence`. A successful termination POST alone cannot do so.
+An absent instance and an active instance in conflicting reads remain unresolved.
+The documented API semantics are recorded in the
+[Lambda Cloud API](https://docs.lambda.com/api/cloud).
+
+After provider fencing, `revoke-bootstrap` never SSHes to the terminated host.
+It checks the quarantine/workload state again, removes only the bound peer and
+inventory entry, reconciles remaining direct peers, and deletes the node with its
+UID precondition. Failure keeps cleanup pending. A fresh recovery task may retry
+that bounded revocation with the same fence; lost original Jobs are not restarted.
+The provider ledger retains the allocation slot while `fenced` and releases it
+only on matching completed executor evidence. Normal drained removal uses its
+original receipt after provider fencing. Historical launch/termination calls reuse
+their committed identities/receipts without new bootstrap or provider I/O.
+
+These changes retain schema version 0.1 and old task input digests. The cleanup
+actions and provider ledger have offline ownership/transport tests and dedicated
+PostgreSQL tests. They have not yet been deployed into the executor or exercised
+against a real GPU allocation; real management lifecycle remains disabled.

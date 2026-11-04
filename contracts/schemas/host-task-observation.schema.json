@@ -26,6 +26,16 @@
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
   "properties": {
+    "bootstrap_cleanup_complete": {
+      "default": false,
+      "title": "Bootstrap Cleanup Complete",
+      "type": "boolean"
+    },
+    "bootstrap_fence_permitted": {
+      "default": false,
+      "title": "Bootstrap Fence Permitted",
+      "type": "boolean"
+    },
     "cilium_ready": {
       "default": false,
       "title": "Cilium Ready",

@@ -1,20 +1,28 @@
 """Real PostgreSQL coordination with mocked provider I/O, never a paid rental."""
 
+import base64
 import hashlib
 from concurrent.futures import ThreadPoolExecutor
+from datetime import timedelta
 from unittest.mock import Mock
 
 import pytest
+from platform_contracts import HostTask, HostTaskObservation
 from platform_management.db.models import ProviderIntent
 from platform_management.db.session import session
 from platform_management.providers.base import AllocationAmbiguous, CapacityUnavailable
-from platform_management.providers.lambda_ledger import PostgresLaunchLedger, allocate_once
+from platform_management.providers.lambda_ledger import (
+    PostgresLaunchLedger,
+    allocate_once,
+    terminate_once,
+)
 from platform_management.providers.lambda_mutations import (
     LaunchPlan,
     ProviderIdentityConflict,
     ProviderRateLimited,
     ProviderRejected,
 )
+from platform_management.services.common import digest, now
 from sqlalchemy import select
 
 USER_DATA = "#cloud-config\nruncmd: []\n"
@@ -198,3 +206,136 @@ def test_account_gate_persists_pacing_and_does_not_hold_a_transaction():
     with ThreadPoolExecutor(max_workers=2) as pool:
         list(pool.map(request, range(2)))
     assert sorted(starts)[1] - sorted(starts)[0] >= 1.0
+
+
+def allocated_ledger():
+    document, ledger = plan(), PostgresLaunchLedger()
+    intent(document)
+    ledger.freeze(document)
+    assert ledger.dispatch(document)
+    ledger.allocated(document, [INSTANCE])
+    return document, ledger
+
+
+def host_receipt(action="cleanup-check", *, fence=None):
+    task = HostTask(
+        id="host-" + ("2" if action == "revoke-bootstrap" else "1") * 24,
+        action=action,
+        provider_instance_id=INSTANCE,
+        node_name="gpu-" + INSTANCE,
+        public_ip="8.8.8.8",
+        private_ip="192.168.1.2",
+        wireguard_ip="10.200.0.67",
+        trusted_host_key="ssh-ed25519 "
+        + base64.b64encode(b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20" + b"x" * 32).decode(),
+        registry_revision=1,
+        deadline=now() + timedelta(minutes=10),
+        previous_task_id="host-" + "0" * 24,
+        provider_fence=fence,
+        node_uid="12345678-1234-1234-1234-123456789abc" if action == "remove" else None,
+    )
+    inputs = task.model_dump(mode="json")
+    if inputs.get("provider_fence") is None:
+        inputs.pop("provider_fence", None)
+    result = HostTaskObservation(
+        task_id=task.id,
+        input_sha256=digest(inputs),
+        job_uid="test-job-uid",
+        status="completed",
+        stage="Synthetic safety evidence",
+        observed_at=now(),
+        registry_revision=1,
+        evidence_sha256="a" * 64,
+        bootstrap_fence_permitted=action == "cleanup-check",
+        bootstrap_cleanup_complete=action == "revoke-bootstrap",
+        node_name=task.node_name if task.node_uid else None,
+        node_uid=task.node_uid,
+    )
+    return task, result
+
+
+def test_termination_requires_host_authorization_before_any_http():
+    document, ledger = allocated_ledger()
+    api = Mock()
+    with pytest.raises(ProviderIdentityConflict, match="safety evidence"):
+        terminate_once(document, ledger, api)
+    assert not api.mock_calls and ledger.read(document)["state"] == "allocated"
+
+
+def test_fenced_allocation_holds_slot_until_exact_executor_cleanup():
+    document, ledger = allocated_ledger()
+    check, checked = host_receipt()
+    ledger.authorize_termination(document, check, checked)
+    api = Mock()
+    observed = observation(document)
+    api.instances.return_value, api.instance.return_value = [observed], observed
+
+    def terminate(_):
+        assert ledger.read(document)["state"] == "terminating"
+        return [{**observed, "status": "terminating"}]
+
+    api.terminate.side_effect = terminate
+    assert terminate_once(document, ledger, api) is None
+    api.instances.return_value, api.instance.return_value = [], None
+    fence = terminate_once(document, ledger, api)
+    assert ledger.read(document)["state"] == "fenced"
+    second = plan("2")
+    intent(second)
+    ledger.freeze(second)
+    with pytest.raises(CapacityUnavailable, match="reservation"):
+        ledger.dispatch(second)
+    revoke, revoked = host_receipt("revoke-bootstrap", fence=fence)
+    with pytest.raises(ProviderIdentityConflict):
+        ledger.cleanup_completed(document, revoke, checked)
+    assert ledger.read(document)["state"] == "fenced"
+    ledger.cleanup_completed(document, revoke, revoked)
+    ledger.cleanup_completed(document, revoke, revoked)
+    assert ledger.read(document)["state"] == "terminated" and ledger.dispatch(second)
+    api.reset_mock()
+    assert terminate_once(document, ledger, api) == fence
+    # A historical launch is returned even when bootstrap material is gone.
+    assert allocate_once(document, None, ledger, api) == (INSTANCE,)
+    assert not api.mock_calls
+
+
+def test_drained_removal_is_completed_only_after_provider_fencing():
+    document, ledger = allocated_ledger()
+    task, result = host_receipt("remove")
+    ledger.authorize_termination(document, task, result)
+    with pytest.raises(ProviderIdentityConflict, match="not complete"):
+        ledger.cleanup_completed(document, task, result)
+    api = Mock()
+    observed = {**observation(document), "status": "terminated"}
+    api.instances.return_value, api.instance.return_value = [observed], observed
+    assert terminate_once(document, ledger, api).provider_instance_id == INSTANCE
+    ledger.cleanup_completed(document, task, result)
+    assert ledger.read(document)["state"] == "terminated"
+    api.terminate.assert_not_called()
+
+
+def test_termination_authorization_rejects_unrelated_and_incomplete_receipts():
+    document, ledger = allocated_ledger()
+    task, result = host_receipt()
+    for changed in (
+        result.model_copy(update={"input_sha256": "b" * 64}),
+        result.model_copy(update={"task_id": "host-" + "f" * 24}),
+        result.model_copy(update={"cleanup_pending": True}),
+        result.model_copy(update={"bootstrap_fence_permitted": False}),
+    ):
+        with pytest.raises(ProviderIdentityConflict):
+            ledger.authorize_termination(document, task, changed)
+    ledger.authorize_termination(document, task, result)
+    ledger.authorize_termination(document, task, result)
+    with pytest.raises(ProviderIdentityConflict, match="immutable"):
+        ledger.authorize_termination(
+            document, task, result.model_copy(update={"evidence_sha256": "b" * 64})
+        )
+
+
+def test_allocated_replay_needs_no_provider_or_bootstrap_readiness():
+    document, ledger = allocated_ledger()
+    api = Mock()
+    assert allocate_once(document, None, ledger, api) == (INSTANCE,)
+    assert not api.mock_calls
+    with pytest.raises(ProviderIdentityConflict):
+        allocate_once(document.model_copy(update={"image_id": "changed"}), None, ledger, api)

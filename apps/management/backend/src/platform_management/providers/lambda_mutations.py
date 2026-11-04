@@ -53,6 +53,10 @@ class ProviderRejected(RuntimeError):
     """A definite API rejection. Messages never include response bodies."""
 
 
+class ProviderNotFound(ProviderRejected):
+    """A specific instance read returned the documented object-does-not-exist code."""
+
+
 class ProviderRateLimited(TransientProviderError):
     """The API definitively rejected this request before allocation."""
 
@@ -138,7 +142,10 @@ class LambdaMutations:
         self.client.close()
 
     def request(self, method, path, *, body=None, params=None):
-        allowed = (method == "GET" and path == "instances") or (
+        allowed = (
+            method == "GET"
+            and (path == "instances" or re.fullmatch(r"instances/[a-f0-9]{32}", path))
+        ) or (
             method == "POST"
             and path in {"instance-operations/launch", "instance-operations/terminate"}
         )
@@ -164,6 +171,13 @@ class LambdaMutations:
                     # Only a known, exact code affects classification. Never echo API text.
                     error = document.get("error")
                     code = error.get("code") if isinstance(error, dict) else None
+                    if (
+                        method == "GET"
+                        and path.startswith("instances/")
+                        and response.status_code == 404
+                        and code == "global/object-does-not-exist"
+                    ):
+                        raise ProviderNotFound("The exact provider instance does not exist")
                     if response.status_code == 400 and code == (
                         "instance-operations/launch/insufficient-capacity"
                     ):
@@ -213,11 +227,27 @@ class LambdaMutations:
     def launch(self, plan: LaunchPlan, user_data: str) -> tuple[str, ...]:
         data, _ = self.request("POST", "instance-operations/launch", body=plan.request(user_data))
         ids = data.get("instance_ids") if isinstance(data, dict) else None
-        if not isinstance(ids, list) or len(ids) != 1 or not isinstance(ids[0], str) or not ids[0]:
+        if (
+            not isinstance(ids, list)
+            or len(ids) != 1
+            or not isinstance(ids[0], str)
+            or not re.fullmatch(r"[a-f0-9]{32}", ids[0])
+        ):
             raise AllocationAmbiguous(
                 "Lambda allocation response did not identify exactly one instance"
             )
         return tuple(ids)
+
+    def instance(self, instance_id: str):
+        if not re.fullmatch(r"[a-f0-9]{32}", instance_id):
+            raise ValueError("Invalid provider instance identity")
+        try:
+            data, _ = self.request("GET", "instances/" + instance_id)
+        except ProviderNotFound:
+            return None
+        if not isinstance(data, dict) or data.get("id") != instance_id:
+            raise ProviderIdentityConflict("Specific instance read changed the requested identity")
+        return safe_instance(data)
 
     def terminate(self, instance_id: str):
         if not re.fullmatch(r"[a-f0-9]{32}", instance_id):

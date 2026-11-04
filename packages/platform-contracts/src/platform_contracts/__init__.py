@@ -2,7 +2,7 @@
 
 from .customers import CustomerSpec
 from .datasets import DatasetManifest
-from .host_operations import HostTask, HostTaskObservation
+from .host_operations import HostTask, HostTaskObservation, ProviderFence
 from .inventory import InfrastructureInventory
 from .loading import ContractCatalog, load_catalog, load_document
 from .measurements import (
@@ -48,6 +48,7 @@ __all__ = [
     "ExecutionVersions",
     "HostTask",
     "HostTaskObservation",
+    "ProviderFence",
     "InfrastructureInventory",
     "OperationStatus",
     "Run",

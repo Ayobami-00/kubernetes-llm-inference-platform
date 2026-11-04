@@ -85,6 +85,10 @@ def perform(root, task):
         raise ValueError("Executor task has a stale peer-registry revision")
     if str(task.public_ip) in {p["public_ip"] for p in inputs["cpu_peers"].values()}:
         raise ValueError("GPU operations cannot target a protected CPU endpoint")
+    if task.action in {"cleanup-check", "revoke-bootstrap"}:
+        from platform_management.host_executor.cleanup import perform_cleanup
+
+        return perform_cleanup(root, task, registry, cp)
     if task.action == "inspect":
         raise ValueError("GPU/connectivity inspection is not configured; readiness remains false")
     alias = access(root, task)
@@ -251,6 +255,10 @@ def run_task(root, identity, *, action=perform):
             cilium_ready=checks["cilium"],
             # Generic B operations cannot establish GPU or Pod connectivity readiness.
             gpu_runtime_ready=False,
+            evidence_sha256=result.get("evidence_sha256")
+            or hashlib.sha256(json.dumps(result, sort_keys=True).encode()).hexdigest(),
+            bootstrap_fence_permitted=result.get("bootstrap_fence_permitted", False),
+            bootstrap_cleanup_complete=result.get("bootstrap_cleanup_complete", False),
         )
     except Exception as error:
         write_private(

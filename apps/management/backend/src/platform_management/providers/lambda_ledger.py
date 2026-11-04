@@ -1,10 +1,12 @@
 """Durable launch ownership and account-wide API pacing without long transactions."""
 
 import copy
+import re
 import time
 from contextlib import contextmanager
 from datetime import timedelta
 
+from platform_contracts import HostTask, HostTaskObservation, ProviderFence
 from sqlalchemy import select, text
 
 from platform_management.db.models import Preference, ProviderIntent
@@ -15,6 +17,7 @@ from platform_management.providers.lambda_mutations import (
     ProviderIdentityConflict,
     ProviderRateLimited,
     ProviderRejected,
+    owned_instances,
     reconcile_launch,
 )
 from platform_management.services.common import digest, lock_key, now
@@ -137,7 +140,11 @@ class PostgresLaunchLedger:
             return True
 
     def allocated(self, plan, identities):
-        if len(identities) != 1 or len(set(identities)) != 1:
+        if (
+            len(identities) != 1
+            or not isinstance(identities[0], str)
+            or not re.fullmatch(r"[a-f0-9]{32}", identities[0])
+        ):
             raise ProviderIdentityConflict("Exactly one provider allocation must be recorded")
         with session() as db, db.begin():
             row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
@@ -166,19 +173,181 @@ class PostgresLaunchLedger:
                 "lambda_launch": {**value, "state": "rejected", "rejection": code},
             }
 
+    def start_termination(self, plan):
+        """Commit intent before provider I/O; a fenced VM still reserves its mesh address."""
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            if value["state"] in {"terminating", "fenced", "terminated"}:
+                return copy.deepcopy(value)
+            if value["state"] != "allocated" or len(value["instance_ids"]) != 1:
+                raise ProviderIdentityConflict(
+                    "Termination requires an identified owned allocation"
+                )
+            if not value.get("termination_authorization"):
+                raise ProviderIdentityConflict("Termination requires trusted host safety evidence")
+            value = {**value, "state": "terminating", "termination_requested_at": now().isoformat()}
+            row.state, row.payload = "terminating", {**row.payload, "lambda_launch": value}
+            return copy.deepcopy(value)
+
+    @staticmethod
+    def check_host_receipt(value, task: HostTask, observation: HostTaskObservation):
+        document = task.model_dump(mode="json")
+        if document.get("provider_fence") is None:
+            document.pop("provider_fence", None)
+        if (
+            value["instance_ids"] != [task.provider_instance_id]
+            or observation.task_id != task.id
+            or observation.input_sha256 != digest(document)
+            or observation.status != "completed"
+            or observation.cleanup_pending
+            or observation.evidence_sha256 is None
+            or observation.gpu_runtime_ready
+            or (task.node_uid and observation.node_uid != task.node_uid)
+        ):
+            raise ProviderIdentityConflict("Host safety receipt differs from the owned task")
+
+    def authorize_termination(self, plan, task: HostTask, observation: HostTaskObservation):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            self.check_host_receipt(value, task, observation)
+            if not (
+                (task.action == "cleanup-check" and observation.bootstrap_fence_permitted)
+                or (task.action == "remove" and task.node_uid is not None)
+            ):
+                raise ProviderIdentityConflict(
+                    "Termination needs bootstrap safety or drained removal"
+                )
+            authorization = {
+                "task_id": task.id,
+                "input_sha256": observation.input_sha256,
+                "observation_sha256": digest(observation.model_dump(mode="json")),
+                "route": "bootstrap" if task.action == "cleanup-check" else "drained",
+            }
+            if value.get("termination_authorization"):
+                if value["termination_authorization"] != authorization:
+                    raise ProviderIdentityConflict("Termination authorization is immutable")
+                return
+            if value["state"] != "allocated":
+                raise ProviderIdentityConflict(
+                    "Cannot replace authorization after termination starts"
+                )
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {**value, "termination_authorization": authorization},
+            }
+
+    def termination_acknowledged(self, plan, observed):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            if value["state"] != "terminating" or observed.get("id") not in value["instance_ids"]:
+                raise ProviderIdentityConflict(
+                    "Termination acknowledgment changed the owned instance"
+                )
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "termination_acknowledgment": {
+                        "at": now().isoformat(),
+                        "sha256": digest(observed),
+                    },
+                },
+            }
+
+    def fenced(self, plan, evidence):
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            if value.get("provider_fence"):
+                return ProviderFence.model_validate(value["provider_fence"])
+            if value["state"] != "terminating":
+                raise ProviderIdentityConflict(
+                    "Provider fencing requires committed termination intent"
+                )
+            receipt = ProviderFence(
+                intent_id=plan.intent_id,
+                provider_instance_id=value["instance_ids"][0],
+                termination_requested_at=value["termination_requested_at"],
+                confirmed_at=now(),
+                observation_sha256=digest(evidence),
+            )
+            row.state = "fenced"
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "state": "fenced",
+                    "provider_fence": receipt.model_dump(mode="json"),
+                },
+            }
+            return receipt
+
+    def cleanup_completed(self, plan, task: HostTask, observation: HostTaskObservation):
+        """Release capacity only after the executor confirms network/identity removal."""
+        with session() as db, db.begin():
+            row = db.get(ProviderIntent, plan.intent_id, with_for_update=True)
+            value = self.checked(row, plan)
+            self.check_host_receipt(value, task, observation)
+            if value["state"] == "terminated":
+                if value.get("cleanup_observation_sha256") != digest(
+                    observation.model_dump(mode="json")
+                ):
+                    raise ProviderIdentityConflict("Terminal cleanup evidence changed")
+                return
+            authorization = value.get("termination_authorization", {})
+            valid_bootstrap = (
+                (
+                    authorization.get("route") == "bootstrap"
+                    and task.action == "revoke-bootstrap"
+                    and observation.bootstrap_cleanup_complete
+                    and task.provider_fence == ProviderFence.model_validate(value["provider_fence"])
+                )
+                if value.get("provider_fence")
+                else False
+            )
+            valid_drained = (
+                authorization.get("route") == "drained"
+                and task.action == "remove"
+                and authorization.get("task_id") == task.id
+                and authorization.get("observation_sha256")
+                == digest(observation.model_dump(mode="json"))
+            )
+            if value["state"] != "fenced" or not (valid_bootstrap or valid_drained):
+                raise ProviderIdentityConflict(
+                    "Mesh cleanup is not complete; reservation remains held"
+                )
+            row.state = "terminated"
+            row.payload = {
+                **row.payload,
+                "lambda_launch": {
+                    **value,
+                    "state": "terminated",
+                    "cleanup_completed_at": now().isoformat(),
+                    "cleanup_observation_sha256": digest(observation.model_dump(mode="json")),
+                },
+            }
+
 
 def allocate_once(plan, user_data, ledger, api):
     """Crash-safe launch coordinator. Repeated calls reconcile the original intent."""
-    plan.request(user_data)  # Check secret-file digest before reserving capacity.
     ledger.freeze(plan)
     current = ledger.read(plan)
+    if current["state"] in {"allocated", "terminating", "fenced", "terminated"}:
+        return tuple(
+            current["instance_ids"]
+        )  # Historical attempt; no credentials/readiness needed.
+    if current["state"] == "rejected":
+        raise ProviderRejected("The original allocation was rejected; create a new operation")
+    if current["state"] == "pending":
+        plan.request(user_data)  # Check secret-file digest before reserving capacity.
     instances = api.instances()
     observed = reconcile_launch(current["state"], plan, instances, current["instance_ids"])
     if observed:
         ledger.allocated(plan, [i["id"] for i in observed])
         return tuple(i["id"] for i in observed)
-    if current["state"] == "rejected":
-        raise ProviderRejected("The original allocation was rejected; create a new operation")
     for instance in instances:
         if {"key": "klip-cluster", "value": plan.cluster_id} in instance.get(
             "tags", []
@@ -203,3 +372,35 @@ def allocate_once(plan, user_data, ledger, api):
     # Ambiguous failures deliberately leave the reservation in dispatching.
     ledger.allocated(plan, identities)
     return identities
+
+
+def terminate_once(plan, ledger, api):
+    """Advance one owned termination; repeated calls never allocate or restart hosts.
+
+    A successful POST only acknowledges the request. Fencing requires a fresh
+    complete list plus an exact-instance terminal observation or documented 404.
+    The caller must complete the bootstrap safety check / normal drain first.
+    """
+    current = ledger.start_termination(plan)
+    if current.get("provider_fence"):
+        return ProviderFence.model_validate(current["provider_fence"])
+    identities = current["instance_ids"]
+    instances = api.instances()
+    owned = owned_instances(plan, instances, identities)
+    specific = api.instance(identities[0])
+    if specific is not None:
+        owned_instances(plan, [specific], identities)
+    terminal = {"terminated", "preempted"}
+    if (not owned or owned[0].get("status") in terminal) and (
+        specific is None or specific.get("status") in terminal
+    ):
+        return ledger.fenced(
+            plan, {"list": owned, "instance": specific, "observed_at": now().isoformat()}
+        )
+    # If the reads disagree, wait for reconciliation; do not terminate a new identity.
+    if not owned or specific is None:
+        return None
+    if not current.get("termination_acknowledgment"):
+        response = api.terminate(identities[0])
+        ledger.termination_acknowledged(plan, response[0])
+    return None

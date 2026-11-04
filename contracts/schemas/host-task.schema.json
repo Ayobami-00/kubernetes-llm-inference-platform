@@ -1,4 +1,46 @@
 {
+  "$defs": {
+    "ProviderFence": {
+      "additionalProperties": false,
+      "description": "Management's authenticated receipt for an owned, confirmed terminated VM.",
+      "properties": {
+        "confirmed_at": {
+          "format": "date-time",
+          "title": "Confirmed At",
+          "type": "string"
+        },
+        "intent_id": {
+          "pattern": "^op-[a-f0-9]{16,32}$",
+          "title": "Intent Id",
+          "type": "string"
+        },
+        "observation_sha256": {
+          "pattern": "^[a-f0-9]{64}$",
+          "title": "Observation Sha256",
+          "type": "string"
+        },
+        "provider_instance_id": {
+          "pattern": "^[a-f0-9]{32}$",
+          "title": "Provider Instance Id",
+          "type": "string"
+        },
+        "termination_requested_at": {
+          "format": "date-time",
+          "title": "Termination Requested At",
+          "type": "string"
+        }
+      },
+      "required": [
+        "intent_id",
+        "provider_instance_id",
+        "termination_requested_at",
+        "confirmed_at",
+        "observation_sha256"
+      ],
+      "title": "ProviderFence",
+      "type": "object"
+    }
+  },
   "$id": "https://schemas.inference-platform.example/0.1/host-task.schema.json",
   "$schema": "https://json-schema.org/draft/2020-12/schema",
   "additionalProperties": false,
@@ -8,7 +50,9 @@
         "prepare",
         "join",
         "inspect",
-        "remove"
+        "remove",
+        "cleanup-check",
+        "revoke-bootstrap"
       ],
       "title": "Action",
       "type": "string"
@@ -71,6 +115,17 @@
       "format": "ipv4",
       "title": "Private Ip",
       "type": "string"
+    },
+    "provider_fence": {
+      "anyOf": [
+        {
+          "$ref": "#/$defs/ProviderFence"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null
     },
     "provider_instance_id": {
       "pattern": "^[a-f0-9]{32}$",
