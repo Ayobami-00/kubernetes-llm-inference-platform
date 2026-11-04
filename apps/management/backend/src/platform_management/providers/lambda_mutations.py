@@ -141,8 +141,8 @@ class LambdaMutations:
     def close(self):
         self.client.close()
 
-    def request(self, method, path, *, body=None, params=None):
-        allowed = (
+    def allowed_request(self, method, path):
+        return (
             method == "GET"
             and (
                 path in {"instances", "instance-types", "images"}
@@ -152,7 +152,9 @@ class LambdaMutations:
             method == "POST"
             and path in {"instance-operations/launch", "instance-operations/terminate"}
         )
-        if not allowed:
+
+    def request(self, method, path, *, body=None, params=None):
+        if not self.allowed_request(method, path):
             raise ValueError("Provider request paths must stay on the fixed API origin")
         launch = path == "instance-operations/launch"
         try:

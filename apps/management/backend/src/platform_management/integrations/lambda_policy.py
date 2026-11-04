@@ -14,6 +14,7 @@ from platform_management.services.bootstrap import callback_origin
 from platform_management.services.common import AppError
 
 UUID_PATTERN = r"^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$"
+FIREWALL_ID_PATTERN = r"^(?:[a-f0-9]{32}|[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12})$"
 
 
 class LambdaLifecyclePolicy(ContractModel):
@@ -38,7 +39,9 @@ class LambdaLifecyclePolicy(ContractModel):
         if (
             self.max_total_lease_minutes < self.max_initial_lease_minutes
             or len(set(self.firewall_ruleset_ids)) != len(self.firewall_ruleset_ids)
-            or any(not re.fullmatch(UUID_PATTERN, item) for item in self.firewall_ruleset_ids)
+            or any(
+                not re.fullmatch(FIREWALL_ID_PATTERN, item) for item in self.firewall_ruleset_ids
+            )
         ):
             raise ValueError("Invalid lease or provider firewall identities")
         return self
