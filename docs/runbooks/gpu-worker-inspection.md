@@ -83,6 +83,21 @@ development headers and documentation. Image finding applicability and the
 actual host kernel require separate explicit review. No GPU runtime approval is
 implied by header-only package evidence or this documentation.
 
+Fresh-host Ansible preparation pins Ubuntu GA `6.8.0-147-generic` and matching
+`6.8.0-147.147` image, headers and modules. It refuses joined hosts, unexpected
+kernel families and downgrades, disables Nouveau in the initramfs, and performs
+a bounded reboot when needed. This runs before the general host role. Inspection
+reads the actual running kernel, dpkg package states, disabled GCOV configuration
+and boot ID before admission and again before promotion. A reboot or changed
+kernel/package evidence keeps the bootstrap quarantined. The kernel pin is not a
+claim that all published kernel vulnerabilities are fixed. Remaining host-kernel
+applicability and exposure must be recorded in the runtime review.
+
+The executor image verifies its installed, checksummed archives and its actual
+inspection imports/configuration during the build without cloud or host access.
+This includes the public workload-identity configuration. GPU containerd is
+staged at build time, so a read-only runtime filesystem needs no artifact download.
+
 The host's kernel prerequisites and NVIDIA operands must be validated on the
 actual fresh VM. CUDA 12.5 vector addition establishes device execution; the
 pinned vLLM CUDA 13.0.2 deployment has its own subsequent serving acceptance.

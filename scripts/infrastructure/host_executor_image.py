@@ -61,5 +61,32 @@ def install():
     os.chmod(cache / "runc-linux-amd64", 0o755)
 
 
+def verify_installed():
+    """Exercise the deployed import/configuration closure without host access.
+
+    An image built from only part of the infrastructure tree must fail during
+    its build, rather than discovering a missing lock or archive on a paid VM.
+    This performs no cloud calls, downloads, or state/custody changes.
+    """
+    from gpu_operator import settings as operator_settings
+    from gpu_runtime import settings, verify
+    from platform_management.host_executor import inspection, worker  # noqa: F401
+    from workload_identity import configuration
+
+    configuration()
+    operator_settings()
+    value = settings()
+    verify(
+        ROOT / "artifacts/platform" / value["containerd_artifact"]["filename"],
+        value["containerd_artifact"],
+    )
+    lock = json.loads((ROOT / "deploy/artifacts.lock.json").read_text())
+    for name in REQUIRED:
+        body = (ROOT / "artifacts/platform" / name).read_bytes()
+        if hashlib.sha256(body).hexdigest() != lock["artifacts"][name]["sha256"]:
+            raise ValueError("Installed executor artifact differs from its release lock")
+
+
 if __name__ == "__main__":
     install()
+    verify_installed()

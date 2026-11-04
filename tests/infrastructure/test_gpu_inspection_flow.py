@@ -166,6 +166,9 @@ def pipeline(tmp_path, monkeypatch):
     monkeypatch.setattr(inspection, "operator_configuration", operator)
     monkeypatch.setattr(inspection, "wireguard", stage("wireguard", {"direct_peers": cpu}))
     monkeypatch.setattr(
+        inspection, "observe_kernel", stage("kernel", {"boot_id": "synthetic-fixed"})
+    )
+    monkeypatch.setattr(
         inspection,
         "operands",
         stage(
@@ -218,6 +221,7 @@ def test_full_inspection_persists_proof_before_promoting_and_emits_actual_facts(
     [
         "approval",
         "host",
+        "kernel",
         "operator",
         "wireguard",
         "operands",

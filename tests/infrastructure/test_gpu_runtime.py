@@ -55,6 +55,46 @@ def test_gpu_profile_requires_v2_lambda_and_bootstrap_quarantine():
         worker_request(json.dumps({**request(), "runtime_profile": "nvidia-operator"}))
 
 
+def kernel_proof():
+    kernel = gpu_runtime.settings()["kernel"]
+    return {
+        "release": kernel["release"],
+        "packages": {
+            kernel[key]: "installed " + kernel["package_version"]
+            for key in ("image_package", "headers_package", "modules_package")
+        },
+        "boot_id": "11111111-2222-3333-4444-555555555555",
+        "nouveau_loaded": False,
+        "gcov_instrumentation": False,
+        "gcov_disabled_explicitly": True,
+    }
+
+
+def test_kernel_inspection_requires_real_running_and_installed_versions():
+    value = kernel_proof()
+    assert gpu_runtime.checked_kernel(value) == value
+    for key, changed in (
+        ("release", "6.8.0-60-generic"),
+        ("packages", {}),
+        ("boot_id", "unobserved"),
+        ("nouveau_loaded", True),
+        ("gcov_instrumentation", True),
+        ("gcov_disabled_explicitly", False),
+    ):
+        with pytest.raises(ValueError):
+            gpu_runtime.checked_kernel({**value, key: changed})
+
+
+def test_host_kernel_inspection_uses_read_only_native_commands():
+    class Host:
+        def run(self, args, *, data):
+            assert args[:3] == ["sudo", "python3", "-c"]
+            assert json.loads(data) == gpu_runtime.settings()["kernel"]
+            return json.dumps(kernel_proof())
+
+    assert gpu_runtime.observe_kernel(Host()) == kernel_proof()
+
+
 def archive_bytes(name="bin/containerd", *, kind=tarfile.REGTYPE):
     stream = io.BytesIO()
     with tarfile.open(fileobj=stream, mode="w:gz") as archive:

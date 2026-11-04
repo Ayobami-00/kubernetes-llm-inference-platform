@@ -12,6 +12,8 @@ on:
       - 'dev/host-executor/**'
       - 'infra/ansible/**'
       - 'deploy/gpu-host.lock.json'
+      - 'deploy/gpu-operator.lock.json'
+      - 'infra/terraform/identity.json'
       - 'deploy/artifacts.lock.json'
       - 'deploy/host-executor-aws-config'
       - 'apps/management/backend/Dockerfile'

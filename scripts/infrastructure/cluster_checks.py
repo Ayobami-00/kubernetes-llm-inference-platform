@@ -71,9 +71,12 @@ def render_role_templates() -> None:
                 runtime_profile=profile,
                 containerd_version=gpu_settings()["containerd_version"],
                 quarantine=True,
+                gpu_kernel=gpu_settings()["kernel"],
             )
         templar = Templar(variables=context)
         for path in (ROOT / "infra/ansible/roles").rglob("*.yaml"):
+            if "klip_gpu_host" in path.parts and profile != "nvidia-operator":
+                continue  # This role is conditional; CPU hosts have no GPU kernel policy.
             visit(yaml.safe_load(path.read_text()), templar)
 
 

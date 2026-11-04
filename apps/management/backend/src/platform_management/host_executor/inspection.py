@@ -8,6 +8,7 @@ from datetime import UTC, datetime
 from cluster_models import assert_node_identity
 from common import utc_now, write_private
 from gpu_operator import BOOTSTRAP, CANDIDATE, image, settings, values
+from gpu_runtime import observe_kernel
 from platform_contracts import HostTaskObservation
 from platform_contracts.inventory import GPUCapacityObservation
 
@@ -367,6 +368,7 @@ def perform_inspection(root, task, inputs, registry, cp):
     host_state = host.agent("preflight")
     if host_state != {"host": True, "instance_id": task.provider_instance_id}:
         raise ValueError("GPU host prerequisites are not verified")
+    kernel = observe_kernel(host)
     operator = operator_configuration(cp)
     if approved["operator"] != operator:
         raise ValueError(
@@ -401,6 +403,8 @@ def perform_inspection(root, task, inputs, registry, cp):
         raise ValueError("GPU Operator configuration changed during inspection")
     if operands(cp, task) != observed:
         raise ValueError("GPU operands changed or restarted during inspection")
+    if observe_kernel(host) != kernel:
+        raise ValueError("GPU host rebooted or its kernel prerequisites changed during inspection")
     after = json.loads(kubectl(cp, "get", "nodes", "-o", "json"))["items"]
     if {n["metadata"]["name"]: n["metadata"]["uid"] for n in after} != node_uids:
         raise ValueError("Cluster node identities changed during GPU/network inspection")
@@ -415,6 +419,7 @@ def perform_inspection(root, task, inputs, registry, cp):
         "node_uid": task.node_uid,
         "runtime_approval": approved,
         "operator": operator,
+        "kernel": kernel,
         "operands": observed,
         "wireguard": network,
         "probes": probes,

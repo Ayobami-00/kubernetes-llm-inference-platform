@@ -293,6 +293,7 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                 fields["klip_node"].update(
                     containerd_version=settings()["containerd_version"],
                     runtime_profile=request.runtime_profile,
+                    gpu_kernel=settings()["kernel"],
                 )
             rules = FOLDER / f"firewall-{request.node_name}.rules"
             write_private(rules, firewall(fields["klip_node"]))

@@ -270,8 +270,7 @@ def rendered(values):
     return output, documents
 
 
-def prepare(receipt, security):
-    review = assess(receipt, security)
+def checked_image_source(review):
     # Verify every shipped executable input, while allowing unrelated operator
     # release code/tests to evolve after the immutable image was built.
     paths = [
@@ -283,6 +282,9 @@ def prepare(receipt, security):
         "scripts/infrastructure/cluster_models.py",
         "scripts/infrastructure/common.py",
         "scripts/infrastructure/gpu_runtime.py",
+        "scripts/infrastructure/gpu_operator.py",
+        "scripts/infrastructure/workload_identity.py",
+        "scripts/infrastructure/issuer_transition.py",
         "scripts/infrastructure/platform_artifacts.py",
         "scripts/infrastructure/inventory.py",
         "scripts/infrastructure/cluster_verification.py",
@@ -294,6 +296,10 @@ def prepare(receipt, security):
         "infra/ansible",
         "deploy/artifacts.lock.json",
         "deploy/gpu-host.lock.json",
+        "deploy/gpu-operator.lock.json",
+        "infra/terraform/project.json",
+        "infra/terraform/platform.json",
+        "infra/terraform/identity.json",
         "deploy/host-executor-aws-config",
         "uv.lock",
         "dev/host-executor/Dockerfile",
@@ -308,6 +314,11 @@ def prepare(receipt, security):
     ).stdout
     if different or untracked:
         raise ValueError("Executor's shipped code/configuration differs from its reviewed image")
+
+
+def prepare(receipt, security):
+    review = assess(receipt, security)
+    checked_image_source(review)
     previous_stages = [json.loads(p.read_text()) for p in folder().glob("*.stage.json")]
     if (folder() / "active.json").exists() or any(
         s.get("status") != "failed" or not s.get("retired_at") or not s.get("job_uid")
