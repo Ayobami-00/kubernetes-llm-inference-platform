@@ -75,7 +75,7 @@ def read_shared(path):
     )
 
 
-def stage(evidence, variant, identity):
+def stage(evidence, variant, identity, *, sustained=False):
     from cluster import Host, kubectl
     from workload_acceptance import images, preparation_job
 
@@ -273,6 +273,46 @@ def stage(evidence, variant, identity):
             "serving-chart": "0.1.1",
         },
     }
+    policy = json.loads(
+        kubectl(
+            "-n",
+            "llm-d",
+            "get",
+            "backendtrafficpolicy",
+            "writer-assist-a10-upstream",
+            "--ignore-not-found",
+            "-o",
+            "json",
+        )
+        or "null"
+    )
+    if policy is not None:
+        expected = {
+            "targetRefs": [
+                {
+                    "group": "gateway.networking.k8s.io",
+                    "kind": "HTTPRoute",
+                    "name": "writer-assist-a10",
+                }
+            ],
+            "timeout": {"http": {"connectionIdleTimeout": "3s"}},
+        }
+        conditions = [
+            c
+            for ancestor in policy.get("status", {}).get("ancestors", [])
+            for c in ancestor.get("conditions", [])
+        ]
+        if policy["spec"] != expected or not any(
+            c["type"] == "Accepted"
+            and c["status"] == "True"
+            and c.get("observedGeneration") == policy["metadata"]["generation"]
+            for c in conditions
+        ):
+            raise ValueError("A10 transport policy differs or is not accepted")
+        pin = hashlib.sha256(json.dumps(expected, sort_keys=True).encode()).hexdigest()
+        # Additional platform entries may pin configuration content as well as
+        # semantic software versions. This records the changed condition before freeze.
+        versions["platform_versions"]["a10-transport-policy"] = "sha256:" + pin
     source = state_home() / "datasets/writer-a10-nonthinking/public/writer-assist/latest.json"
     manifest = PreparationManifest.model_validate_json(source.read_text())
     from workload_runner.artifacts import artifact_path
@@ -350,6 +390,8 @@ print('staged immutable files')
         "--output",
         root + "/plan",
     ]
+    if sustained:
+        job["spec"]["template"]["spec"]["containers"][0]["command"].append("--sustained")
     write_private(output / "plan-job.json", job)
     from cluster import load_hosts
 
@@ -363,6 +405,8 @@ print('staged immutable files')
         {
             "identity": identity,
             "variant": variant,
+            "duration_variant": "sustained-20m" if sustained else "canonical",
+            "gateway_transport_policy": policy,
             "node": node,
             "inventory": inv,
             "capacity": capacity,
@@ -374,7 +418,7 @@ print('staged immutable files')
     return {"identity": identity, "variant": variant, "plan_job": job["metadata"]["name"]}
 
 
-def submit(evidence, identity):
+def submit(evidence, identity, *, import_only=False):
     from platform_management.integrations.job_runner import frozen_file
     from workload_runner.management import ManagementClient, submit_bundle
 
@@ -412,6 +456,12 @@ def submit(evidence, identity):
         client.close()
     groups = {"latency-a10-retained@1": "writer-a10-retained-capacity"}
     write_private(output / "groups.json", groups)
+    if import_only:
+        return {
+            "identity": identity,
+            "status": "capacity-imported",
+            "bundle": str(output / "management-bundle.json"),
+        }
     run = submit_bundle(
         output / "management-bundle.json",
         "https://management.klip-lab.click",
@@ -430,14 +480,15 @@ def submit(evidence, identity):
 
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--action", choices=["stage", "submit"], default="stage")
+    parser.add_argument("--action", choices=["stage", "submit", "import"], default="stage")
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--variant", choices=["baseline", "ngram"], default="baseline")
     parser.add_argument("--identity", required=True)
+    parser.add_argument("--sustained", action="store_true")
     args = parser.parse_args()
     result = (
-        stage(args.evidence.resolve(), args.variant, args.identity)
+        stage(args.evidence.resolve(), args.variant, args.identity, sustained=args.sustained)
         if args.action == "stage"
-        else submit(args.evidence.resolve(), args.identity)
+        else submit(args.evidence.resolve(), args.identity, import_only=args.action == "import")
     )
     print(json.dumps(result, indent=2))

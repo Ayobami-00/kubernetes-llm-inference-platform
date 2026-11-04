@@ -1,0 +1,12 @@
+# Apply after the unchanged-route baseline/ngram pair. This is a new transport
+# condition, so subsequent validation uses a distinct run identity.
+# Close idle gateway connections before vLLM's shorter server keepalive; no retries.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: BackendTrafficPolicy
+metadata: {name: writer-assist-a10-upstream, namespace: llm-d}
+spec:
+  targetRefs:
+    - {group: gateway.networking.k8s.io, kind: HTTPRoute, name: writer-assist-a10}
+  timeout:
+    http:
+      connectionIdleTimeout: 3s

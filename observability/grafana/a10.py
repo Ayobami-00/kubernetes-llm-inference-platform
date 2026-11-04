@@ -80,6 +80,23 @@ def dashboard():
         ("GPU framebuffer used", "DCGM_FI_DEV_FB_USED" + GPU, "decmbytes"),
         ("GPU temperature", "DCGM_FI_DEV_GPU_TEMP" + GPU, "celsius"),
         ("GPU power", "DCGM_FI_DEV_POWER_USAGE" + GPU, "watt"),
+        (
+            "Speculative token acceptance (ngram only)",
+            "sum(rate(vllm:spec_decode_num_accepted_tokens_total" + MODEL + "[1m]))/"
+            "sum(rate(vllm:spec_decode_num_draft_tokens_total" + MODEL + "[1m]))",
+            "percentunit",
+        ),
+        (
+            "Accepted tokens per draft (ngram only)",
+            "sum(rate(vllm:spec_decode_num_accepted_tokens_total" + MODEL + "[1m]))/"
+            "sum(rate(vllm:spec_decode_num_drafts_total" + MODEL + "[1m]))",
+            "short",
+        ),
+        (
+            "Proposed tokens per second (ngram only)",
+            "sum(rate(vllm:spec_decode_num_draft_tokens_total" + MODEL + "[1m]))",
+            "ops",
+        ),
     ]
     panels = [
         {

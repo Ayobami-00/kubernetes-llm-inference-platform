@@ -790,6 +790,120 @@
           "mode": "multi"
         }
       }
+    },
+    {
+      "id": 22,
+      "type": "timeseries",
+      "title": "Speculative token acceptance (ngram only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 85,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:spec_decode_num_accepted_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))/sum(rate(vllm:spec_decode_num_draft_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "percentunit",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 23,
+      "type": "timeseries",
+      "title": "Accepted tokens per draft (ngram only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 12,
+        "y": 85,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:spec_decode_num_accepted_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))/sum(rate(vllm:spec_decode_num_drafts_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "short",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
+    },
+    {
+      "id": 24,
+      "type": "timeseries",
+      "title": "Proposed tokens per second (ngram only)",
+      "datasource": {
+        "type": "prometheus",
+        "uid": "klip-metrics"
+      },
+      "gridPos": {
+        "x": 0,
+        "y": 93,
+        "w": 12,
+        "h": 8
+      },
+      "targets": [
+        {
+          "refId": "A",
+          "expr": "sum(rate(vllm:spec_decode_num_draft_tokens_total{namespace=\"llm-d\",service=\"writer-assist-a10\"}[1m]))",
+          "legendFormat": "{{pod}} {{instance}}"
+        }
+      ],
+      "fieldConfig": {
+        "defaults": {
+          "unit": "ops",
+          "noValue": "No data"
+        },
+        "overrides": []
+      },
+      "options": {
+        "legend": {
+          "displayMode": "table",
+          "placement": "bottom"
+        },
+        "tooltip": {
+          "mode": "multi"
+        }
+      }
     }
   ],
   "links": [

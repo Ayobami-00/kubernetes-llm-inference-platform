@@ -248,6 +248,8 @@ function Workspace() {
     queryFn: () => unwrap(e.listWorkerGroups()),
     refetchInterval: 2000,
   });
+  const readyGroups = groups.data?.filter((g) => g.group.status.phase === 'ready') || [];
+  const readyRealGroups = readyGroups.filter((g) => g.mode === 'real').length;
   const operations = useQuery({
     queryKey: ['operations'],
     queryFn: () => unwrap(e.listOperations()),
@@ -551,7 +553,7 @@ function Workspace() {
               hint={
                 snapshot
                   ? 'Frozen configuration inputs'
-                  : `${groups.data?.filter((g) => g.group.status.phase === 'ready').length || 0} GPU-ready · simulated`
+                  : `${readyGroups.length} GPU-ready · ${readyRealGroups} real · ${readyGroups.length - readyRealGroups} simulated`
               }
             />
             <Summary

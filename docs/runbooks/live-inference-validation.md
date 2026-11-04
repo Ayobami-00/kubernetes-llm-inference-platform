@@ -152,6 +152,8 @@ distinct GPU nodes. Control-plane/etcd fault experiments remain B's workstream.
 
 ## Current live gate
 
-Local integration does not supply GPU leases, production RWX storage or a tested vLLM image/model
-handoff. Until B supplies those inputs, keep live, mixed and sustained/failure acceptance pending.
-Never replace the missing evidence with documentation addresses, fixture flags or invented pins.
+The retained A10 experiment now supplies real WriterAssist/JFLEG execution through the private
+llm-d gateway and management-owned Jobs. Follow [the A10 runbook](retained-a10-speculation.md) for
+its exact pins, external ownership without a lease, authentication, evidence and retained risks.
+The current user scope is this A10 speculation experiment only. This evidence does not establish
+acceptance of the other profiles, mixed workloads, public inference DNS or production readiness.

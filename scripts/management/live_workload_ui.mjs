@@ -12,6 +12,7 @@ const { values } = parseArgs({
     bundle: { type: "string" },
     output: { type: "string" },
     operation: { type: "string" },
+    "real-a10": { type: "boolean", default: false },
   },
 });
 if (
@@ -28,15 +29,46 @@ const content = fs.readFileSync(values.bundle);
 const bundleSha = createHash("sha256").update(content).digest("hex");
 const bundle = JSON.parse(content);
 const snapshot = bundle.document.snapshot;
-if (
+const realA10 = values["real-a10"];
+if (realA10) {
+  if (
+    bundle.document.fixture ||
+    snapshot.target.mode !== "benchmark" ||
+    snapshot.target.serving_stack !== "llm-d-vllm" ||
+    snapshot.target.endpoint !==
+      "http://inference.llm-d.svc.cluster.local:8080/v1/chat/completions" ||
+    snapshot.customers.length !== 1 ||
+    snapshot.derivation[
+      snapshot.customers[0].id + "@" + snapshot.customers[0].revision
+    ] !== "writer-assist@1" ||
+    snapshot.serving_profiles.length !== 1 ||
+    snapshot.serving_profiles[0].id !== "gec-a10-retained" ||
+    snapshot.serving_profiles[0].revision !== 2 ||
+    snapshot.serving_profiles[0].engine.speculative_decoding?.method !==
+      "ngram" ||
+    snapshot.worker_groups.length !== 1 ||
+    snapshot.worker_groups[0].capacity_lifecycle !== "externally_retained" ||
+    snapshot.worker_groups[0].ttl_minutes !== null ||
+    snapshot.inventory.nodes.filter((n) => n.provider === "lambda").length !==
+      1 ||
+    !snapshot.inventory.nodes.some(
+      (n) => n.provider_instance_id === "8f2e29b7279b42148ffaaed4a4dcdd8e",
+    ) ||
+    !snapshot.admission_schedule.uri.startsWith(
+      "file:///artifacts/experiments/retained-a10/",
+    )
+  )
+    throw new Error(
+      "Only the exact staged retained-A10 n-gram experiment is permitted",
+    );
+} else if (
   !bundle.document.fixture ||
   snapshot.target.mode !== "local-stub" ||
   !snapshot.admission_schedule.uri.startsWith(
     `file:///artifacts/acceptance/${values.operation}/`,
   )
-) {
+)
   throw new Error("This proof only accepts the exact staged synthetic cohort");
-}
 if (fs.existsSync(receipt)) {
   const previous = JSON.parse(fs.readFileSync(receipt));
   if (previous.bundle_sha256 !== bundleSha)
@@ -101,17 +133,23 @@ try {
     .click();
   await page.getByRole("link", { name: "Imports", exact: true }).click();
   authenticated = true;
-  const identity = `browser-workload-${values.operation}`;
+  const identity = `browser-${realA10 ? "a10" : "workload"}-${values.operation}`;
   await page.getByLabel("Document type").selectOption("prepared-runs");
   await page
     .getByLabel("Source name")
-    .fill(`AWS UI workload proof ${values.operation}`);
-  await page.getByLabel("Source provenance").selectOption("synthetic");
+    .fill(
+      `${realA10 ? "Retained A10 n-gram" : "AWS UI workload"} proof ${values.operation}`,
+    );
+  await page
+    .getByLabel("Source provenance")
+    .selectOption(realA10 ? "measured" : "synthetic");
   await page.getByLabel("Import JSON file").setInputFiles({
-    name: "synthetic-prepared-run.json",
+    name: realA10
+      ? "a10-ngram-prepared-run.json"
+      : "synthetic-prepared-run.json",
     mimeType: "application/json",
     buffer: Buffer.from(
-      JSON.stringify({ id: identity, fixture: true, snapshot }),
+      JSON.stringify({ id: identity, fixture: !realA10, snapshot }),
     ),
   });
   state.status = "importing";
@@ -140,7 +178,7 @@ try {
     .getByRole("button", { name: "Check readiness", exact: true })
     .click();
   const launch = inspector.getByRole("button", {
-    name: "Run local workload",
+    name: realA10 ? "Launch real run" : "Run local workload",
     exact: true,
   });
   await launch.waitFor();
@@ -169,7 +207,7 @@ try {
     .getByRole("button")
     .filter({ hasText: state.run_id })
     .first();
-  const deadline = Date.now() + 240000;
+  const deadline = Date.now() + (realA10 ? 1500000 : 240000);
   while (!(await row.textContent()).includes("completed")) {
     const text = await row.textContent();
     if (text.includes("failed") || text.includes("cancelled")) {
@@ -196,7 +234,7 @@ try {
   const report = fs.readFileSync(path.join(output, "report.md"));
   if (
     !isDeepStrictEqual(view.run.snapshot, snapshot) ||
-    !view.run.fixture ||
+    view.run.fixture !== !realA10 ||
     createHash("sha256").update(report).digest("hex") !==
       view.run.result.artifacts.report.sha256
   ) {
@@ -204,7 +242,7 @@ try {
   }
   state = {
     ...state,
-    fixture: true,
+    fixture: !realA10,
     execution: view.run.status,
     validity: view.run.result.validity,
     slo_verdict: view.run.result.slo_verdict,
