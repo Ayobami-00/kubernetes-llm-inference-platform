@@ -1,0 +1,84 @@
+apiVersion: batch/v1
+kind: Job
+metadata:
+  labels:
+    klip.dev/experiment: retained-a10
+  name: retained-a10-model-runtime
+  namespace: llm-d
+spec:
+  activeDeadlineSeconds: 1200
+  backoffLimit: 0
+  template:
+    metadata:
+      labels:
+        klip.dev/experiment: retained-a10
+    spec:
+      automountServiceAccountToken: false
+      containers:
+      - command:
+        - python3
+        - -c
+        - 'import json,torch,importlib.metadata
+
+          if not torch.cuda.is_available() or torch.cuda.device_count()!=1:raise RuntimeError("One
+          CUDA GPU required")
+
+          if torch.cuda.get_device_name(0)!="NVIDIA A10":raise RuntimeError("Wrong
+          GPU")
+
+          a=torch.ones((256,256),device="cuda",dtype=torch.bfloat16);b=a@a;torch.cuda.synchronize()
+
+          if not torch.all(b==256).item():raise RuntimeError("CUDA arithmetic failed")
+
+          print(json.dumps({"cuda_available":True,"device":torch.cuda.get_device_name(0),"torch":torch.__version__,"cuda":torch.version.cuda,"vllm":importlib.metadata.version("vllm"),"memory_total":torch.cuda.get_device_properties(0).total_memory,"bfloat16_matmul":"passed"}))'
+        env:
+        - name: HOME
+          value: /tmp
+        - name: AWS_EC2_METADATA_DISABLED
+          value: 'true'
+        image: 127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/model-serving@sha256:5d22b814fb6a5d90d2f24a94fa4f379704ffe5c89107bc58b3a76324e1584784
+        name: runtime
+        resources:
+          limits:
+            cpu: '2'
+            memory: 8Gi
+            nvidia.com/gpu: '1'
+          requests:
+            cpu: '1'
+            memory: 2Gi
+            nvidia.com/gpu: '1'
+        securityContext:
+          allowPrivilegeEscalation: false
+          capabilities:
+            drop:
+            - ALL
+          readOnlyRootFilesystem: true
+        volumeMounts:
+        - mountPath: /tmp
+          name: tmp
+      nodeSelector:
+        klip.dev.node-restriction.kubernetes.io/gpu-candidate: 'true'
+        kubernetes.io/hostname: writer-a10-retained
+      restartPolicy: Never
+      runtimeClassName: nvidia
+      securityContext:
+        fsGroup: 10001
+        runAsGroup: 10001
+        runAsNonRoot: true
+        runAsUser: 10001
+        seccompProfile:
+          type: RuntimeDefault
+      serviceAccountName: klip-model-release
+      tolerations:
+      - effect: NoSchedule
+        key: klip.dev/bootstrap
+        operator: Equal
+        value: 'true'
+      - effect: NoSchedule
+        key: nvidia.com/gpu
+        operator: Exists
+      volumes:
+      - emptyDir:
+          sizeLimit: 2Gi
+        name: tmp
+  ttlSecondsAfterFinished: 86400

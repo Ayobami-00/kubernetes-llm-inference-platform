@@ -1,0 +1,39 @@
+schema_version: '0.1'
+id: gec-a10-retained
+revision: 2
+draft: false
+notes: "Paired n-gram experiment: identical model, tokenizer, image and baseline engine\
+  \ settings; five speculative tokens with a 2\u20135 token lookup window. Not a measured\
+  \ speedup claim."
+model:
+  alias: gec-small
+  repository: Qwen/Qwen3-4B
+  revision: 1cfa9a7208912126459214e8b04321603b3df60c
+  tokenizer_revision: 1cfa9a7208912126459214e8b04321603b3df60c
+engine:
+  backend: vllm
+  image: 127811062476.dkr.ecr.eu-west-2.amazonaws.com/klip/model-serving@sha256:5d22b814fb6a5d90d2f24a94fa4f379704ffe5c89107bc58b3a76324e1584784
+  dtype: bfloat16
+  max_model_len: 768
+  max_num_seqs: 8
+  gpu_memory_utilization: 0.8
+  prefix_caching: false
+  speculative_decoding:
+    method: ngram
+    num_speculative_tokens: 5
+    prompt_lookup_min: 2
+    prompt_lookup_max: 5
+  chat_template_kwargs:
+    enable_thinking: false
+topology:
+  kind: aggregated
+  replicas: 1
+  gpus_per_replica: 1
+  tensor_parallel_size: 1
+  pipeline_parallel_size: 1
+hardware:
+  vendor: nvidia
+  min_vram_gib_per_gpu: 16.0
+  gpu_model: A10
+worker_class: latency
+routing_policy: load_aware

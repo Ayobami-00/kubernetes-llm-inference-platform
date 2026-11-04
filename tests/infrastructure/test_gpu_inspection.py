@@ -196,6 +196,18 @@ def test_hardware_description_cannot_substitute_another_gpu_or_driver(name, memo
         inspection_probes.hardware(f"0, {GPU_UUID}, {name}, {memory}, {driver}")
 
 
+def test_retained_driver_requires_explicit_supported_profile():
+    text = f"0, {GPU_UUID}, NVIDIA A10, 23028, 580.105.08"
+    with pytest.raises(ValueError):
+        inspection_probes.hardware(text)
+    assert (
+        inspection_probes.hardware(text, expected_driver="580.105.08").driver_version
+        == "580.105.08"
+    )
+    with pytest.raises(ValueError):
+        inspection_probes.hardware(text, expected_driver="580.0")
+
+
 def test_actual_usable_memory_is_preserved_separately_from_advertised_capacity():
     observed = inspection_probes.hardware(f"0, {GPU_UUID}, NVIDIA A10, 23028, 595.91.07")
     capacity = GPUCapacityObservation(

@@ -119,11 +119,11 @@ def native_program(previous=None):
     return JOIN_PROGRAM
 
 
-def join_job(value, deployment, previous=None):
+def join_job(value, deployment, previous=None, *, program_override=None):
     """Use existing custody in an isolated, single-attempt operator Job."""
     from host_executor_release import bootstrap_job
 
-    program = native_program(previous)
+    program = native_program(previous) if program_override is None else program_override
     binding = hashlib.sha256(
         json.dumps(
             {"input": value, "program": program, "previous": previous}, sort_keys=True
@@ -263,6 +263,93 @@ def image_credentials(evidence):
     return {"status": "configured", "match_images": provider["providers"][0]["matchImages"]}
 
 
+def probe(evidence):
+    from cluster import Host, kubectl, load_hosts
+
+    value = json.loads((evidence / "prepared.json").read_text())
+    node = json.loads(kubectl("get", "node", NAME, "-o", "json"))
+    if node["metadata"]["uid"] != json.loads((evidence / "candidate.json").read_text())["uid"]:
+        raise ValueError("Retained Node UID changed after admission")
+    value["node_uid"] = node["metadata"]["uid"]
+    namespace = json.loads(kubectl("get", "namespace", "klip-acceptance", "-o", "json"))
+    if (
+        namespace["metadata"].get("labels", {}).get("klip.dev/project")
+        != "kubernetes-llm-inference-platform"
+    ):
+        raise ValueError("Acceptance namespace is not project-owned")
+    value["acceptance_namespace_uid"] = namespace["metadata"]["uid"]
+    source = (
+        ROOT / "apps/management/backend/src/platform_management/host_executor/inspection_probes.py"
+    ).read_text()
+    value.update(
+        probe_source=source, probe_source_sha256=hashlib.sha256(source.encode()).hexdigest()
+    )
+    runtime = json.loads(
+        kubectl("-n", "llm-d", "get", "job", "retained-a10-model-runtime", "-o", "json")
+    )
+    if runtime.get("status", {}).get("succeeded") != 1:
+        raise ValueError("Wait for the exact CUDA/vLLM runtime canary before GPU probes")
+    pods = json.loads(
+        kubectl(
+            "-n", "llm-d", "get", "pods", "-l", "job-name=retained-a10-model-runtime", "-o", "json"
+        )
+    )["items"]
+    if len(pods) != 1:
+        raise ValueError("Expected exactly one non-retrying CUDA runtime canary")
+    pod = pods[0]
+    status = pod["status"].get("containerStatuses", [])
+    expected_image = json.loads((evidence / "model-review.json").read_text())["image"]
+    if (
+        pod["spec"]["nodeName"] != NAME
+        or len(status) != 1
+        or status[0].get("state", {}).get("terminated", {}).get("exitCode") != 0
+        or not status[0].get("imageID", "").endswith(expected_image.split("@")[1])
+        or not any(
+            o.get("uid") == runtime["metadata"]["uid"] for o in pod["metadata"]["ownerReferences"]
+        )
+    ):
+        raise ValueError("Runtime canary identity, GPU placement or actual image differs")
+    output = kubectl("-n", "llm-d", "logs", pod["metadata"]["name"])
+    proof = json.loads(
+        next(line for line in reversed(output.splitlines()) if line.startswith('{"cuda_available"'))
+    )
+    if proof.get("bfloat16_matmul") != "passed" or proof.get("vllm") != "0.32.0":
+        raise ValueError("Pinned vLLM CUDA compatibility was not demonstrated")
+    value["runtime_proof"] = {
+        "job_uid": runtime["metadata"]["uid"],
+        "pod_uid": pod["metadata"]["uid"],
+        "image_id": status[0]["imageID"],
+        "measurements": proof,
+    }
+    write_private(evidence / "model-runtime-proof.json", value["runtime_proof"])
+    deployment = json.loads(
+        kubectl("-n", "platform-ops", "get", "deployment", "host-executor", "-o", "json")
+    )
+    program = Path(__file__).with_name("retained_gpu_probe.py").read_text()
+    job = join_job(value, deployment, program_override=program)
+    path = evidence / (job["metadata"]["name"] + ".json")
+    write_private(path, job)
+    cp = Host(load_hosts()["cp-01"])
+    actual = json.loads(
+        cp.run(
+            [
+                "sudo",
+                "kubectl",
+                "--kubeconfig=/etc/kubernetes/admin.conf",
+                "create",
+                "-f",
+                "-",
+                "-o",
+                "json",
+            ],
+            data=json.dumps(job),
+        )
+    )
+    result = {"job": actual["metadata"]["name"], "uid": actual["metadata"]["uid"]}
+    write_private(evidence / "probe-receipt.json", result)
+    return result
+
+
 def join(evidence, previous=None):
     from cluster import Host, kubectl, load_hosts
 
@@ -322,7 +409,7 @@ def join(evidence, previous=None):
 if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument(
-        "action", choices=["prepare", "operator-preinstalled", "image-credentials", "join"]
+        "action", choices=["prepare", "operator-preinstalled", "image-credentials", "join", "probe"]
     )
     parser.add_argument("--evidence", type=Path, required=True)
     parser.add_argument("--previous-failed-result")
@@ -332,6 +419,7 @@ if __name__ == "__main__":
         "operator-preinstalled": operator_preinstalled,
         "image-credentials": image_credentials,
         "join": join,
+        "probe": probe,
     }[args.action]
     result = (
         join(args.evidence.resolve(), args.previous_failed_result)

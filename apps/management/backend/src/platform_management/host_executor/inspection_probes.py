@@ -253,7 +253,7 @@ def cleanup_chain(root, task, cp):
         identity = previous.previous_task_id
 
 
-def hardware(text):
+def hardware(text, *, expected_driver="595.91.07"):
     from platform_contracts.inventory import GPUDeviceObservation
 
     rows = list(csv.reader(text.strip().splitlines(), skipinitialspace=True))
@@ -267,7 +267,8 @@ def hardware(text):
         value.index != 0
         or value.name not in {"NVIDIA A10", "A10"}
         or not 22000 <= value.memory_total_mib <= 25000
-        or value.driver_version != "595.91.07"
+        or expected_driver not in {"595.91.07", "580.105.08"}
+        or value.driver_version != expected_driver
     ):
         raise ValueError(
             "Observed GPU hardware, usable memory or driver differs from the A10 profile"
@@ -275,7 +276,7 @@ def hardware(text):
     return value
 
 
-def execute(root, task, cp, cpu_names, gpu_host):
+def execute(root, task, cp, cpu_names, gpu_host, *, expected_driver="595.91.07"):
     directory = root / "executions" / task.id
     documents = manifests(task, cpu_names)
     frozen_file(directory / "probe-manifests.json", json.dumps(documents, sort_keys=True).encode())
@@ -340,7 +341,8 @@ def execute(root, task, cp, cpu_names, gpu_host):
                 if "Test PASSED" not in output:
                     raise ValueError("CUDA vector addition did not report its success marker")
                 evidence["hardware"] = hardware(
-                    kubectl(cp, "-n", "gpu-system", "logs", metadata["name"], "-c", "hardware")
+                    kubectl(cp, "-n", "gpu-system", "logs", metadata["name"], "-c", "hardware"),
+                    expected_driver=expected_driver,
                 ).model_dump(mode="json")
             else:
                 address = ipaddress.ip_address(observed["status"]["podIP"])
