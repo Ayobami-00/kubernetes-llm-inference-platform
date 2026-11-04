@@ -335,8 +335,17 @@ def raw_apis():
     documents = []
     for name in ("gateway-api", "inference-api"):
         for document in yaml.safe_load_all((CACHE / (name + ".yaml")).read_text()):
-            if not document or document["kind"] != "CustomResourceDefinition":
-                raise ValueError("Only locked CRDs belong in the inference API foundation")
+            if not document:
+                continue
+            if document["kind"] != "CustomResourceDefinition" and not (
+                name == "gateway-api"
+                and document["kind"]
+                in {"ValidatingAdmissionPolicy", "ValidatingAdmissionPolicyBinding"}
+                and document["metadata"]["name"] == "safe-upgrades.gateway.networking.k8s.io"
+            ):
+                raise ValueError(
+                    "Only locked APIs and their exact upgrade safety policy are permitted"
+                )
             document["metadata"].setdefault("labels", {}).update(
                 {
                     "app.kubernetes.io/part-of": "klip",
@@ -398,6 +407,27 @@ def native_inputs(kubectl):
         }
     if len(certificates) != 3:
         raise ValueError("The pinned certificate foundation is missing")
+    policies = {}
+    for kind in ("validatingadmissionpolicy", "validatingadmissionpolicybinding"):
+        text = kubectl(
+            "get",
+            kind,
+            "safe-upgrades.gateway.networking.k8s.io",
+            "--ignore-not-found",
+            "-o",
+            "json",
+        )
+        if text.strip():
+            policy = json.loads(text)
+            if (
+                policy["metadata"].get("labels", {}).get("klip.dev/platform-component")
+                != "inference"
+            ):
+                raise ValueError("Gateway API upgrade policy belongs to a different owner")
+            policies[kind] = {
+                "uid": policy["metadata"]["uid"],
+                "spec_sha256": sha(json.dumps(policy["spec"], sort_keys=True).encode()),
+            }
     return {
         "namespaces": {
             n: existing.get(n)
@@ -405,6 +435,7 @@ def native_inputs(kubectl):
         },
         "crds": crds,
         "certificate_deployments": certificates,
+        "api_upgrade_policies": policies,
         "platform_nodes": healthy_targets(),
     }
 

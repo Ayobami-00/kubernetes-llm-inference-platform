@@ -33,6 +33,13 @@ def test_pinned_controller_render_is_deterministic_and_has_no_generated_secrets(
     ai = platform.values()["klip-ai"]
     assert ai["controller"]["mutatingWebhook"]["certManager"]["enable"]
     assert ai["controller"]["mcp"]["sessionEncryption"]["existingSecret"]
+    apis = list(yaml.safe_load_all(platform.raw_apis()))
+    policies = [v for v in apis if v["kind"] != "CustomResourceDefinition"]
+    assert {v["kind"] for v in policies} == {
+        "ValidatingAdmissionPolicy",
+        "ValidatingAdmissionPolicyBinding",
+    }
+    assert all(v["metadata"]["name"] == "safe-upgrades.gateway.networking.k8s.io" for v in policies)
 
 
 @pytest.mark.parametrize(
