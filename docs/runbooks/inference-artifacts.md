@@ -83,3 +83,33 @@ application pull identities retain their original three-repository scope.
 The new role can read model and release-helper images, cannot publish, and
 does not give model Pods Kubernetes credentials. One approximately 9 GB image
 costs roughly $1/month in registry storage, excluding transfer and later images.
+
+The static controller foundation has its own saved-plan procedure:
+
+```sh
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/inference_platform.py prepare --scans <native-inference-scan-directory>
+PYTHONPATH=scripts/infrastructure .venv/bin/python \
+  scripts/infrastructure/inference_platform.py deploy --approve-plan <printed-sha256>
+```
+
+It installs the locked Gateway/Inference APIs, Envoy/AI CRDs and two replicas of
+each controller on distinct protected CPU workers. It reuses the deployed
+cert-manager for webhook certificates. Image digests, resource reservations,
+anti-affinity, the private network boundary, cluster/Node/CRD identities and
+the exact native scan review are bound before deployment. Existing foreign
+CRDs cannot be adopted implicitly. Runtime Pod image IDs, readiness and host
+separation are checked after installation; replica counts alone are insufficient.
+
+This foundation deliberately creates no Gateway, inference pool, model or
+public Service. Its temporary seven-day review covers private controllers
+only and retains the exact High findings. Active serving requires a separate
+data-plane/model review and authenticated gateway configuration. Adding serving
+resources also prevents reusing this narrower controller installation plan.
+
+The AI chart's otherwise random MCP seed is supplied through a separate,
+high-entropy private file and existing Secret reference, so rendering is
+deterministic and never contains generated credentials. Deployment creates or
+verifies that exact Secret without replacing an existing value. The seed is
+retained under the operator's private state; encrypted external recovery must
+be completed before a retained-state rebuild. No MCP route is enabled.

@@ -1,0 +1,152 @@
+{
+  "schema_version": "klip-inference-controller-review.v1",
+  "scope": "private-controllers-only",
+  "reviewed_at": "2026-11-04T12:08:36.747173+00:00",
+  "expires_at": "2026-11-11T12:08:36.747173+00:00",
+  "configuration": {
+    "values": "3ce260ca3b5da1fb506e2ae4b20fab5e5c91645770129224609773cfc2d92e06",
+    "boundary": "99b6d2d1a54c3c40f98ff0fa2d558cc4fea541b7bc2b6a1e10592274ccb4d21f",
+    "lock": "4ebacaf0bf3e7d8af54d3799d1502d358671421f6908874b6cb81d8777d75954"
+  },
+  "conditions": {
+    "no-public-serving": "Install controllers/CRDs only. No Gateway, InferencePool, HTTPRoute, AIGatewayRoute or model is installed; this review does not authorize public or tenant traffic.",
+    "private-peers": "Cilium restricts ingress to the cluster API, fixed controller namespaces and Prometheus; no controller Service is public. CPU/memory are bounded; administrative Kubernetes writes require authenticated RBAC.",
+    "no-jwks": "No JWT/OIDC/OAuth/JWKS policies or untrusted JWK input are configured. Subsequent authentication policy changes require another review.",
+    "private-ca": "Controller TLS clients use the private cluster/API roots and fixed cluster peers; arbitrary public issuer/backends and tenant-controlled certificates are not enabled."
+  },
+  "components": {
+    "gateway": {
+      "directory": "inference-gateway-a85630c961616c7988142397aa343e5a2e060c6a",
+      "image": "docker.io/envoyproxy/gateway:v1.9.3@sha256:83dee303a1fda5477339c7d1ba1c311be36bff173c761339393bb57c9502f477",
+      "report_sha256": "b9e13ed8228be03529e091114b81e8cb0a24d372ba5b75892e7b612d5ce66f81",
+      "high_findings": [
+        {
+          "finding": [
+            "CVE-2026-116587",
+            "github.com/go-jose/go-jose/v4",
+            "v4.1.5"
+          ],
+          "condition": "no-jwks",
+          "rationale": "RSA JWK validation DoS remains in the binary; no JWK-consuming policy or untrusted JWK configuration is admitted."
+        }
+      ]
+    },
+    "ai-controller": {
+      "directory": "inference-ai-controller-a85630c961616c7988142397aa343e5a2e060c6a",
+      "image": "docker.io/envoyproxy/ai-gateway-controller:v1.2.0@sha256:30c2cfea92f39adad64d6dac8504cf1b9031c1080bf6945fa40f0f2ddd140ae2",
+      "report_sha256": "05aba628ff0cdeaa4ca76a71deaa8b232ca6859ba5aa3181697b4d712367c8cc",
+      "high_findings": [
+        {
+          "finding": [
+            "CVE-2026-111943",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-ca",
+          "rationale": "The affected public intermediate denylist is not a replacement for patching. This rollout uses fixed private cluster trust and introduces no public backend TLS clients."
+        },
+        {
+          "finding": [
+            "CVE-2026-116587",
+            "github.com/go-jose/go-jose/v4",
+            "v4.1.4"
+          ],
+          "condition": "no-jwks",
+          "rationale": "RSA JWK validation DoS remains in the binary; no JWK-consuming policy or untrusted JWK configuration is admitted."
+        },
+        {
+          "finding": [
+            "CVE-2026-78667",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-peers",
+          "rationale": "Range-parser DoS remains; no tenant file server or public controller endpoint is exposed. Fixed private peers and bounded resources mitigate the reviewed rollout."
+        },
+        {
+          "finding": [
+            "CVE-2026-78669",
+            "golang.org/x/net",
+            "v0.58.0"
+          ],
+          "condition": "private-peers",
+          "rationale": "HTTP/2 SETTINGS DoS remains; only authenticated administrative and fixed in-cluster peers can reach these controller/extension ports. No serving proxy or public request path is installed."
+        },
+        {
+          "finding": [
+            "CVE-2026-78669",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-peers",
+          "rationale": "HTTP/2 SETTINGS DoS remains; only authenticated administrative and fixed in-cluster peers can reach these controller/extension ports. No serving proxy or public request path is installed."
+        },
+        {
+          "finding": [
+            "CVE-2026-97031",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-peers",
+          "rationale": "TLS ECH parsing DoS remains; controller/webhook services are reachable only from the private Kubernetes API and fixed cluster peers. Public TLS serving is outside this approval."
+        }
+      ]
+    },
+    "ai-extproc": {
+      "directory": "inference-ai-extproc-a85630c961616c7988142397aa343e5a2e060c6a",
+      "image": "docker.io/envoyproxy/ai-gateway-extproc:v1.2.0@sha256:d5e4351bc7965b6c14d5b0a19c0da4507837859f3d28498f6a8e222e2e8e7802",
+      "report_sha256": "ac16f626da63ff4d6199b5d28f142444d3aa714e469bef54b6853331fff7da13",
+      "high_findings": [
+        {
+          "finding": [
+            "CVE-2026-111943",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-ca",
+          "rationale": "The affected public intermediate denylist is not a replacement for patching. This rollout uses fixed private cluster trust and introduces no public backend TLS clients."
+        },
+        {
+          "finding": [
+            "CVE-2026-78667",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-peers",
+          "rationale": "Range-parser DoS remains; no tenant file server or public controller endpoint is exposed. Fixed private peers and bounded resources mitigate the reviewed rollout."
+        },
+        {
+          "finding": [
+            "CVE-2026-78669",
+            "golang.org/x/net",
+            "v0.58.0"
+          ],
+          "condition": "private-peers",
+          "rationale": "HTTP/2 SETTINGS DoS remains; only authenticated administrative and fixed in-cluster peers can reach these controller/extension ports. No serving proxy or public request path is installed."
+        },
+        {
+          "finding": [
+            "CVE-2026-78669",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-peers",
+          "rationale": "HTTP/2 SETTINGS DoS remains; only authenticated administrative and fixed in-cluster peers can reach these controller/extension ports. No serving proxy or public request path is installed."
+        },
+        {
+          "finding": [
+            "CVE-2026-97031",
+            "stdlib",
+            "v1.27.1"
+          ],
+          "condition": "private-peers",
+          "rationale": "TLS ECH parsing DoS remains; controller/webhook services are reachable only from the private Kubernetes API and fixed cluster peers. Public TLS serving is outside this approval."
+        }
+      ]
+    }
+  },
+  "limitations": [
+    "This is a scoped temporary applicability decision, not a claim that High findings are fixed.",
+    "A separate model/proxy/router and authenticated public gateway review is required before inference exposure."
+  ]
+}
