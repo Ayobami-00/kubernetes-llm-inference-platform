@@ -1,0 +1,6 @@
+[profile kubernetes-llm-foundation]
+role_arn = arn:aws:iam::127811062476:role/kubernetes-llm-inference-platform/klip-host-executor
+web_identity_token_file = /var/run/secrets/klip-host-identity/token
+role_session_name = klip-host-executor
+region = eu-west-2
+duration_seconds = 900

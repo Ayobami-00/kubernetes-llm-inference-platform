@@ -161,3 +161,8 @@ def test_preflight_job_has_no_cluster_token_or_api_client_key():
         }
     ]
     assert pod == original
+    mounts = [
+        v["mountPath"].replace("/var/run/", "/run/")
+        for v in actual["containers"][0]["volumeMounts"]
+    ]
+    assert len(mounts) == len(set(mounts))

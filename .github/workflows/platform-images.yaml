@@ -13,6 +13,7 @@ on:
       - 'infra/ansible/**'
       - 'deploy/gpu-host.lock.json'
       - 'deploy/artifacts.lock.json'
+      - 'deploy/host-executor-aws-config'
       - 'apps/management/backend/Dockerfile'
       - 'apps/management/web/Dockerfile'
       - 'workload-runner/Dockerfile'

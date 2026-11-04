@@ -294,6 +294,7 @@ def prepare(receipt, security):
         "infra/ansible",
         "deploy/artifacts.lock.json",
         "deploy/gpu-host.lock.json",
+        "deploy/host-executor-aws-config",
         "uv.lock",
         "dev/host-executor/Dockerfile",
     ]
@@ -307,7 +308,11 @@ def prepare(receipt, security):
     ).stdout
     if different or untracked:
         raise ValueError("Executor's shipped code/configuration differs from its reviewed image")
-    if (folder() / "active.json").exists() or list(folder().glob("*.stage.json")):
+    previous_stages = [json.loads(p.read_text()) for p in folder().glob("*.stage.json")]
+    if (folder() / "active.json").exists() or any(
+        s.get("status") != "failed" or not s.get("retired_at") or not s.get("job_uid")
+        for s in previous_stages
+    ):
         raise ValueError(
             "Initial custody is already staged; preserve it and use explicit upgrade/recovery"
         )
@@ -426,13 +431,13 @@ def bootstrap_job(plan, documents):
         f"while not Path({done!r}).is_file(): time.sleep(1)\n",
     ]
     container["env"] = [v for v in container["env"] if v["name"] != "HOST_EXECUTOR_IMAGE"] + [
-        {"name": "AWS_CONFIG_FILE", "value": "/run/secrets/host-executor/aws-config"},
+        {"name": "AWS_CONFIG_FILE", "value": "/app/deploy/host-executor-aws-config"},
     ]
     container["volumeMounts"] = [
         v for v in container["volumeMounts"] if v["name"] not in {"tls", "identity"}
     ] + [
         {"name": "credentials", "mountPath": "/run/secrets/host-executor", "readOnly": True},
-        {"name": "identity", "mountPath": "/var/run/secrets/host-executor", "readOnly": True},
+        {"name": "identity", "mountPath": "/var/run/secrets/klip-host-identity", "readOnly": True},
     ]
     pod["volumes"] = [v for v in pod["volumes"] if v["name"] not in {"tls", "identity"}] + [
         {

@@ -118,6 +118,14 @@ def test_fixed_job_has_no_api_token_or_host_mounts(tmp_path):
         "platform_management.host_executor.worker",
     ]
     assert "sh" not in pod["containers"][0]["command"]
+    paths = [
+        v["mountPath"].replace("/var/run/", "/run/") for v in pod["containers"][0]["volumeMounts"]
+    ]
+    assert len(set(paths)) == len(paths), (
+        "Debian /var/run aliases /run; mounts must not hide credentials"
+    )
+    env = {e["name"]: e.get("value") for e in pod["containers"][0]["env"]}
+    assert env["AWS_CONFIG_FILE"] == "/app/deploy/host-executor-aws-config"
 
 
 def test_terminal_and_repeated_keys_never_need_new_api_access_or_credentials(tmp_path):

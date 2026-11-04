@@ -97,7 +97,7 @@ class HostController:
                                         "KLIP_SSH_SOCKET_HOME": "/tmp/klip-ssh",
                                         "PYTHONPATH": "/app/scripts/infrastructure",
                                         "HOME": "/tmp",
-                                        "AWS_CONFIG_FILE": "/run/secrets/host-executor/aws-config",
+                                        "AWS_CONFIG_FILE": "/app/deploy/host-executor-aws-config",
                                         "AWS_EC2_METADATA_DISABLED": "true",
                                         "LANG": "C.UTF-8",
                                         "LC_ALL": "C.UTF-8",
@@ -133,7 +133,7 @@ class HostController:
                                     },
                                     {
                                         "name": "identity",
-                                        "mountPath": "/var/run/secrets/host-executor",
+                                        "mountPath": "/var/run/secrets/klip-host-identity",
                                         "readOnly": True,
                                     },
                                     {"name": "temporary", "mountPath": "/tmp"},
