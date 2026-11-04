@@ -7,6 +7,10 @@ locals {
     http      = { protocol = "tcp", port = 80 }
     https     = { protocol = "tcp", port = 443 }
     wireguard = { protocol = "udp", port = 51820 }
+    # Lambda public addresses are allocated dynamically by management. Pod
+    # policy and the typed, pinned host executor constrain the SSH destination;
+    # the persistent worker SG must also allow its outbound transport.
+    lambda_ssh = { protocol = "tcp", port = 22 }
   }
 }
 

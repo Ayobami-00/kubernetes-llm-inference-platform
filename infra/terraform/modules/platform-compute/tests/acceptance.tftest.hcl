@@ -33,6 +33,10 @@ run "protected_worker_capacity" {
     condition     = aws_vpc_security_group_ingress_rule.wireguard.from_port == 51820 && aws_vpc_security_group_ingress_rule.wireguard.ip_protocol == "udp" && aws_vpc_security_group_ingress_rule.pmtu.ip_protocol == "icmp"
     error_message = "Initial ingress is limited to authenticated WireGuard and path-MTU ICMP."
   }
+  assert {
+    condition     = aws_vpc_security_group_egress_rule.packages_and_mesh["lambda_ssh"].ip_protocol == "tcp" && aws_vpc_security_group_egress_rule.packages_and_mesh["lambda_ssh"].from_port == 22 && aws_vpc_security_group_egress_rule.packages_and_mesh["lambda_ssh"].to_port == 22 && length(aws_vpc_security_group_egress_rule.packages_and_mesh) == 4
+    error_message = "The trusted Lambda executor needs outbound TCP 22 without adding public SSH ingress or unrestricted egress."
+  }
 }
 
 run "reject_incomplete_ha_tier" {

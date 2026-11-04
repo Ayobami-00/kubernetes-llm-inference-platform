@@ -112,3 +112,19 @@ is absent. Running tasks, another allocation's pending cleanup, changed evidence
 joined Nodes and unfenced recovery remain forbidden. It neither clears the
 reservation nor rewrites failed history. After repair, submit a new management
 cleanup operation and confirm its completed revocation before a fresh rental.
+
+The repaired executor completed that cleanup as `op-3c6b6f5ce7ad45b0` at
+11:27:17 UTC. The next attempt, `writer-a10-20261104-d`, reached native
+Ansible gathering facts but SSH timed out. Its automatic cleanup completed at
+11:39:56, including provider termination and address release. No host kernel,
+driver or GPU facts were observed by that failed preparation.
+
+The platform worker AWS security group allowed package downloads and WireGuard,
+but omitted the executor's outbound TCP 22 connection to Lambda. The reviewed
+Terraform plan `22c82c1ee1e933d6daffb9cc37bf6beb8b5bf4a829bcf352642c04075998fdba`
+added only `packages_and_mesh["lambda_ssh"]`, rule `sgr-0542142e783eb6a79`.
+It changed no instances, volumes or ingress rules. Pod egress remains restricted
+by the host Job NetworkPolicy; Lambda's SSH source restrictions and strict host
+key verification remain required. Both platform-compute mock tests passed.
+This removes a confirmed network prerequisite; a new native preparation must
+still establish SSH, OS compatibility and GPU readiness.
