@@ -242,6 +242,31 @@ def render(values: dict) -> str:
     ).stdout
 
 
+def retain_active_release(root):
+    """Preserve the verified release before preparing a different HA application image."""
+    from platform_management.integrations.job_runner import frozen_file
+
+    if not (root / "active.json").exists():
+        return
+    active = json.loads((root / "active.json").read_text())
+    plan = json.loads((root / "plan.json").read_text())
+    if (
+        active["approval_sha256"] != plan["approval_sha256"]
+        or hashlib.sha256((root / "values.yaml").read_bytes()).hexdigest() != plan["values_sha256"]
+        or hashlib.sha256((root / "rendered.yaml").read_bytes()).hexdigest()
+        != plan["manifest_sha256"]
+    ):
+        raise ValueError(
+            "Reconcile the previous management release before replacing its saved plan"
+        )
+    destination = root / "release-history" / active["approval_sha256"]
+    for name in ("active.json", "plan.json", "values.yaml", "rendered.yaml"):
+        frozen_file(destination / name, (root / name).read_bytes())
+    receipt = root / (active["approval_sha256"] + ".json")
+    if receipt.exists():
+        frozen_file(destination / "deployment.json", receipt.read_bytes())
+
+
 def prepare(receipts: Path) -> dict:
     from cluster import kubectl
 
@@ -281,6 +306,7 @@ def prepare(receipts: Path) -> dict:
     values = values_for(assessed)
     manifest = render(values)
     guard_workloads([d for d in yaml.safe_load_all(manifest) if d])
+    retain_active_release(folder())
     write_private(folder() / "values.yaml", yaml.safe_dump(values))
     write_private(folder() / "rendered.yaml", manifest)
     plan = {
