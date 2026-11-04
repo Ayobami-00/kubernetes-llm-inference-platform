@@ -194,7 +194,10 @@ def test_extension_reader_covers_only_the_configured_namespace_watch():
     assert watch == {"type": "Namespaces", "namespaces": ["llm-d", "inference-gateway"]}
 
 
-def test_private_secret_read_retries_only_a_lost_get_with_the_same_pins(tmp_path, monkeypatch):
+@pytest.mark.parametrize("returncode", [255, -13])
+def test_private_secret_read_retries_only_a_lost_get_with_the_same_pins(
+    tmp_path, monkeypatch, returncode
+):
     import base64
     import json
 
@@ -211,9 +214,21 @@ def test_private_secret_read_retries_only_a_lost_get_with_the_same_pins(tmp_path
 
         def run(self, args, **kwargs):
             self.calls.append((args, kwargs))
-            assert "get" in args and "create" not in args
+            assert args == [
+                "sudo",
+                "kubectl",
+                "--kubeconfig=/etc/kubernetes/admin.conf",
+                "-n",
+                "envoy-ai-gateway-system",
+                "get",
+                "secret",
+                "klip-ai-mcp-seed",
+                "--ignore-not-found",
+                "-o",
+                "json",
+            ]
             if len(self.calls) == 1:
-                raise CommandFailure("fixture transport failure", "ssh", 255)
+                raise CommandFailure("fixture transport failure", "ssh", returncode)
             return json.dumps(
                 {
                     "metadata": {"uid": "original-secret"},

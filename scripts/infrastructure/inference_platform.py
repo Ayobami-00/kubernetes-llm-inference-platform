@@ -516,7 +516,13 @@ def native_inputs(kubectl):
     return {
         "namespaces": {
             n: existing.get(n)
-            for n in ("kube-system", "llm-d", "envoy-gateway-system", "envoy-ai-gateway-system")
+            for n in (
+                "kube-system",
+                "llm-d",
+                "envoy-gateway-system",
+                "envoy-ai-gateway-system",
+                "inference-gateway",
+            )
         },
         "crds": crds,
         "certificate_deployments": certificates,
@@ -552,11 +558,10 @@ def stage_seed(cp, expected):
         "--kubeconfig=/etc/kubernetes/admin.conf",
         "-n",
         "envoy-ai-gateway-system",
-        "inference-gateway",
     ]
     read = [*command, "get", "secret", "klip-ai-mcp-seed", "--ignore-not-found", "-o", "json"]
     try:
-        present = cp.run(read, secret=True)
+        present = cp.run(read, secret=True, reuse=False)
     except CommandFailure as error:
         if error.program != "ssh" or error.returncode not in {255, -13}:
             raise
