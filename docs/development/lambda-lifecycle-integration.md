@@ -314,3 +314,17 @@ journal; missing historical fields do not count. Authorization and first dispatc
 lock the same intent, so they cannot both succeed. Provider fencing remains
 mandatory before releasing that reservation. Once a task is frozen, the regular
 safety-check/revocation path is required even if its HTTP response was lost.
+
+An input whose absolute deadline expired before native Job submission returns a
+stable failed observation (`host_task_expired_unsubmitted`). Repeating that input
+cannot create a Job, including after a lost initial connection. A fresh cleanup
+check can follow it. If a native submission receipt already exists, the original
+Job/receipt remains authoritative; this expiration path cannot replace it.
+
+Verification checkpoint: the final offline suite passed 853 tests (17 optional
+skips), including deadline recovery. Management's complete backend/PostgreSQL,
+web and Kubernetes integration CI passed for both `f89c817` and `4a96232`,
+including the concurrent ownership, address, fencing and journal tests. Ruff,
+formatting, JSON Schemas and management OpenAPI checks also passed. Local Docker
+did not answer a bounded daemon query; only that query was stopped, and the
+PostgreSQL tests ran in CI's isolated service instead.

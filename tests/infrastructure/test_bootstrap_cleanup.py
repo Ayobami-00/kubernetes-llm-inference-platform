@@ -264,3 +264,30 @@ def test_revoke_contract_rejects_a_different_provider_fence():
                 "provider_fence": fence(provider_instance_id="b" * 32),
             }
         )
+
+
+def test_unsubmitted_expired_input_is_terminal_without_native_api_access(tmp_path):
+    cluster = Cluster()
+    cluster.fail_all = True
+    controller = HostController(tmp_path, IMAGE, cluster)
+    original = task(deadline=datetime.now(UTC) - timedelta(seconds=1))
+    failed = controller.launch(original)
+    assert failed.status == "failed" and failed.job_uid is None
+    assert failed.error.code == "host_task_expired_unsubmitted"
+    assert controller.launch(original) == failed and controller.observe(original.id) == failed
+    assert not cluster.posts and not (controller.directory(original.id) / "receipt.json").exists()
+    cluster.fail_all = False
+    check = task("2", action="cleanup-check", previous_task_id=original.id)
+    assert controller.launch(check).status == "running" and len(cluster.posts) == 1
+
+
+def test_expired_submission_cannot_replace_a_previously_owned_job(tmp_path):
+    cluster, original = Cluster(), task()
+    controller = HostController(tmp_path, IMAGE, cluster)
+    controller.launch(original)
+    # The immutable accepted input remains the source of truth on every retry.
+    with pytest.raises(ValueError, match="Immutable"):
+        controller.launch(
+            original.model_copy(update={"deadline": datetime.now(UTC) - timedelta(seconds=1)})
+        )
+    assert len(cluster.posts) == 1

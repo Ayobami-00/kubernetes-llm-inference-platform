@@ -224,6 +224,8 @@ class HostController:
                 or str(task.private_ip) in self.protected_ips
             ):
                 raise AppError(409, "GPU host operations cannot target persistent CPU addresses")
+            if task.deadline <= datetime.now(UTC):
+                return self.observe(task.id)  # Retain an expired input without creating a Job.
             recovery = False
             if task.previous_task_id:
                 previous_task = self.task(task.previous_task_id)
@@ -274,6 +276,20 @@ class HostController:
         result_path = directory / "observation.json"
         receipt_path = directory / "receipt.json"
         if not receipt_path.exists():
+            if task.deadline <= datetime.now(UTC):
+                return HostTaskObservation(
+                    task_id=identity,
+                    input_sha256=sha,
+                    observed_at=task.deadline,
+                    registry_revision=task.registry_revision,
+                    status="failed",
+                    stage="Expired before native Job submission",
+                    cleanup_pending=True,
+                    error={
+                        "code": "host_task_expired_unsubmitted",
+                        "message": "Expired host input was not submitted; it cannot start",
+                    },
+                )
             raise AppError(404, "Host task was not submitted")
         receipt = json.loads(receipt_path.read_text())
         if result_path.exists():
