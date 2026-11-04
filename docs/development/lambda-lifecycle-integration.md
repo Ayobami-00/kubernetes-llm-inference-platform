@@ -4,9 +4,11 @@ The current single-A10 workflow now includes a separate
 [GPU/network inspection implementation](../runbooks/gpu-worker-inspection.md),
 measured device observations and an inspection-configuration gate before a new
 paid dispatch. These paths are covered by synthetic external-I/O tests. The live
-executor still needs its reviewed image upgrade and runtime-approval receipt;
-real UI provisioning remains disabled until those and provider prerequisites
-are deployed. The earlier sections below record the component's implementation
+executor has its reviewed inspection-capable image upgrade; the separate GPU
+runtime-approval receipt remains required. Free provider prerequisites were
+registered and verified on 4 November. Real UI provisioning remains disabled
+until runtime approval and the lifecycle configuration are deployed. The earlier
+sections below record the component's implementation
 and live integration history, rather than claiming a real GPU has been verified.
 
 `lambda_mutations.py` implements the bounded transport for Lambda API 1.10.0.
@@ -68,6 +70,18 @@ conflicting pins, orphan capacity, credential-field filtering and definite failu
 
 Official interface checked on 4 November 2026:
 [Lambda Cloud API](https://docs.lambda.ai/api/cloud).
+
+New real launches freeze a `klip-host-attestation.v2` bootstrap policy containing
+the three executor CPU public `/32` addresses. Before reporting its host key,
+cloud-init verifies the effective OpenSSH configuration: only `ubuntu` from those
+addresses is allowed, root/password/interactive authentication is disabled, and
+the checked configuration has been activated. Policy failure prevents the
+attestation callback and leaves the worker quarantined. Historical v1 documents
+remain byte-compatible; existing intents cannot change their frozen SSH sources.
+Lambda's account-wide firewall rules still allow TCP 22 from the Internet and
+are deliberately unchanged. This safeguard restricts SSH authentication; the
+subsequent Ansible host firewall and actual negative-connectivity checks remain
+required. The v2 program has local execution tests, not live GPU-host evidence.
 
 The host-identity component now provides an operation-scoped callback at
 `POST /api/v1/bootstrap/{operation_id}`. It uses its own Bearer credential and

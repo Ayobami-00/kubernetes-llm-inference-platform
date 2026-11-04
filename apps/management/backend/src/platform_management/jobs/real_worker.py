@@ -66,7 +66,18 @@ class RuntimeIO:
         path = Path(self.config["bootstrap_seed_file"])
         if hashlib.sha256(path.read_bytes()).hexdigest() != self.config["bootstrap_seed_sha256"]:
             raise AppError(409, "Bound bootstrap seed changed", "host_identity_conflict")
-        return bootstrap.issue(identity, self.config["origin"], path)
+        client = self.host()
+        try:
+            metadata = client.cluster()
+        finally:
+            client.close()
+        checked_binding(self.binding).check_metadata(metadata)
+        return bootstrap.issue(
+            identity,
+            self.config["origin"],
+            path,
+            sources=bootstrap.ssh_sources(metadata.get("ssh_source_cidrs")),
+        )
 
 
 class RealWorkerWorkflow:

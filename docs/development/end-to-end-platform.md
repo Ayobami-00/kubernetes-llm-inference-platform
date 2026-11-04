@@ -673,3 +673,19 @@ expiry. That review does not approve the GPU host runtime. Controller readiness
 and configured scrape policies do not prove allocatable GPUs or ingested DCGM
 measurements. Real host inspection, runtime security, UI-driven A10 admission,
 serving and real inference remain required before those gates can pass.
+
+At 08:20:18 UTC on 4 November, management verification `4aca565d3674`
+passed after deploying source `bcbd1ec`: two Ready replicas per component on
+separate CPU hosts, verified database TLS, authenticated HTTPS, all 36 historical
+runs preserved, and shared-artifact reads/writes from each API/worker replica.
+Release history is archived before replacing an active plan. Paid lifecycle
+operations remain disabled.
+
+At 08:33:44 UTC, prerequisite Job `lambda-prereq-d1b9a1b5bf0e45fb90e5`
+completed; observation at 08:35:32 matched its native UID, PostgreSQL receipt,
+executor public key, registered SSH key and dedicated nine-rule firewall.
+The preceding image-startup failure is retained and was reconciled before a
+new attempt; no provider mutation occurred in that failed attempt. The successful
+setup allocates no GPU. Lambda's unchanged global SSH rule broadens effective
+ingress; source-restricted bootstrap authentication and the later host firewall
+are separate checks. No actual GPU, CUDA, serving or inference gate is inferred.

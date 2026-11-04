@@ -90,6 +90,26 @@ def test_bootstrap_issuance_is_immutable_and_separate_from_simulation(tmp_path):
         issue(IDENTITY, ORIGIN, path)
 
 
+def test_source_restricted_bootstrap_pins_sources_without_rewriting_a_previous_issue(tmp_path):
+    path = tmp_path / "seed"
+    path.write_bytes(SEED)
+    sources = ["8.8.8.1/32", "8.8.8.2/32", "8.8.8.3/32"]
+    with session() as db, db.begin():
+        db.add(ProviderIntent(id=IDENTITY, group_id="group", payload={"mode": "real"}))
+    first = issue(IDENTITY, ORIGIN, path, sources=sources)
+    assert issue(IDENTITY, ORIGIN, path, sources=list(reversed(sources))) == first
+    with session() as db:
+        value = db.get(ProviderIntent, IDENTITY).payload["bootstrap"]
+        assert (
+            value["schema_version"] == "klip-host-attestation.v2"
+            and value["ssh_sources"] == sources
+        )
+    with pytest.raises(AppError, match="sources changed"):
+        issue(IDENTITY, ORIGIN, path, sources=["8.8.8.4/32", *sources[1:]])
+    with pytest.raises(AppError, match="sources changed"):
+        issue(IDENTITY, ORIGIN, path)
+
+
 @pytest.mark.parametrize("state", ["pending", "rejected", "terminated"])
 def test_callback_does_not_activate_an_unlaunched_or_terminal_intent(client, tmp_path, state):
     _, _, _, nonce = prepare(tmp_path)

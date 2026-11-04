@@ -10,6 +10,7 @@ import hmac
 import json
 import re
 from datetime import datetime, timedelta
+from ipaddress import IPv4Network
 from urllib.parse import urlsplit
 
 import yaml
@@ -52,6 +53,48 @@ except (ValueError, KeyError, OSError):
 print('KLIP host attestation failed; bootstrap remains quarantined', file=sys.stderr)
 sys.exit(1)
 """
+
+SSH_GUARD = r"""import subprocess
+
+def check_ssh_sources(sources):
+    expected = {'ubuntu@' + value.split('/')[0] for value in sources}
+    subprocess.run(['/usr/sbin/sshd','-t'],check=True,
+                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=15)
+    effective = subprocess.check_output(['/usr/sbin/sshd','-T'],text=True,
+                                       stderr=subprocess.DEVNULL,timeout=15)
+    values = {}
+    for line in effective.splitlines():
+        name,_,value=line.partition(' ')
+        values.setdefault(name,[]).extend(value.split())
+    if (set(values.get('allowusers',[])) != expected or
+        values.get('permitrootlogin') != ['no'] or
+        values.get('passwordauthentication') != ['no'] or
+        values.get('kbdinteractiveauthentication') != ['no']):
+        raise ValueError('Bootstrap SSH authentication policy differs')
+    subprocess.run(['systemctl','reload-or-restart','ssh'],check=True,
+                   stdout=subprocess.DEVNULL,stderr=subprocess.DEVNULL,timeout=30)
+"""
+
+SCRIPT_V2 = (
+    SSH_GUARD
+    + "\n"
+    + SCRIPT_V1.replace(
+        "    key = ' '.join",
+        "    check_ssh_sources(config['ssh_sources'])\n    key = ' '.join",
+        1,
+    ).replace("except (ValueError, KeyError, OSError):", "except Exception:")
+)
+
+
+def ssh_sources(values):
+    if not isinstance(values, (list, tuple)) or len(values) != 3:
+        raise ValueError("Bootstrap requires three platform CPU SSH sources")
+    networks = [IPv4Network(value, strict=True) for value in values]
+    if len(set(networks)) != 3 or any(
+        n.prefixlen != 32 or not n.network_address.is_global for n in networks
+    ):
+        raise ValueError("Bootstrap SSH sources require three distinct public /32s")
+    return sorted(str(n) for n in networks)
 
 
 def public_host_key(value: str) -> str:
@@ -99,13 +142,16 @@ def nonce_for(seed: bytes, identity: str, origin: str, expires_at: str) -> str:
     return hmac.new(seed, message, hashlib.sha256).hexdigest()
 
 
-def cloud_init(identity: str, nonce: str, origin: str) -> str:
+def cloud_init(identity: str, nonce: str, origin: str, *, sources=None) -> str:
     if not re.fullmatch(r"op-[a-f0-9]{16,32}", identity) or not re.fullmatch(
         r"[a-f0-9]{64}", nonce
     ):
         raise ValueError("Invalid bootstrap identity or credential")
     origin = callback_origin(origin)
-    config = json.dumps({"url": origin + "/api/v1/bootstrap/" + identity, "nonce": nonce})
+    config = {"url": origin + "/api/v1/bootstrap/" + identity, "nonce": nonce}
+    if sources is not None:
+        sources = ssh_sources(sources)
+        config["ssh_sources"] = sources
     document = {
         "disable_root": True,
         "ssh_pwauth": False,
@@ -114,22 +160,35 @@ def cloud_init(identity: str, nonce: str, origin: str) -> str:
         "write_files": [
             {"path": path, "owner": "root:root", "permissions": "0600", "content": content}
             for path, content in (
-                ("/var/lib/klip/host-attestation.json", config),
-                ("/var/lib/klip/attest-host.py", SCRIPT_V1),
+                ("/var/lib/klip/host-attestation.json", json.dumps(config)),
+                ("/var/lib/klip/attest-host.py", SCRIPT_V1 if sources is None else SCRIPT_V2),
             )
         ],
         "runcmd": [["python3", "/var/lib/klip/attest-host.py"]],
     }
+    if sources is not None:
+        allow = " ".join("ubuntu@" + source.split("/")[0] for source in sources)
+        document["write_files"].append(
+            {
+                "path": "/etc/ssh/sshd_config.d/10-klip-bootstrap.conf",
+                "owner": "root:root",
+                "permissions": "0600",
+                "content": "PermitRootLogin no\nPasswordAuthentication no\n"
+                "KbdInteractiveAuthentication no\nAllowUsers " + allow + "\n",
+            }
+        )
     return "#cloud-config\n" + yaml.safe_dump(document, sort_keys=False)
 
 
-def issue(identity: str, origin: str, seed_file):
+def issue(identity: str, origin: str, seed_file, *, sources=None):
     """Before dispatch, commit nonce metadata and reconstruct deterministic user data.
 
     Callers must not print or retain the returned user data in ordinary artifacts.
     The exact digest becomes part of the immutable Lambda launch plan.
     """
     origin = callback_origin(origin)
+    if sources is not None:
+        sources = ssh_sources(sources)
     if seed_file is None or not seed_file.is_file():
         raise AppError(422, "Bootstrap seed reference is unconfigured", "adapter_unavailable")
     seed = seed_file.read_bytes()
@@ -144,6 +203,8 @@ def issue(identity: str, origin: str, seed_file):
         if existing:
             if existing["origin"] != origin or existing["seed_sha256"] != seed_sha:
                 raise AppError(409, "Bootstrap identity changed; reconcile the original intent")
+            if existing.get("ssh_sources") != sources:
+                raise AppError(409, "Bootstrap SSH sources changed; reconcile the original intent")
             if datetime.fromisoformat(existing["expires_at"]) <= now():
                 raise AppError(409, "Bootstrap credential expired", "bootstrap_expired")
             metadata = existing
@@ -155,9 +216,11 @@ def issue(identity: str, origin: str, seed_file):
                 "issued_at": now().isoformat(),
                 "expires_at": (now() + timedelta(minutes=20)).isoformat(),
             }
+            if sources is not None:
+                metadata.update(schema_version="klip-host-attestation.v2", ssh_sources=sources)
         nonce = nonce_for(seed, identity, origin, metadata["expires_at"])
         metadata = {**metadata, "nonce_sha256": hashlib.sha256(nonce.encode()).hexdigest()}
-        content = cloud_init(identity, nonce, origin)
+        content = cloud_init(identity, nonce, origin, sources=sources)
         content_sha = hashlib.sha256(content.encode()).hexdigest()
         if metadata.get("cloud_init_sha256", content_sha) != content_sha:
             raise AppError(409, "Bootstrap program changed; reconcile the original intent")
