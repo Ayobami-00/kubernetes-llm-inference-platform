@@ -6,6 +6,12 @@ on:
     paths:
       - '.github/workflows/platform-images.yaml'
       - 'scripts/infrastructure/publish_images.py'
+      - 'scripts/infrastructure/host_executor_image.py'
+      - 'scripts/infrastructure/cluster*.py'
+      - 'dev/host-executor/**'
+      - 'infra/ansible/**'
+      - 'deploy/gpu-host.lock.json'
+      - 'deploy/artifacts.lock.json'
       - 'apps/management/backend/Dockerfile'
       - 'apps/management/web/Dockerfile'
       - 'workload-runner/Dockerfile'
@@ -108,6 +114,9 @@ jobs:
             target: ''
           - component: stub
             file: dev/inference-stub/Dockerfile
+            target: ''
+          - component: host-executor
+            file: dev/host-executor/Dockerfile
             target: ''
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4

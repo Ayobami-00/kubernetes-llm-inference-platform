@@ -309,3 +309,173 @@ def test_ssh_control_sockets_can_use_local_scratch_instead_of_nfs(tmp_path, monk
     monkeypatch.setenv("KLIP_SSH_SOCKET_HOME", "relative-path")
     with pytest.raises(ValueError, match="absolute"):
         host.ssh_arguments()
+
+
+def test_typed_api_repeats_original_job_and_never_echoes_untrusted_payload(tmp_path):
+    from fastapi.testclient import TestClient
+    from platform_management.host_executor.api import create_app
+
+    cluster, document = Cluster(), task()
+    client = TestClient(create_app(HostController(tmp_path, IMAGE, cluster)))
+    first = client.post("/v1/tasks", json=document.model_dump(mode="json"))
+    assert first.status_code == 200 and first.json()["status"] == "running"
+    repeated = client.post("/v1/tasks", json=document.model_dump(mode="json")).json()
+    assert repeated["job_uid"] == first.json()["job_uid"]
+    assert repeated["input_sha256"] == first.json()["input_sha256"]
+    assert len(cluster.posts) == 1
+    rejected = client.post(
+        "/v1/tasks", json={**document.model_dump(mode="json"), "command": "untrusted-marker"}
+    )
+    assert rejected.status_code == 422 and "untrusted-marker" not in rejected.text
+    assert client.get("/openapi.json").status_code == 404
+    assert client.get("/v1/tasks/host-" + "f" * 24).status_code == 404
+    assert first.headers["cache-control"] == "no-store"
+
+
+def test_api_rejects_bounded_chunked_body_before_task_submission(tmp_path):
+    from fastapi.testclient import TestClient
+    from platform_management.host_executor.api import MAX_BODY, create_app
+
+    cluster = Cluster()
+    client = TestClient(create_app(HostController(tmp_path, IMAGE, cluster)))
+    response = client.post(
+        "/v1/tasks",
+        content=iter([b"x" * (MAX_BODY // 2)] * 3),
+        headers={"content-type": "application/json"},
+    )
+    assert response.status_code == 413 and not cluster.posts
+
+
+def test_api_ambiguous_submission_is_reconciled_without_second_job(tmp_path):
+    from fastapi.testclient import TestClient
+    from platform_management.host_executor.api import create_app
+
+    cluster, document = Cluster(), task()
+    cluster.lost_response = True
+    client = TestClient(create_app(HostController(tmp_path, IMAGE, cluster)))
+    assert client.post("/v1/tasks", json=document.model_dump(mode="json")).status_code == 409
+    assert client.get("/v1/tasks/" + document.id).json()["status"] == "running"
+    assert client.post("/v1/tasks", json=document.model_dump(mode="json")).status_code == 200
+    assert len(cluster.posts) == 1
+
+
+def test_executor_image_installs_locked_tools_and_keeps_existing_release_set():
+    from common import ROOT
+    from host_executor_image import REQUIRED
+    from publish_images import COMPONENTS, identity
+
+    assert set(COMPONENTS) == {"backend", "web", "runner", "stub"}
+    assert identity("host-executor", "a" * 40) == (
+        "klip/management-backend",
+        "host-executor-" + "a" * 40,
+    )
+    dockerfile = (ROOT / "dev/host-executor/Dockerfile").read_text()
+    assert "amazon/aws-cli:2.34.53@sha256:" in dockerfile
+    assert "USER 20002:20002" in dockerfile and "--group infrastructure" in dockerfile
+    lock = json.loads((ROOT / "deploy/artifacts.lock.json").read_text())
+    assert all(lock["artifacts"][name]["sha256"] for name in REQUIRED)
+
+
+def test_executor_tool_download_rejects_corruption_and_oversize(monkeypatch):
+    from contextlib import contextmanager
+
+    import host_executor_image
+
+    class Response:
+        def read(self, bound):
+            assert bound == 5
+            return b"12345"
+
+    @contextmanager
+    def response(*_, **__):
+        yield Response()
+
+    monkeypatch.setattr(host_executor_image, "MAX_BYTES", 4)
+    monkeypatch.setattr(host_executor_image.urllib.request, "urlopen", response)
+    with pytest.raises(ValueError, match="size or checksum"):
+        host_executor_image.download({"url": "https://example.org/pinned", "sha256": "a" * 64})
+
+
+def test_dedicated_tls_requires_client_identity_and_preserves_custody(tmp_path):
+    import socket
+    import ssl
+    import threading
+    from socketserver import BaseRequestHandler, TCPServer
+
+    from host_executor_tls import SERVER_NAME, material
+
+    files = material(tmp_path / "tls")
+    original = (tmp_path / "tls/ca.key").read_bytes()
+    assert material(tmp_path / "tls") == files
+    assert (tmp_path / "tls/ca.key").read_bytes() == original
+    context = ssl.SSLContext(ssl.PROTOCOL_TLS_SERVER)
+    context.verify_mode = ssl.CERT_REQUIRED
+    context.load_cert_chain(files["server"] / "tls.crt", files["server"] / "tls.key")
+    context.load_verify_locations(files["server"] / "ca.crt")
+
+    class Handler(BaseRequestHandler):
+        def handle(self):
+            self.request.recv(1024)
+            self.request.sendall(b"authenticated")
+
+    class Server(TCPServer):
+        def get_request(self):
+            connection, address = super().get_request()
+            try:
+                return context.wrap_socket(connection, server_side=True), address
+            except Exception:
+                connection.close()
+                raise
+
+    with Server(("127.0.0.1", 0), Handler) as server:
+        thread = threading.Thread(target=server.serve_forever, daemon=True)
+        thread.start()
+        try:
+            verified = ssl.create_default_context(cafile=str(files["client"] / "ca.crt"))
+            with socket.create_connection(server.server_address, timeout=3) as connection:
+                with pytest.raises((ssl.SSLError, ConnectionResetError)):
+                    with verified.wrap_socket(connection, server_hostname=SERVER_NAME) as wrapped:
+                        wrapped.sendall(b"request")
+                        wrapped.recv(1024)
+            verified.load_cert_chain(files["client"] / "tls.crt", files["client"] / "tls.key")
+            with socket.create_connection(server.server_address, timeout=3) as connection:
+                with verified.wrap_socket(connection, server_hostname=SERVER_NAME) as wrapped:
+                    wrapped.sendall(b"request")
+                    assert wrapped.recv(1024) == b"authenticated"
+        finally:
+            server.shutdown()
+            thread.join(timeout=3)
+    with pytest.raises(ValueError, match="renewal"):
+        material(tmp_path / "tls", now=datetime.now(UTC) + timedelta(days=24))
+
+
+def test_production_listener_has_no_plaintext_fallback(tmp_path, monkeypatch):
+    import ssl
+
+    import common
+    import platform_management.host_executor.api as api
+    import platform_management.host_executor.controller as controller
+    import platform_management.integrations.cluster_client as cluster_client
+    import uvicorn
+
+    (tmp_path / "cluster").mkdir()
+    (tmp_path / "cluster/executor-inputs.json").write_text('{"cpu_peers": {}}')
+    monkeypatch.setattr(common, "state_home", lambda: tmp_path)
+    monkeypatch.setattr(cluster_client, "ClusterClient", lambda _: None)
+    monkeypatch.setattr(controller, "HostController", lambda *_, **__: object())
+    monkeypatch.setattr(api, "metadata", lambda _: {})
+    monkeypatch.setattr(api, "create_app", lambda _: object())
+    monkeypatch.setattr(api, "TLS_HOME", tmp_path)
+    monkeypatch.setenv("HOST_EXECUTOR_IMAGE", IMAGE)
+    for name in ("tls.crt", "tls.key", "ca.crt"):
+        (tmp_path / name).write_text("test-only")
+    calls = []
+    monkeypatch.setattr(uvicorn, "run", lambda app, **kwargs: calls.append(kwargs))
+    api.main()
+    assert calls[0]["ssl_cert_reqs"] == ssl.CERT_REQUIRED
+    assert calls[0]["ssl_version"] == ssl.PROTOCOL_TLS_SERVER
+    assert calls[0]["port"] == 8443 and calls[0]["access_log"] is False
+    (tmp_path / "ca.crt").unlink()
+    with pytest.raises(ValueError, match="mandatory"):
+        api.main()
+    assert len(calls) == 1

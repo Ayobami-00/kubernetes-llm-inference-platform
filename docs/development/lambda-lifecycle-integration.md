@@ -115,10 +115,22 @@ cannot mark GPU/connectivity checks ready.
 
 The worker's transport/ownership wrapper has cloud-free tests. Actual SSH/Ansible
 execution through this new worker is not yet live-verified. Connectivity/CUDA
-inspection, the mutual-TLS API, dedicated storage/IAM/image, deployment, state
+inspection, dedicated storage/IAM, deployment, state
 handoff and management adapters still require implementation and verification.
 The fixed template/core is not an enabled service. Its executor image must include
 the pinned operator tools and infrastructure dependencies before deployment.
+
+The internal API and image definition now exist. The only production listener
+requires a client certificate signed by the dedicated executor CA; there is no
+HTTP fallback. The client fixes the service origin, verifies the server, ignores
+proxy environment variables and refuses redirects. Only typed task submission,
+observation and public bootstrap metadata are exposed. Request bodies are bounded
+to 8 KiB, including chunked input; errors never echo submitted values. Repeated
+submissions and an ambiguous native Job response preserve the original task/Job.
+This API has offline tests but is not deployed or live-verified yet. The image
+uses pinned Python, uv and AWS CLI bases and installs checksum-locked SSM/runtime
+artifacts plus the workspace's locked Ansible dependencies. It has a separate
+CI image receipt; the existing four-image management release set is unchanged.
 
 Peer-registry ownership must transfer deliberately to the executor. Do not run an
 independent operator mesh reconciliation from an older local registry: node-side

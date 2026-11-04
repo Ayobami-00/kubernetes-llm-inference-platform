@@ -17,13 +17,17 @@ COMPONENTS = {
     "runner": ("workload-runner", "workload-runner/Dockerfile"),
     "stub": ("workload-runner", "dev/inference-stub/Dockerfile"),
 }
+ADDITIONAL_COMPONENTS = {
+    "host-executor": ("management-backend", "dev/host-executor/Dockerfile"),
+}
+ALL_COMPONENTS = COMPONENTS | ADDITIONAL_COMPONENTS
 REGISTRY = "127811062476.dkr.ecr.eu-west-2.amazonaws.com"
 
 
 def identity(component: str, sha: str) -> tuple[str, str]:
     if not re.fullmatch(r"[0-9a-f]{40}", sha):
         raise ValueError("An exact source commit is required")
-    return "klip/" + COMPONENTS[component][0], component + "-" + sha
+    return "klip/" + ALL_COMPONENTS[component][0], component + "-" + sha
 
 
 def aws(*arguments: str, absent: bool = False) -> dict | None:
@@ -110,7 +114,7 @@ def record(component: str, sha: str, *, sleep=time.sleep) -> Path:
         **resolved,
         "pinned_image": REGISTRY + "/" + resolved["repository"] + "@" + resolved["digest"],
         "dockerfile_sha256": hashlib.sha256(
-            Path(COMPONENTS[component][1]).read_bytes()
+            Path(ALL_COMPONENTS[component][1]).read_bytes()
         ).hexdigest(),
         "lockfile_sha256": hashlib.sha256(Path("uv.lock").read_bytes()).hexdigest(),
         "workflow_run_id": os.environ["GITHUB_RUN_ID"],
@@ -127,7 +131,7 @@ def record(component: str, sha: str, *, sleep=time.sleep) -> Path:
 def main() -> None:
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("action", choices=["resolve", "record"])
-    parser.add_argument("component", choices=COMPONENTS)
+    parser.add_argument("component", choices=ALL_COMPONENTS)
     args = parser.parse_args()
     sha = os.environ["GITHUB_SHA"]
     if args.action == "record":
