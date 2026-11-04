@@ -1,0 +1,65 @@
+{{- if .Values.experiments.a10Enabled }}
+{{- if or (ne .Release.Namespace "klip") (ne .Values.runner.servingNamespace "llm-d") .Values.lifecycle.enabled }}
+{{- fail "The retained A10 experiment requires klip/llm-d and disabled provider lifecycle" }}
+{{- end }}
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ .Release.Name }}-a10-experiment, namespace: llm-d}
+rules:
+  - apiGroups: [apps]
+    resources: [deployments]
+    resourceNames: [writer-assist-a10]
+    verbs: [get, patch]
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+  - apiGroups: [""]
+    resources: [services]
+    resourceNames: [inference]
+    verbs: [get]
+  # Pod names change on gateway rollout; code restricts this to the two reviewed
+  # gateway replicas and loopback admin port 19000. No exec/Secret/provider access.
+  - apiGroups: [""]
+    resources: [pods/portforward]
+    verbs: [get, create]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ .Release.Name }}-a10-experiment, namespace: llm-d}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ .Release.Name }}-a10-experiment}
+subjects:
+  - {kind: ServiceAccount, name: {{ .Release.Name }}-worker, namespace: klip}
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: Role
+metadata: {name: {{ .Release.Name }}-a10-cilium-observer, namespace: kube-system}
+rules:
+  - apiGroups: [""]
+    resources: [pods]
+    verbs: [get, list]
+---
+apiVersion: rbac.authorization.k8s.io/v1
+kind: RoleBinding
+metadata: {name: {{ .Release.Name }}-a10-cilium-observer, namespace: kube-system}
+roleRef: {apiGroup: rbac.authorization.k8s.io, kind: Role, name: {{ .Release.Name }}-a10-cilium-observer}
+subjects:
+  - {kind: ServiceAccount, name: {{ .Release.Name }}-worker, namespace: klip}
+---
+apiVersion: cilium.io/v2
+kind: CiliumNetworkPolicy
+metadata: {name: klip-a10-experiment-metrics, namespace: observability}
+spec:
+  endpointSelector:
+    matchLabels:
+      app.kubernetes.io/name: thanos
+      app.kubernetes.io/instance: klip-thanos
+      app.kubernetes.io/component: query
+  ingress:
+    - fromEndpoints:
+        - matchLabels:
+            k8s:io.kubernetes.pod.namespace: klip
+            app.kubernetes.io/name: {{ .Release.Name }}
+            app.kubernetes.io/component: worker
+      toPorts:
+        - ports: [{port: '9090', protocol: TCP}]
+{{- end }}

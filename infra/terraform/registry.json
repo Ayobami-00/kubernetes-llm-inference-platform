@@ -4,6 +4,9 @@
     "repository": "Ayobami-00/kubernetes-llm-inference-platform",
     "owner_id": "41403457",
     "repository_id": "1432746028",
-    "refs": ["refs/heads/codex/end-to-end-platform"]
+    "refs": [
+      "refs/heads/main",
+      "refs/heads/feat/a10-ngram-experiment"
+    ]
   }
 }

@@ -648,6 +648,126 @@ export type ExecutionVersions = {
 };
 
 /**
+ * ExperimentLaunch
+ */
+export type ExperimentLaunch = {
+    /**
+     * Definition Sha256
+     */
+    definition_sha256: string;
+};
+
+/**
+ * ExperimentPreview
+ */
+export type ExperimentPreview = {
+    /**
+     * Available
+     */
+    available: boolean;
+    /**
+     * Blockers
+     */
+    blockers?: Array<string>;
+    /**
+     * Definition Sha256
+     */
+    definition_sha256?: string | null;
+    /**
+     * Summary
+     */
+    summary?: {
+        [key: string]: unknown;
+    };
+};
+
+/**
+ * ExperimentView
+ */
+export type ExperimentView = {
+    /**
+     * Artifacts
+     */
+    artifacts?: {
+        [key: string]: {
+            [key: string]: unknown;
+        };
+    };
+    /**
+     * Children
+     */
+    children?: {
+        [key: string]: string;
+    };
+    /**
+     * Comparison
+     */
+    comparison?: {
+        [key: string]: unknown;
+    } | null;
+    /**
+     * Created At
+     */
+    created_at: string;
+    /**
+     * Definition Sha256
+     */
+    definition_sha256: string;
+    /**
+     * Error
+     */
+    error?: {
+        [key: string]: string;
+    } | null;
+    /**
+     * Finished At
+     */
+    finished_at?: string | null;
+    /**
+     * Id
+     */
+    id: string;
+    /**
+     * Mode
+     */
+    mode?: 'real';
+    /**
+     * Operation Id
+     */
+    operation_id: string;
+    /**
+     * Stage
+     */
+    stage: string;
+    /**
+     * Stages
+     */
+    stages?: {
+        [key: string]: {
+            [key: string]: unknown;
+        };
+    };
+    /**
+     * Started At
+     */
+    started_at?: string | null;
+    /**
+     * Status
+     */
+    status: 'queued' | 'running' | 'completed' | 'failed' | 'cancelled';
+    /**
+     * Stop Requested
+     */
+    stop_requested?: boolean;
+    /**
+     * Summary
+     */
+    summary: {
+        [key: string]: unknown;
+    };
+};
+
+/**
  * ExternalCapacity
  */
 export type ExternalCapacity = {
@@ -1394,7 +1514,7 @@ export type OperationStatus = {
     /**
      * Type
      */
-    type: 'create_worker_group' | 'delete_worker_group' | 'renew_worker_group' | 'deploy_serving' | 'start_run' | 'stop_run';
+    type: 'create_worker_group' | 'delete_worker_group' | 'renew_worker_group' | 'deploy_serving' | 'start_run' | 'stop_run' | 'start_experiment' | 'stop_experiment';
     /**
      * Updated At
      */
@@ -1416,7 +1536,7 @@ export type OperationTarget = {
     /**
      * Resource Type
      */
-    resource_type: 'worker_group' | 'serving_deployment' | 'run';
+    resource_type: 'worker_group' | 'serving_deployment' | 'run' | 'experiment';
 };
 
 /**
@@ -3868,6 +3988,295 @@ export type HistoryDatasetsResponses = {
 };
 
 export type HistoryDatasetsResponse = HistoryDatasetsResponses[keyof HistoryDatasetsResponses];
+
+export type ListExperimentsData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/experiments';
+};
+
+export type ListExperimentsErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type ListExperimentsError = ListExperimentsErrors[keyof ListExperimentsErrors];
+
+export type ListExperimentsResponses = {
+    /**
+     * Response Listexperiments
+     *
+     * Successful Response
+     */
+    200: Array<ExperimentView>;
+};
+
+export type ListExperimentsResponse = ListExperimentsResponses[keyof ListExperimentsResponses];
+
+export type StartA10ExperimentData = {
+    body: ExperimentLaunch;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path?: never;
+    query?: never;
+    url: '/api/v1/experiments/a10';
+};
+
+export type StartA10ExperimentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type StartA10ExperimentError = StartA10ExperimentErrors[keyof StartA10ExperimentErrors];
+
+export type StartA10ExperimentResponses = {
+    /**
+     * Successful Response
+     */
+    202: Accepted;
+};
+
+export type StartA10ExperimentResponse = StartA10ExperimentResponses[keyof StartA10ExperimentResponses];
+
+export type PreviewA10ExperimentData = {
+    body?: never;
+    path?: never;
+    query?: never;
+    url: '/api/v1/experiments/a10/preview';
+};
+
+export type PreviewA10ExperimentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type PreviewA10ExperimentError = PreviewA10ExperimentErrors[keyof PreviewA10ExperimentErrors];
+
+export type PreviewA10ExperimentResponses = {
+    /**
+     * Successful Response
+     */
+    200: ExperimentPreview;
+};
+
+export type PreviewA10ExperimentResponse = PreviewA10ExperimentResponses[keyof PreviewA10ExperimentResponses];
+
+export type GetExperimentData = {
+    body?: never;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/experiments/{identity}';
+};
+
+export type GetExperimentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type GetExperimentError = GetExperimentErrors[keyof GetExperimentErrors];
+
+export type GetExperimentResponses = {
+    /**
+     * Successful Response
+     */
+    200: ExperimentView;
+};
+
+export type GetExperimentResponse = GetExperimentResponses[keyof GetExperimentResponses];
+
+export type StopExperimentData = {
+    body?: never;
+    headers: {
+        /**
+         * Idempotency-Key
+         */
+        'Idempotency-Key': string;
+    };
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/experiments/{identity}/stop';
+};
+
+export type StopExperimentErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type StopExperimentError = StopExperimentErrors[keyof StopExperimentErrors];
+
+export type StopExperimentResponses = {
+    /**
+     * Successful Response
+     */
+    202: Accepted;
+};
+
+export type StopExperimentResponse = StopExperimentResponses[keyof StopExperimentResponses];
 
 export type ListImportsData = {
     body?: never;

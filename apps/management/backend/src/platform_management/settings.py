@@ -53,6 +53,10 @@ class Settings(BaseSettings):
     runner_startup_allowance_seconds: int = 300
     lease_seconds: int = 60
     heartbeat_seconds: int = 10
+    a10_experiment_enabled: bool = False
+    a10_preparation_file: Path = Path(
+        "/artifacts/experiments/retained-a10/prepared/public/writer-assist/latest.json"
+    )
 
     @field_validator("runner_resources")
     @classmethod

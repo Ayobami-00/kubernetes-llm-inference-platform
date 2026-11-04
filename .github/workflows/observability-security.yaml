@@ -2,7 +2,7 @@ name: Observability image security
 
 on:
   push:
-    branches: [codex/end-to-end-platform]
+    branches: [main, feat/a10-ngram-experiment]
     paths:
       - 'deploy/observability.lock.json'
       - '.github/workflows/observability-security.yaml'

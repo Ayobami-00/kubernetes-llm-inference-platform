@@ -57,7 +57,8 @@
           "enum": [
             "worker_group",
             "serving_deployment",
-            "run"
+            "run",
+            "experiment"
           ],
           "title": "Resource Type",
           "type": "string"
@@ -164,7 +165,9 @@
         "renew_worker_group",
         "deploy_serving",
         "start_run",
-        "stop_run"
+        "stop_run",
+        "start_experiment",
+        "stop_experiment"
       ],
       "title": "Type",
       "type": "string"

@@ -342,6 +342,12 @@ def execute(identity, owner):
                     op, run_data, run_context, checkpoint, config, owner
                 )
                 result, creation_failed = None, False
+            elif action.endswith("experiment"):
+                from platform_management.jobs.a10_experiment import step_experiment
+
+                result, checkpoint, done, creation_failed, step = step_experiment(
+                    op, resource_data, checkpoint, config, owner
+                )
             else:
                 result = resource_data
                 with session() as db:
@@ -362,6 +368,14 @@ def execute(identity, owner):
                 operation = db.get(Operation, identity, with_for_update=True)
                 resource = db.get(Resource, target, with_for_update=True)
                 if result is not None:
+                    if resource.kind == "experiment":
+                        result["stop_requested"] = bool(
+                            result.get("stop_requested") or resource.payload.get("stop_requested")
+                        )
+                        result["children"] = {
+                            **result.get("children", {}),
+                            **resource.payload.get("children", {}),
+                        }
                     if done and "group" in result:
                         result["group"]["status"]["active_operation_id"] = None
                     resource.payload = result
@@ -427,7 +441,8 @@ def execute(identity, owner):
                 elif done:
                     final = (
                         "cancelled"
-                        if action == "start_run" and run_data["status"] == "cancelled"
+                        if (action == "start_run" and run_data["status"] == "cancelled")
+                        or (action.endswith("experiment") and result["status"] == "cancelled")
                         else "completed"
                     )
                     operation.payload = stamp_operation(
@@ -471,6 +486,17 @@ def execute(identity, owner):
                 operation = db.get(Operation, identity, with_for_update=True)
                 resource = db.get(Resource, target, with_for_update=True)
                 cleanup = False
+                if resource and resource.kind == "experiment" and action == "start_experiment":
+                    # Retry reconciliation/cleanup, never replay an execution after an error.
+                    # Keep the reservation until existing children are terminal.
+                    if terminal:
+                        error = {
+                            "code": "experiment_failed",
+                            "message": "Experiment control failed; reconciling retained children",
+                        }
+                        job.checkpoint = {**job.checkpoint, "failure": error, "step": "cleanup"}
+                        resource.payload = {**resource.payload, "error": error, "stage": "cleanup"}
+                        terminal = False
                 if resource and resource.kind == "worker_group":
                     payload = copy.deepcopy(resource.payload)
                     status = payload["group"]["status"]

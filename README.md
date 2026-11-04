@@ -204,3 +204,13 @@ seven workload scenarios through management, artifact downloads, recovery and ca
 [A/B/C integration notes](docs/development/workload-integration.md) and
 [live validation runbook](docs/runbooks/live-inference-validation.md) for external capacity imports,
 the first pinned direct-vLLM WriterAssist run, subsequent profiles and 20-minute campaigns.
+
+## On-demand A10 comparison
+
+The authenticated management **Experiments** page runs a paired WriterAssist
+baseline-versus-n-gram experiment on the retained A10. See the
+[specification](experiments/writer-assist-a10/ngram-comparison.md),
+[dashboard runbook](docs/runbooks/dashboard-a10-comparison.md) and
+[first measured comparison](docs/experiments/writer-assist-a10-dashboard-2026-11-04.md).
+Each execution retains separate child runs, SLO/quality assessments and downloadable
+reports. The workflow does not rent, restart or terminate the GPU VM.

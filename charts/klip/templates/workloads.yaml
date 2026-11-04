@@ -41,6 +41,9 @@ spec:
           {{- end }}
           env: {{ include "klip.env" $ | nindent 12 }}
           volumeMounts: {{ include "klip.mounts" $ | nindent 12 }}
+            {{- if and $.Values.experiments.a10Enabled (eq $role "worker") }}
+            - {name: a10-inference-key, mountPath: /run/secrets/runner/klip-writer-inference, readOnly: true}
+            {{- end }}
           resources: {{ index $.Values.resources $role | toYaml | nindent 12 }}
           securityContext: {allowPrivilegeEscalation: false, readOnlyRootFilesystem: true, capabilities: {drop: [ALL]}}
           {{- if eq $role "worker" }}
@@ -56,6 +59,12 @@ spec:
           livenessProbe: {httpGet: {path: /health/live, port: http}, periodSeconds: 15}
           {{- end }}
       volumes: {{ include "klip.volumes" $ | nindent 8 }}
+        {{- if and $.Values.experiments.a10Enabled (eq $role "worker") }}
+        - name: a10-inference-key
+          secret:
+            secretName: klip-writer-inference
+            items: [{key: api-key, path: api-key}]
+        {{- end }}
 {{- end }}
 ---
 apiVersion: v1

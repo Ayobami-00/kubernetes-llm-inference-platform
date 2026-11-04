@@ -80,6 +80,7 @@ def compile_run(
     inventory=None,
     versions=None,
     sustained=False,
+    duration_variant=None,
 ):
     if smoke and sustained:
         raise ValueError("smoke and sustained variants are mutually exclusive")
@@ -104,6 +105,7 @@ def compile_run(
                 "target": target,
                 "smoke": smoke,
                 "sustained": sustained,
+                **({"duration_variant": duration_variant} if duration_variant else {}),
             }
         )
     )[:12]
@@ -212,7 +214,8 @@ def compile_run(
         **{value: key for key, value in ref_map.items()},
         "source_scenario_ref": base.scenario.ref,
         "source_snapshot_sha256": digest(canonical(base)),
-        "duration_variant": "smoke" if smoke else "sustained-20m" if sustained else "canonical",
+        "duration_variant": duration_variant
+        or ("smoke" if smoke else "sustained-20m" if sustained else "canonical"),
     }
     data["target"]["credential_env"] = {
         id_map.get(key, key): value for key, value in data["target"]["credential_env"].items()

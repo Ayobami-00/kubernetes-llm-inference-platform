@@ -134,9 +134,9 @@ audience, expiry, repository ID and ref without retaining the signed token. Its
 subject includes immutable owner/repository IDs. Configure CI publisher trust from
 that verified subject; do not assume the older name-only subject format. The
 publisher role now trusts only the verified immutable-ID subject on
-`codex/end-to-end-platform`, recorded in `infra/terraform/registry.json`. Its
-former unused Kubernetes publisher subject was removed. Main and pull-request
-subjects have no publishing access. Adding a release branch requires an explicit
+`main` and `feat/a10-ngram-experiment`, recorded in `infra/terraform/registry.json`.
+The old codex-prefixed branch and former unused Kubernetes publisher subject were
+removed. Pull-request subjects have no publishing access. Adding a branch requires an explicit
 Terraform trust review; merely changing a workflow cannot broaden IAM trust.
 
 The reviewed follow-up plan created the retained GitHub provider and updated only

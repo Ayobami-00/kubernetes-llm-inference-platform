@@ -3168,3 +3168,45 @@ select:focus-visible {
     padding: 16px;
   }
 }
+/* Fixed-preset paired experiments share the existing management visual language. */
+.experiment-definition {
+  overflow: auto;
+  max-height: 26rem;
+  padding: 1rem;
+  font-size: 0.78rem;
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+}
+.experiment-results {
+  overflow-x: auto;
+  margin-block: 1rem;
+}
+.experiment-results table {
+  border-collapse: collapse;
+  width: 100%;
+}
+.experiment-results th,
+.experiment-results td {
+  padding: 0.65rem;
+  text-align: left;
+  border-bottom: 1px solid var(--border);
+}
+.experiment-card {
+  margin-block: 1rem;
+}
+.experiment-children,
+.experiment-downloads {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 1rem;
+  margin-block: 1rem;
+}
+.experiment-children > div {
+  flex: 1;
+  min-width: 15rem;
+}
+.experiment-downloads a {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4rem;
+}

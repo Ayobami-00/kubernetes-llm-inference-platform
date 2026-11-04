@@ -2,7 +2,7 @@
 
 import type { Client, ClientMeta, Options as Options2, RequestResult, TDataShape } from './client';
 import { client } from './client.gen';
-import type { AttestHostData, AttestHostErrors, AttestHostResponses, CreateWorkerGroupData, CreateWorkerGroupErrors, CreateWorkerGroupResponses, DeleteWorkerGroupData, DeleteWorkerGroupErrors, DeleteWorkerGroupResponses, DeployServingData, DeployServingErrors, DeployServingResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, ExportConfigurationData, ExportConfigurationErrors, ExportConfigurationResponses, ExportCustomersData, ExportCustomersErrors, ExportCustomersResponses, ExportDatasetsData, ExportDatasetsErrors, ExportDatasetsResponses, ExportScenariosData, ExportScenariosErrors, ExportScenariosResponses, ExportServingProfilesData, ExportServingProfilesErrors, ExportServingProfilesResponses, ExportWorkerGroupSpecsData, ExportWorkerGroupSpecsErrors, ExportWorkerGroupSpecsResponses, GetCapacityData, GetCapacityErrors, GetCapacityResponses, GetImportData, GetImportErrors, GetImportResponses, GetIntegrationsData, GetIntegrationsErrors, GetIntegrationsResponses, GetInventoryData, GetInventoryErrors, GetInventoryResponses, GetOperationData, GetOperationErrors, GetOperationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetRunData, GetRunErrors, GetRunResponses, GetRunTopologyData, GetRunTopologyErrors, GetRunTopologyResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetTopologyData, GetTopologyErrors, GetTopologyResponses, GetWorkerLifecycleOptionsData, GetWorkerLifecycleOptionsErrors, GetWorkerLifecycleOptionsResponses, HistoryCustomersData, HistoryCustomersErrors, HistoryCustomersResponses, HistoryDatasetsData, HistoryDatasetsErrors, HistoryDatasetsResponses, HistoryScenariosData, HistoryScenariosErrors, HistoryScenariosResponses, HistoryServingProfilesData, HistoryServingProfilesErrors, HistoryServingProfilesResponses, HistoryWorkerGroupSpecsData, HistoryWorkerGroupSpecsErrors, HistoryWorkerGroupSpecsResponses, ImportDatasetData, ImportDatasetErrors, ImportDatasetResponses, ImportExternalCapacityData, ImportExternalCapacityErrors, ImportExternalCapacityResponses, ImportHistoricalRunData, ImportHistoricalRunErrors, ImportHistoricalRunResponses, ImportInventoryData, ImportInventoryErrors, ImportInventoryResponses, ImportPreparedRunData, ImportPreparedRunErrors, ImportPreparedRunResponses, ListArtifactsData, ListArtifactsErrors, ListArtifactsResponses, ListAssignmentsData, ListAssignmentsErrors, ListAssignmentsResponses, ListCustomersData, ListCustomersErrors, ListCustomersResponses, ListDatasetsData, ListDatasetsErrors, ListDatasetsResponses, ListImportsData, ListImportsErrors, ListImportsResponses, ListInventoryData, ListInventoryErrors, ListInventoryResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListPreparedRunsData, ListPreparedRunsErrors, ListPreparedRunsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListScenariosData, ListScenariosErrors, ListScenariosResponses, ListServingDeploymentsData, ListServingDeploymentsErrors, ListServingDeploymentsResponses, ListServingProfilesData, ListServingProfilesErrors, ListServingProfilesResponses, ListWorkerGroupsData, ListWorkerGroupsErrors, ListWorkerGroupSpecsData, ListWorkerGroupSpecsErrors, ListWorkerGroupSpecsResponses, ListWorkerGroupsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, PreflightRunData, PreflightRunErrors, PreflightRunResponses, PublishCustomersData, PublishCustomersErrors, PublishCustomersResponses, PublishDatasetsData, PublishDatasetsErrors, PublishDatasetsResponses, PublishScenariosData, PublishScenariosErrors, PublishScenariosResponses, PublishServingProfilesData, PublishServingProfilesErrors, PublishServingProfilesResponses, PublishWorkerGroupSpecsData, PublishWorkerGroupSpecsErrors, PublishWorkerGroupSpecsResponses, RefreshCapacityData, RefreshCapacityErrors, RefreshCapacityResponses, RenewWorkerGroupData, RenewWorkerGroupErrors, RenewWorkerGroupResponses, ReportBootstrapFailureData, ReportBootstrapFailureErrors, ReportBootstrapFailureResponses, SaveAssignmentData, SaveAssignmentErrors, SaveAssignmentResponses, SaveCustomersDraftData, SaveCustomersDraftErrors, SaveCustomersDraftResponses, SaveDatasetsDraftData, SaveDatasetsDraftErrors, SaveDatasetsDraftResponses, SavePreferencesData, SavePreferencesErrors, SavePreferencesResponses, SaveScenariosDraftData, SaveScenariosDraftErrors, SaveScenariosDraftResponses, SaveServingProfilesDraftData, SaveServingProfilesDraftErrors, SaveServingProfilesDraftResponses, SaveWorkerGroupSpecsDraftData, SaveWorkerGroupSpecsDraftErrors, SaveWorkerGroupSpecsDraftResponses, SetSimulationFaultData, SetSimulationFaultErrors, SetSimulationFaultResponses, StartRunData, StartRunErrors, StartRunResponses, StopRunData, StopRunErrors, StopRunResponses } from './types.gen';
+import type { AttestHostData, AttestHostErrors, AttestHostResponses, CreateWorkerGroupData, CreateWorkerGroupErrors, CreateWorkerGroupResponses, DeleteWorkerGroupData, DeleteWorkerGroupErrors, DeleteWorkerGroupResponses, DeployServingData, DeployServingErrors, DeployServingResponses, DownloadArtifactData, DownloadArtifactErrors, DownloadArtifactResponses, ExportConfigurationData, ExportConfigurationErrors, ExportConfigurationResponses, ExportCustomersData, ExportCustomersErrors, ExportCustomersResponses, ExportDatasetsData, ExportDatasetsErrors, ExportDatasetsResponses, ExportScenariosData, ExportScenariosErrors, ExportScenariosResponses, ExportServingProfilesData, ExportServingProfilesErrors, ExportServingProfilesResponses, ExportWorkerGroupSpecsData, ExportWorkerGroupSpecsErrors, ExportWorkerGroupSpecsResponses, GetCapacityData, GetCapacityErrors, GetCapacityResponses, GetExperimentData, GetExperimentErrors, GetExperimentResponses, GetImportData, GetImportErrors, GetImportResponses, GetIntegrationsData, GetIntegrationsErrors, GetIntegrationsResponses, GetInventoryData, GetInventoryErrors, GetInventoryResponses, GetOperationData, GetOperationErrors, GetOperationResponses, GetPreferencesData, GetPreferencesErrors, GetPreferencesResponses, GetRunData, GetRunErrors, GetRunResponses, GetRunTopologyData, GetRunTopologyErrors, GetRunTopologyResponses, GetSessionData, GetSessionErrors, GetSessionResponses, GetTopologyData, GetTopologyErrors, GetTopologyResponses, GetWorkerLifecycleOptionsData, GetWorkerLifecycleOptionsErrors, GetWorkerLifecycleOptionsResponses, HistoryCustomersData, HistoryCustomersErrors, HistoryCustomersResponses, HistoryDatasetsData, HistoryDatasetsErrors, HistoryDatasetsResponses, HistoryScenariosData, HistoryScenariosErrors, HistoryScenariosResponses, HistoryServingProfilesData, HistoryServingProfilesErrors, HistoryServingProfilesResponses, HistoryWorkerGroupSpecsData, HistoryWorkerGroupSpecsErrors, HistoryWorkerGroupSpecsResponses, ImportDatasetData, ImportDatasetErrors, ImportDatasetResponses, ImportExternalCapacityData, ImportExternalCapacityErrors, ImportExternalCapacityResponses, ImportHistoricalRunData, ImportHistoricalRunErrors, ImportHistoricalRunResponses, ImportInventoryData, ImportInventoryErrors, ImportInventoryResponses, ImportPreparedRunData, ImportPreparedRunErrors, ImportPreparedRunResponses, ListArtifactsData, ListArtifactsErrors, ListArtifactsResponses, ListAssignmentsData, ListAssignmentsErrors, ListAssignmentsResponses, ListCustomersData, ListCustomersErrors, ListCustomersResponses, ListDatasetsData, ListDatasetsErrors, ListDatasetsResponses, ListExperimentsData, ListExperimentsErrors, ListExperimentsResponses, ListImportsData, ListImportsErrors, ListImportsResponses, ListInventoryData, ListInventoryErrors, ListInventoryResponses, ListOperationsData, ListOperationsErrors, ListOperationsResponses, ListPreparedRunsData, ListPreparedRunsErrors, ListPreparedRunsResponses, ListRunsData, ListRunsErrors, ListRunsResponses, ListScenariosData, ListScenariosErrors, ListScenariosResponses, ListServingDeploymentsData, ListServingDeploymentsErrors, ListServingDeploymentsResponses, ListServingProfilesData, ListServingProfilesErrors, ListServingProfilesResponses, ListWorkerGroupsData, ListWorkerGroupsErrors, ListWorkerGroupSpecsData, ListWorkerGroupSpecsErrors, ListWorkerGroupSpecsResponses, ListWorkerGroupsResponses, LoginData, LoginErrors, LoginResponses, LogoutData, LogoutErrors, LogoutResponses, PreflightRunData, PreflightRunErrors, PreflightRunResponses, PreviewA10ExperimentData, PreviewA10ExperimentErrors, PreviewA10ExperimentResponses, PublishCustomersData, PublishCustomersErrors, PublishCustomersResponses, PublishDatasetsData, PublishDatasetsErrors, PublishDatasetsResponses, PublishScenariosData, PublishScenariosErrors, PublishScenariosResponses, PublishServingProfilesData, PublishServingProfilesErrors, PublishServingProfilesResponses, PublishWorkerGroupSpecsData, PublishWorkerGroupSpecsErrors, PublishWorkerGroupSpecsResponses, RefreshCapacityData, RefreshCapacityErrors, RefreshCapacityResponses, RenewWorkerGroupData, RenewWorkerGroupErrors, RenewWorkerGroupResponses, ReportBootstrapFailureData, ReportBootstrapFailureErrors, ReportBootstrapFailureResponses, SaveAssignmentData, SaveAssignmentErrors, SaveAssignmentResponses, SaveCustomersDraftData, SaveCustomersDraftErrors, SaveCustomersDraftResponses, SaveDatasetsDraftData, SaveDatasetsDraftErrors, SaveDatasetsDraftResponses, SavePreferencesData, SavePreferencesErrors, SavePreferencesResponses, SaveScenariosDraftData, SaveScenariosDraftErrors, SaveScenariosDraftResponses, SaveServingProfilesDraftData, SaveServingProfilesDraftErrors, SaveServingProfilesDraftResponses, SaveWorkerGroupSpecsDraftData, SaveWorkerGroupSpecsDraftErrors, SaveWorkerGroupSpecsDraftResponses, SetSimulationFaultData, SetSimulationFaultErrors, SetSimulationFaultResponses, StartA10ExperimentData, StartA10ExperimentErrors, StartA10ExperimentResponses, StartRunData, StartRunErrors, StartRunResponses, StopExperimentData, StopExperimentErrors, StopExperimentResponses, StopRunData, StopRunErrors, StopRunResponses } from './types.gen';
 
 export type Options<TData extends TDataShape = TDataShape, ThrowOnError extends boolean = boolean, TResponse = unknown> = Options2<TData, ThrowOnError, TResponse> & {
     /**
@@ -320,6 +320,75 @@ export const historyDatasets = <ThrowOnError extends boolean = false>(options: O
             type: 'apiKey'
         }],
     url: '/api/v1/datasets/{resource_id}/revisions',
+    ...options
+});
+
+/**
+ * Experiments
+ */
+export const listExperiments = <ThrowOnError extends boolean = false>(options?: Options<ListExperimentsData, ThrowOnError>): RequestResult<ListExperimentsResponses, ListExperimentsErrors, ThrowOnError> => (options?.client ?? client).get<ListExperimentsResponses, ListExperimentsErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/experiments',
+    ...options
+});
+
+/**
+ * Launch
+ */
+export const startA10Experiment = <ThrowOnError extends boolean = false>(options: Options<StartA10ExperimentData, ThrowOnError>): RequestResult<StartA10ExperimentResponses, StartA10ExperimentErrors, ThrowOnError> => (options.client ?? client).post<StartA10ExperimentResponses, StartA10ExperimentErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/experiments/a10',
+    ...options,
+    headers: {
+        'Content-Type': 'application/json',
+        ...options.headers
+    }
+});
+
+/**
+ * Preview
+ */
+export const previewA10Experiment = <ThrowOnError extends boolean = false>(options?: Options<PreviewA10ExperimentData, ThrowOnError>): RequestResult<PreviewA10ExperimentResponses, PreviewA10ExperimentErrors, ThrowOnError> => (options?.client ?? client).get<PreviewA10ExperimentResponses, PreviewA10ExperimentErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/experiments/a10/preview',
+    ...options
+});
+
+/**
+ * Get Experiment
+ */
+export const getExperiment = <ThrowOnError extends boolean = false>(options: Options<GetExperimentData, ThrowOnError>): RequestResult<GetExperimentResponses, GetExperimentErrors, ThrowOnError> => (options.client ?? client).get<GetExperimentResponses, GetExperimentErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/experiments/{identity}',
+    ...options
+});
+
+/**
+ * Stop
+ */
+export const stopExperiment = <ThrowOnError extends boolean = false>(options: Options<StopExperimentData, ThrowOnError>): RequestResult<StopExperimentResponses, StopExperimentErrors, ThrowOnError> => (options.client ?? client).post<StopExperimentResponses, StopExperimentErrors, ThrowOnError>({
+    security: [{
+            in: 'cookie',
+            name: 'management_session',
+            type: 'apiKey'
+        }],
+    url: '/api/v1/experiments/{identity}/stop',
     ...options
 });
 

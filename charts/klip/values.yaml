@@ -36,6 +36,8 @@ database:
   requireTLS: false
 publicOrigin: ""
 localDevelopment: false
+experiments:
+  a10Enabled: false
 artifacts:
   existingClaim: ""
   storageClass: ""

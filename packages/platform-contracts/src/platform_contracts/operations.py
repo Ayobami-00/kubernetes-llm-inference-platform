@@ -18,7 +18,7 @@ from .common import (
 
 
 class OperationTarget(ContractModel):
-    resource_type: Literal["worker_group", "serving_deployment", "run"]
+    resource_type: Literal["worker_group", "serving_deployment", "run", "experiment"]
     resource_id: Slug
     requested_revision: PositiveInt | None = None
 
@@ -32,6 +32,8 @@ class OperationStatus(RuntimeRecord):
         "deploy_serving",
         "start_run",
         "stop_run",
+        "start_experiment",
+        "stop_experiment",
     ]
     target: OperationTarget
     status: ExecutionStatus
@@ -60,6 +62,8 @@ class OperationStatus(RuntimeRecord):
             if self.type.endswith("worker_group")
             else "serving_deployment"
             if self.type == "deploy_serving"
+            else "experiment"
+            if self.type.endswith("experiment")
             else "run"
         )
         if self.target.resource_type != expected_target:

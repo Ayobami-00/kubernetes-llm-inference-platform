@@ -9,7 +9,7 @@ on:
         default: all
         options: [all, vllm]
   push:
-    branches: [codex/end-to-end-platform]
+    branches: [main, feat/a10-ngram-experiment]
     paths:
       - 'deploy/inference.lock.json'
       - '.github/workflows/inference-security.yaml'

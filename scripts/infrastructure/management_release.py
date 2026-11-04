@@ -363,6 +363,11 @@ def prepare(receipts: Path, *, external_capacity_only=False) -> dict:
             "contracts/fixtures",
             ".dockerignore",
             "scripts/management/stage_workspace.py",
+            "scripts/management/install_experiment_tool.py",
+            "experiments/writer-assist-a10/ngram-comparison.md",
+            "deploy/environments/lab/experiments/a10",
+            "deploy/retained-a10-model-risk-review.json",
+            "deploy/retained-a10-gateway-risk-review.json",
         ],
         cwd=ROOT,
         check=True,
@@ -387,6 +392,7 @@ def prepare(receipts: Path, *, external_capacity_only=False) -> dict:
             (ROOT / "deploy/environments/lab/experiments/a10/management-values.yaml").read_text()
         )
         values["runner"].update(overlay["runner"])
+        values["experiments"] = overlay["experiments"]
     manifest = render(values)
     guard_workloads([d for d in yaml.safe_load_all(manifest) if d])
     retain_active_release(folder())

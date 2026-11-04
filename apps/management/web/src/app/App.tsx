@@ -2,6 +2,7 @@ import { lazy, Suspense, useEffect, useRef, useState } from 'react';
 import { ThemeControl } from './theme';
 import ImportsPage from '../features/integrations/ImportsPage';
 import ReadinessPage from '../features/integrations/ReadinessPage';
+import ExperimentsPage from '../features/experiments/ExperimentsPage';
 import CapacityView from '../features/capacity/CapacityView';
 import WorkerProvisioner from '../features/capacity/WorkerProvisioner';
 import { Link, useLocation, useNavigate } from 'react-router-dom';
@@ -48,6 +49,7 @@ const navigation = [
   { path: '/customers', label: 'Customers', icon: Users },
   { path: '/capacity', label: 'GPU capacity', icon: Cpu },
   { path: '/runs', label: 'Runs & results', icon: FlaskConical },
+  { path: '/experiments', label: 'Experiments', icon: FlaskConical },
   { path: '/operations', label: 'Operations', icon: Activity },
   { path: '/simulation', label: 'Simulation lab', icon: Sparkles },
   { path: '/imports', label: 'Imports', icon: FileUp },
@@ -463,7 +465,7 @@ function Workspace() {
             <ThemeControl />
             <span className="environment">
               <span className="status-dot ready" />
-              Local environment
+              {pathname === '/experiments' ? 'Retained A10' : 'Local environment'}
             </span>
             <span className="topbar-divider" />
             <ShieldCheck size={16} />
@@ -505,6 +507,11 @@ function Workspace() {
               >
                 Return to current topology
               </button>
+            ) : pathname === '/experiments' ? (
+              <span className="simulation-label">
+                <FlaskConical size={13} />
+                Real inference · retained A10
+              </span>
             ) : (
               <>
                 <span className="simulation-label">
@@ -532,7 +539,7 @@ function Workspace() {
             )}
           </div>
         </div>
-        {!['/capacity', '/imports', '/integrations'].includes(pathname) && (
+        {!['/capacity', '/imports', '/integrations', '/experiments'].includes(pathname) && (
           <div className="summary-grid">
             <Summary
               icon={Users}
@@ -719,6 +726,8 @@ function Workspace() {
                   />
                 )}
               />
+            ) : pathname === '/experiments' ? (
+              <ExperimentsPage />
             ) : pathname === '/imports' ? (
               <ImportsPage act={act} busy={busy} />
             ) : pathname === '/integrations' ? (

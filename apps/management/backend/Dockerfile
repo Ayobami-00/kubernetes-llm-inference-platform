@@ -4,6 +4,9 @@ COPY --from=uv /uv /usr/local/bin/uv
 WORKDIR /app
 COPY pyproject.toml uv.lock .python-version ./
 COPY scripts/management/stage_workspace.py /tmp/stage_workspace.py
+COPY scripts/management/install_experiment_tool.py /tmp/install_experiment_tool.py
+COPY deploy/artifacts.lock.json /tmp/artifacts.lock.json
+RUN python /tmp/install_experiment_tool.py /tmp/artifacts.lock.json /usr/local/bin/kubectl
 RUN --mount=type=bind,source=.,target=/workspace-context,readonly \
     python /tmp/stage_workspace.py /workspace-context /app \
     && uv sync --locked --package platform-management --no-dev \
@@ -14,6 +17,10 @@ RUN --mount=type=bind,source=.,target=/workspace-context,readonly \
 COPY configs configs
 COPY datasets/manifests datasets/manifests
 COPY contracts/fixtures contracts/fixtures
+COPY deploy/environments/lab/experiments/a10 deploy/environments/lab/experiments/a10
+COPY deploy/retained-a10-model-risk-review.json deploy/retained-a10-model-risk-review.json
+COPY deploy/retained-a10-gateway-risk-review.json deploy/retained-a10-gateway-risk-review.json
+COPY experiments/writer-assist-a10/ngram-comparison.md experiments/writer-assist-a10/ngram-comparison.md
 ENV PATH="/app/.venv/bin:$PATH" MANAGEMENT_REPOSITORY_ROOT=/app PYTHONUNBUFFERED=1 PYTHONDONTWRITEBYTECODE=1
 CMD ["uvicorn", "platform_management.api.app:app", "--host", "0.0.0.0", "--port", "8000"]
 

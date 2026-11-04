@@ -33,7 +33,7 @@ resource "aws_iam_openid_connect_provider" "github" {
   lifecycle {
     prevent_destroy = true
     precondition {
-      condition     = local.github.issuer == "https://token.actions.githubusercontent.com" && local.github.repository == "Ayobami-00/kubernetes-llm-inference-platform" && local.github.owner_id == "41403457" && local.github.repository_id == "1432746028" && length(local.github.refs) > 0 && alltrue([for ref in local.github.refs : contains(["refs/heads/codex/end-to-end-platform", "refs/heads/main"], ref)])
+      condition     = local.github.issuer == "https://token.actions.githubusercontent.com" && local.github.repository == "Ayobami-00/kubernetes-llm-inference-platform" && local.github.owner_id == "41403457" && local.github.repository_id == "1432746028" && length(local.github.refs) > 0 && alltrue([for ref in local.github.refs : contains(["refs/heads/main", "refs/heads/feat/a10-ngram-experiment"], ref)])
       error_message = "Publishing trust must use the verified immutable repository identity and explicitly reviewed branches."
     }
   }
