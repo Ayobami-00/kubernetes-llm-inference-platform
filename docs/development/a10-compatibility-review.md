@@ -40,3 +40,40 @@ Sources checked on 2026-11-03:
 - [llm-d 1.0.0 release](https://github.com/llm-d/llm-d/releases/tag/v1.0.0)
 - [vLLM stable 0.32.0](https://github.com/vllm-project/vllm/releases/tag/v0.32.0)
 - [Lambda Cloud API](https://docs.lambda.ai/api/cloud)
+
+On 4 November, the bounded official release API identifies containerd **2.3.7**.
+Its AMD64 release archive SHA-256 is
+`09a1b669ac6d21e7e24c3c33a9805b48987ba5845e8d88f039c47013a0c0025c`.
+The archive was downloaded and verified, including safe archive paths. It was not
+installed on a running host. `deploy/gpu-host.lock.json` records this separate
+pin. GPU worker operations opt into `klip-worker-operation.v2`; v1 request digests
+and CPU runtime selection remain unchanged. The opt-in path requires quarantine,
+plain Ubuntu 24.04 AMD64, no installed/loaded NVIDIA stack, matching kernel headers
+and an exposed NVIDIA PCI device. It does not install NVIDIA drivers or toolkit.
+
+The Docker registry's unique Linux AMD64 manifest for vLLM `v0.30.0` was verified
+against its downloaded manifest bytes and config architecture:
+`docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40`.
+The pinned Hugging Face revision reports Apache-2.0. This is metadata verification,
+not an image security review, A10 compatibility test or ready serving release.
+The explicitly draft candidate is under `deploy/environments/lab/candidates/` so
+it does not introduce ambiguous defaults into the four authored serving profiles.
+Its 16 GiB minimum is an experimental memory requirement, to be verified on the
+actual host before producing a non-draft revision.
+
+A new public preparation, `prepared-writer-assist-a33798fa6fa5`, uses the exact
+Qwen model/tokenizer revision with `enable_thinking: false`. It retains 100 JFLEG
+development warmup records and all 747 test records with four references each.
+Its entries SHA-256 is
+`a76e48a11c2c559352e735fd64be31f3721453707c771fde58eef7d0e5bf8f3a`;
+the maximum rendered input is 115 actual tokenizer tokens. Source revision is
+`ee06ff806a208aba815ac45313f4e750a48330a5`, with recorded CC-BY-NC-SA-4.0
+evidence. The requested 1,000-record bound exhausted at 847 and records the
+153-record shortfall explicitly. Files are retained outside Git in operator
+storage. Exact canonical/sustained schedule sufficiency still must be checked at
+planning time; this preparation does not establish a live inference result.
+Offline sufficiency plans retained unchanged authored rates/targets: the canonical
+schedule selected 35 warmup and 375 scored inputs, and the 20-minute schedule
+selected 35 warmup and 723 scored inputs, all without replacement. Both used an
+explicit local-stub target and were not executed. Live planning must still freeze
+the actual inventory, endpoint, versions, bindings and canonical artifact mount.

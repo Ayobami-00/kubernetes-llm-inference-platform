@@ -11,6 +11,16 @@ C owns allocation/termination, operation persistence, distributed serialization,
 address allocation and job retries. B's initial operator executor uses a local
 lock; it is not a replacement for C's durable/distributed coordination.
 
+The explicit GPU preparation variant uses `klip-worker-operation.v2`, parsed as
+`GPUWorkerRequest`. It requires `runtime_profile: nvidia-operator`, Lambda and
+`quarantine: true`. V1 remains the generic/CPU profile with its existing serialized
+form and idempotency hashes. The v2 path stages the checksum-locked containerd
+2.3.7 archive before host changes, rejects a preinstalled NVIDIA stack and prepares
+kernel/runtime prerequisites. NVIDIA software is installed later by GPU Operator;
+generic join still reports `gpu_runtime: false`. See `deploy/gpu-host.lock.json`
+and `docs/development/a10-compatibility-review.md`. No operator installation or
+live GPU verification is implied by successful host preparation.
+
 Requests carry cluster/provider identity, node name/expected UID, addresses,
 credential references, current peer-registry revision, operation ID and deadline.
 Lambda SSH access additionally requires explicit executor public /32 sources;

@@ -10,7 +10,13 @@ from pathlib import Path
 
 import yaml
 from cluster_config import firewall, kubeadm_documents, node_configuration
-from cluster_models import PeerRegistry, WorkerRequest, assert_node_identity
+from cluster_models import (
+    GPUWorkerRequest,
+    PeerRegistry,
+    WorkerRequest,
+    assert_node_identity,
+    worker_request,
+)
 from common import CONFIG, PROFILES, ROOT, Aws, state_home, tf, utc_now, write_private
 
 
@@ -205,7 +211,7 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
         return {"peers_revoked": True, "terraform_probe_destroy_required": True}
     if not request_path:
         raise ValueError("A versioned --request is required")
-    request = WorkerRequest.model_validate_json(request_path.read_text())
+    request = worker_request(request_path.read_text())
     operation = FOLDER / "operations" / f"{request.operation_id}.json"
     digest = hashlib.sha256(request.model_dump_json().encode()).hexdigest()
     if operation.exists():
@@ -276,6 +282,14 @@ def operate_worker(action: str, request_path: Path | None) -> dict:
                 str(network) for network in request.ssh_source_cidrs
             ]
             fields["klip_node"]["quarantine"] = request.quarantine
+            if isinstance(request, GPUWorkerRequest):
+                from gpu_runtime import install_artifact, settings
+
+                install_artifact()  # Checksum and size validation precede host changes.
+                fields["klip_node"].update(
+                    containerd_version=settings()["containerd_version"],
+                    runtime_profile=request.runtime_profile,
+                )
             rules = FOLDER / f"firewall-{request.node_name}.rules"
             write_private(rules, firewall(fields["klip_node"]))
             fields["klip_firewall_file"] = str(rules)

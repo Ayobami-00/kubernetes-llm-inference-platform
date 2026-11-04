@@ -1,0 +1,47 @@
+---
+- name: Require the reviewed plain Ubuntu GPU host profile
+  ansible.builtin.assert:
+    that:
+      - klip_node.provider == 'lambda'
+      - klip_node.role == 'worker'
+      - klip_node.quarantine | bool
+      - klip_node.containerd_version == '2.3.7'
+      - ansible_facts.distribution == 'Ubuntu'
+      - ansible_facts.distribution_version == '24.04'
+      - ansible_facts.architecture == 'x86_64'
+    fail_msg: GPU preparation requires the quarantined plain Ubuntu 24.04 AMD64 profile
+- name: Check for preinstalled NVIDIA userspace
+  ansible.builtin.stat:
+    path: '{{ item }}'
+  loop:
+    - /usr/bin/nvidia-smi
+    - /usr/bin/nvidia-container-runtime
+    - /usr/bin/nvidia-ctk
+  register: klip_gpu_host_existing_userspace
+- name: Read loaded modules without changing drivers
+  ansible.builtin.slurp:
+    src: /proc/modules
+  register: klip_gpu_host_loaded_modules
+- name: Reject a preinstalled or loaded NVIDIA stack
+  ansible.builtin.assert:
+    that:
+      - klip_gpu_host_existing_userspace.results | selectattr('stat.exists') | list | length == 0
+      - (klip_gpu_host_loaded_modules.content | b64decode) is not regex('(?m)^nvidia')
+    fail_msg: Use a plain image; driver/toolkit removal requires explicit recovery
+- name: Install matching kernel headers and PCI inspection tools
+  ansible.builtin.apt:
+    name:
+      - linux-headers-{{ ansible_facts.kernel }}
+      - pciutils
+    state: present
+    update_cache: true
+- name: Observe NVIDIA PCI devices
+  ansible.builtin.command:
+    argv: [lspci, -Dn, -d, '10de:']
+  register: klip_gpu_host_pci
+  changed_when: false
+- name: Require an exposed NVIDIA PCI device before joining
+  ansible.builtin.assert:
+    that:
+      - klip_gpu_host_pci.stdout_lines | length > 0
+    fail_msg: No NVIDIA PCI device is visible; Kubernetes/GPU readiness is not established

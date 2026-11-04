@@ -1,0 +1,24 @@
+{
+  "schema_version": "klip-gpu-host.v1",
+  "runtime_profile": "nvidia-operator",
+  "os": "ubuntu-24.04",
+  "architecture": "amd64",
+  "gpu_operator_version": "v26.7.2",
+  "containerd_version": "2.3.7",
+  "containerd_artifact": {
+    "url": "https://github.com/containerd/containerd/releases/download/v2.3.7/containerd-2.3.7-linux-amd64.tar.gz",
+    "sha256": "09a1b669ac6d21e7e24c3c33a9805b48987ba5845e8d88f039c47013a0c0025c",
+    "filename": "containerd-gpu-linux-amd64",
+    "max_bytes": 134217728
+  },
+  "evidence": {
+    "checked_at": "2026-11-04",
+    "release": "https://github.com/containerd/containerd/releases/tag/v2.3.7",
+    "matrix": "https://docs.nvidia.com/datacenter/cloud-native/gpu-operator/26.7/platform-support.html"
+  },
+  "limitations": [
+    "Metadata and supported-version selection; no GPU-host installation is established by this lock.",
+    "CPU hosts retain containerd 2.4.2.",
+    "GPU Operator, not Ansible, owns NVIDIA drivers, toolkit, plugin and DCGM."
+  ]
+}

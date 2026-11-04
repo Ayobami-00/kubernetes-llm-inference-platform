@@ -7,5 +7,7 @@
     - klip_base
     - role: klip_storage
       when: klip_node.role == 'control_plane'
+    - role: klip_gpu_host
+      when: klip_node.runtime_profile | default('standard') == 'nvidia-operator'
     - klip_runtime
     - klip_telemetry
