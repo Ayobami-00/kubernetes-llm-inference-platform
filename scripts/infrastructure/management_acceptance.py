@@ -23,6 +23,21 @@ from management_release import ORIGIN, folder
 from smoke import wait_until
 
 
+class HTTPSProbeFailure(RuntimeError):
+    def __init__(self, path, error):
+        self.safe_details = {
+            "type": type(error).__name__,
+            "path": path,
+            "http_status": getattr(error, "code", None),
+            "reason_type": type(getattr(error, "reason", None)).__name__,
+        }
+        super().__init__(
+            "Authenticated HTTPS probe failed: "
+            + json.dumps(self.safe_details)
+            + "; credential-bearing details withheld"
+        )
+
+
 class PinnedTunnelConnection(http.client.HTTPSConnection):
     def __init__(self, host, *, local_port, **kwargs):
         if host != urlparse(ORIGIN).hostname:
@@ -120,10 +135,8 @@ def https_probe(port: int | None, ca_file=None, *, handler=None) -> dict:
                 if len(data) > 16 * 1024 * 1024:
                     raise ValueError("Application proof response exceeds its bound")
                 return json.loads(data) if data else None
-        except Exception:
-            raise RuntimeError(
-                "Authenticated HTTPS probe failed; credential-bearing details withheld"
-            ) from None
+        except Exception as error:
+            raise HTTPSProbeFailure(path, error) from None
 
     request("/health/ready")
     session = request(
@@ -152,9 +165,6 @@ def https_probe(port: int | None, ca_file=None, *, handler=None) -> dict:
 
 
 def verify() -> dict:
-    from cluster import FOLDER, Host, kubectl, load_hosts
-    from database_recovery import sql
-
     plan = json.loads((folder() / "plan.json").read_text())
     active = json.loads((folder() / "active.json").read_text())
     if active["approval_sha256"] != plan["approval_sha256"]:
@@ -174,6 +184,23 @@ def verify() -> dict:
     }
     path = root / "verification.json"
     write_private(path, report)
+    try:
+        return _verify(plan, report, root, path)
+    except Exception as error:
+        report.update(
+            status="failed",
+            failed_at=utc_now(),
+            error=getattr(error, "safe_details", {"type": type(error).__name__}),
+        )
+        write_private(path, report)
+        raise
+
+
+def _verify(plan, report, root, path):
+    from cluster import FOLDER, Host, kubectl, load_hosts
+    from database_recovery import sql
+
+    operation = report["operation"]
     backend_pods = []
     for role in ("api", "worker", "web"):
         deployment = json.loads(

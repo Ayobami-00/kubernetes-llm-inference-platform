@@ -600,3 +600,28 @@ returned three deduplicated API-server targets at 23:45 UTC, while selecting a
 nonexistent gateway returned no series. The retained `cold-history-proof.json`
 therefore records `cold_history_verified: true`. This demonstrates cold history
 retrieval for those uploaded blocks, not a completed retention/failure rehearsal.
+
+On 4 November, the Lambda allocation boundary passed isolated PostgreSQL CI,
+including concurrent dispatch and uncertain-response reconciliation. The bootstrap
+callback passed database/API tests and generated-client checks. GPU runtime
+preparation now uses its own pinned 2.3.7 artifact; the CPU runtime stays 2.4.2.
+The first infrastructure check found an incomplete offline template context; the
+correction now renders both runtime profiles and passed infrastructure CI.
+
+Source `055d6f3` adds the typed isolated host-executor core and passed management,
+contracts, infrastructure, image and native workload CI. Local checks passed
+794 tests with 17 optional skips, Ruff/formatting and all 21 generated schemas.
+Its transport/ownership tests do not establish live SSH/Ansible execution through
+the new executor. Mutual-TLS service, dedicated image/storage/IAM, management
+wiring and actual connectivity/GPU canaries remain next work. Real provisioning
+is still disabled and no GPU has been rented.
+
+Verification `a3f9501baca9` stopped at the private HTTPS readiness probe before
+login; the old helper did not capture the underlying cause. The public health
+endpoint subsequently returned 200, both unchanged API Pods/endpoints were ready,
+all six nodes were ready and CNPG reported continuous archiving and a successful
+02:00 backup. Follow-up `0f531385cc4e` passed the full management verification at
+02:53:22 UTC. The initial failure is retained and is not treated as a measured
+application outage or silently erased. The verifier now records failed status
+and safe error class/status metadata without retaining credential-bearing errors
+or adding authentication retries.
