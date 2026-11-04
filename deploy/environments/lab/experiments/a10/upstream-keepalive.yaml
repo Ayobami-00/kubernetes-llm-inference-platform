@@ -10,3 +10,21 @@ spec:
   timeout:
     http:
       connectionIdleTimeout: 3s
+---
+# AI Gateway 1.2.0 rebuilds InferencePool HTTP options in PostCluster. The
+# ordinary BackendTrafficPolicy is consequently lost. Envoy Gateway 1.9.3
+# applies this narrow JSON patch after PostCluster; AI PostTranslation preserves it.
+# Verify the resulting value on every Envoy replica before admitting a run.
+apiVersion: gateway.envoyproxy.io/v1alpha1
+kind: EnvoyPatchPolicy
+metadata: {name: writer-assist-a10-upstream, namespace: llm-d}
+spec:
+  targetRef: {group: gateway.networking.k8s.io, kind: Gateway, name: inference}
+  type: JSONPatch
+  jsonPatches:
+    - type: type.googleapis.com/envoy.config.cluster.v3.Cluster
+      name: httproute/llm-d/writer-assist-a10/rule/0
+      operation:
+        op: add
+        path: /typed_extension_protocol_options/envoy.extensions.upstreams.http.v3.HttpProtocolOptions/common_http_protocol_options
+        value: {idle_timeout: 3s}

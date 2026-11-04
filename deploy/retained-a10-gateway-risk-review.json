@@ -25,14 +25,14 @@
   },
   "conditions": {
     "private-entry": "Only a ClusterIP listener, authenticated with a high-entropy API key; no public Service or DNS entry.",
-    "fixed-model": "Only gec-small routes to the one identity-verified WriterAssist pool. No provider fallbacks, arbitrary backends, JWT/JWKS, custom plugins or model-supplied code. The optional WriterAssist-only BackendTrafficPolicy closes idle upstream connections at three seconds, with no retries.",
+    "fixed-model": "Only gec-small routes to the one identity-verified WriterAssist pool. No provider fallbacks, arbitrary backends, JWT/JWKS, custom plugins or model-supplied code. The optional WriterAssist-only BackendTrafficPolicy closes idle upstream connections at three seconds, with no retries. A pinned, model-cluster-only Envoy JSON patch preserves the timeout after AI Gateway PostCluster; it neither changes authentication nor introduces retries.",
     "private-ca": "The EPP x509 High finding remains. Its TLS peers are the fixed private Kubernetes API and gateway services, without attacker-supplied intermediate certificates. Model metric scraping is private HTTP.",
     "resource-isolation": "Proxy replicas are spread across protected CPU hosts, the EPP is CPU-affined and bounded, and Cilium restricts API/model/metric flows. Admission permits private host/remote-node identities on port 9443 for the self-managed API servers. Endpoint-picker selectors use the pinned chart Pod label. The fixed gateway may reach controller xDS on 18000/18002. Scrape monitors use separate named, port-scoped policies."
   },
   "configuration": {
     "deploy/environments/lab/experiments/a10/router-values.yaml": "a926dc61b42346925ccfc40ddb82118a0e943b26e78dc0e155e3123095bab996",
     "deploy/environments/lab/experiments/a10/gateway.yaml": "8b7af31bac6097e88edc436a5686d6784e47985ffbb6d0dadd818c16ee80b55e",
-    "deploy/environments/lab/experiments/a10/upstream-keepalive.yaml": "b785d9900a3cd964036a7b90b9634c47cb9a014e0a40f48e825ff38300e14176"
+    "deploy/environments/lab/experiments/a10/upstream-keepalive.yaml": "daba8d428946479953193675c382b8a4f80521125b7858c65b47115ed3c677cd"
   },
   "limitations": [
     "One EPP and one A10 model; no serving HA claim. One EPP High finding is retained. Public exposure needs a separate review."

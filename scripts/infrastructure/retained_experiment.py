@@ -286,6 +286,7 @@ def stage(evidence, variant, identity, *, sustained=False):
         )
         or "null"
     )
+    patch, gateway_proof = None, None
     if policy is not None:
         expected = {
             "targetRefs": [
@@ -309,7 +310,40 @@ def stage(evidence, variant, identity, *, sustained=False):
             for c in conditions
         ):
             raise ValueError("A10 transport policy differs or is not accepted")
-        pin = hashlib.sha256(json.dumps(expected, sort_keys=True).encode()).hexdigest()
+        expected_patch = next(
+            d["spec"]
+            for d in yaml.safe_load_all(
+                (
+                    ROOT / "deploy/environments/lab/experiments/a10/upstream-keepalive.yaml"
+                ).read_text()
+            )
+            if d["kind"] == "EnvoyPatchPolicy"
+        )
+        patch = json.loads(
+            kubectl(
+                "-n", "llm-d", "get", "envoypatchpolicy", "writer-assist-a10-upstream", "-o", "json"
+            )
+        )
+        conditions = [
+            c
+            for ancestor in patch.get("status", {}).get("ancestors", [])
+            for c in ancestor.get("conditions", [])
+        ]
+        if patch["spec"] != expected_patch or not any(
+            c["type"] == "Programmed"
+            and c["status"] == "True"
+            and c.get("observedGeneration") == patch["metadata"]["generation"]
+            for c in conditions
+        ):
+            raise ValueError("Inference upstream patch differs or is not programmed")
+        from retained_gateway_runtime import observe
+
+        gateway_proof = observe()
+        pin = hashlib.sha256(
+            json.dumps(
+                {"backend_policy": expected, "post_cluster_patch": expected_patch}, sort_keys=True
+            ).encode()
+        ).hexdigest()
         # Additional platform entries may pin configuration content as well as
         # semantic software versions. This records the changed condition before freeze.
         versions["platform_versions"]["a10-transport-policy"] = "sha256:" + pin
@@ -341,6 +375,10 @@ def stage(evidence, variant, identity, *, sustained=False):
             ]
         ).encode(),
     }
+    if gateway_proof is not None:
+        files[root + "/gateway-proof.json"] = json.dumps(
+            {"backend_policy": policy, "patch": patch, "effective": gateway_proof}, indent=2
+        ).encode()
     payload = {k: base64.b64encode(v).decode() for k, v in files.items()}
     api_exec(
         """import sys,json,base64
@@ -407,6 +445,8 @@ print('staged immutable files')
             "variant": variant,
             "duration_variant": "sustained-20m" if sustained else "canonical",
             "gateway_transport_policy": policy,
+            "gateway_xds_patch": patch,
+            "gateway_effective_proof": gateway_proof,
             "node": node,
             "inventory": inv,
             "capacity": capacity,
