@@ -10,7 +10,7 @@ rendering or a successful stub run does not satisfy a live gate.
 | --- | --- | --- |
 | Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | Live, including management/API recovery, database promotion and isolated restore; durable worker ownership and unplanned CPU loss still pending |
 | Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
-| GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pending |
+| GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pinned Operator/NFD CPU controllers live; actual GPU installation, CUDA and telemetry ingestion pending |
 | Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
 | WriterAssist | Real JFLEG canonical run, valid delivery, GLEU and reconciled SLO verdict | Pending |
 | Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | Private metrics/logs/traces live, synthetic persisted trace queried; full views, application instrumentation, public dashboard and failure tests pending |
@@ -640,3 +640,36 @@ The exact deployed image and seven-day residual-risk review are documented in
 `lambda-lifecycle-integration.md`. Management's real lifecycle is not enabled and
 no GPU has been rented. UI-driven allocation, GPU/software readiness, serving,
 live inference and full recovery gates remain unfinished.
+
+On 4 November, source `238b40a` installed GPU Operator 26.7.2 and standalone NFD
+0.20.1 from checksum-verified charts and Linux AMD64 image digests. The older
+bundled NFD is disabled. The three controller Pods became Ready on platform CPU
+workers; verification at 05:57:52 UTC matched their runtime image IDs to the
+reviewed digests. NFD workers require an executor-assigned protected candidate
+label, and their desired count was zero. No GPU was allocated and no NVIDIA
+driver was installed on a CPU host. The saved installation is
+`fcd49d3649272058a2da50b93b45f3c32ce6eebfbd99cefcf65e71da5cd76783`.
+
+Source `3922d93` then applied the narrowly scoped telemetry transition
+`49b94b284d07d7312e05f54b3e0020fe62385266d9733405e4b6e2db9f3b464c`.
+It adds the actual Prometheus discovery label to the DCGM ServiceMonitor and
+permits only Prometheus-to-GPU-exporter TCP 9400 egress. The original install,
+previous values/rendering, both Helm revisions and the update receipt remain
+retained. Fresh installations include the corrected configuration directly.
+See the [GPU Operator runbook](../runbooks/gpu-operator.md).
+
+Post-update verification at 06:13:05 UTC confirmed six Ready CPU nodes, two Ready
+replicas of each management component, three Ready PostgreSQL instances, three
+Ready API-server/etcd Pods each, and both Prometheus replicas Ready. The first
+verification stopped because it used a Pod component label against Deployment
+metadata; exact Deployment-name checks corrected that verification assumption.
+No application outage is inferred from that script failure.
+
+The full offline suite passed 914 tests with 17 optional skips, Ruff/formatting,
+21 generated schemas and management OpenAPI checks. Clean-cache chart fetching
+also passed. Controller scans found no Critical findings; remaining High tuples
+are explicitly reviewed against the private CPU-controller boundary with an
+expiry. That review does not approve the GPU host runtime. Controller readiness
+and configured scrape policies do not prove allocatable GPUs or ingested DCGM
+measurements. Real host inspection, runtime security, UI-driven A10 admission,
+serving and real inference remain required before those gates can pass.
