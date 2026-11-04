@@ -98,6 +98,20 @@ worker recovery reproduces the original bytes. Historical reports and assessment
 remain immutable. The experiment definition/report specification is
 `experiments/writer-assist-a10/ngram-comparison.md`.
 
+An opt-in Playwright procedure exercises the actual deployed dashboard. It never
+provisions capacity or submits an experiment through a hidden API shortcut:
+
+```sh
+node scripts/infrastructure/a10_comparison_ui.mjs inspect artifacts/acceptance/a10-pair-preview
+node scripts/infrastructure/a10_comparison_ui.mjs launch artifacts/acceptance/a10-pair-launch
+node scripts/infrastructure/a10_comparison_ui.mjs collect artifacts/acceptance/a10-pair-result <experiment-id>
+```
+
+Use a fresh output directory for each action. A saved launch intent must be
+observed rather than resubmitted. `cancel` takes an existing experiment ID and
+clicks that card's cancellation button. Downloads are checksum-verified; captured
+responses and screenshots remain in ignored private artifact storage.
+
 Use the existing private access helper for Grafana, then open the A10 speculation
 dashboard. Server counters and scrape-based increases explain behavior; client
 records are the SLO authority. A successful pair establishes behavior on this
