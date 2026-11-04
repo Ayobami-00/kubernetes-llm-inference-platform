@@ -14,6 +14,7 @@ PyYAML. It imports no service, cloud, Kubernetes, benchmarking or persistence li
 | `WorkerGroupStatus` / `WorkerGroup` | Observed members, counts, allocation and expiry; optionally wrapped with the spec |
 | `ServingProfile` | Aggregated vLLM model recipe, resources, placement and routing intent |
 | `OperationStatus` | One background management action and its public progress |
+| `HostTask` / `HostTaskObservation` | Bounded identities and observed results for the isolated privileged executor; no commands or credential paths |
 | `InfrastructureInventory` | Observed cluster, network, host and GPU information |
 | `DatasetManifest` | Public source and preparation metadata; optional prepared-artifact metadata |
 | `RunSnapshot` / `Run` / `RunResult` | Resolved inputs, execution state, and final measurements/assessments in one run resource |
@@ -28,6 +29,14 @@ serving profiles and worker groups. It includes defaults and makes an independen
 versions, inventory and schedule metadata. Persist the snapshot once before execution; the management
 backend owns database write protection and published-revision enforcement. Editing a
 published configuration requires a new revision rather than rewriting historical inputs.
+
+Host tasks preserve a separate opaque identity, input checksum, native Job UID,
+deadline and predecessor chain. They exclude persistent CPU names and WireGuard
+slots. GPU readiness requires host/node/Cilium checks, verified connectivity and
+a GPU canary, with a retained evidence checksum. `connectivity_verified` covers
+DNS, Service reachability and effective MTU; the executor must produce that proof.
+These models validate supplied observations; they do not perform host checks or
+make an undeployed executor available.
 
 `validate_for_execution(snapshot)` checks that draft placeholders have been resolved: prepared
 datasets and their tokenizer/template identity, source revisions and reviewed licenses, immutable

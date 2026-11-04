@@ -10,6 +10,8 @@ from platform_contracts import (
     CustomerSpec,
     DatasetManifest,
     ExecutionTarget,
+    HostTask,
+    HostTaskObservation,
     InfrastructureInventory,
     OperationStatus,
     PreparationManifest,
@@ -47,6 +49,8 @@ SCHEMA_MODELS = {
     "request-record": RequestRecord,
     "session-record": SessionRecord,
     "runner-observation": RunnerObservation,
+    "host-task": HostTask,
+    "host-task-observation": HostTaskObservation,
 }
 
 

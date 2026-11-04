@@ -88,3 +88,41 @@ privileges outside the management application and artifact mount. Its durable
 operation/Job identity must be reconciled after process loss, rather than starting
 another host operation blindly. Real UI mode stays disabled until that path and
 actual GPU/network readiness are integrated.
+
+The isolated executor now has typed `HostTask`/`HostTaskObservation` contracts and
+a tested Kubernetes Job ownership component. Tasks accept GPU/provider identity,
+addresses, a trusted public host key, revision/deadline and predecessor identity.
+They cannot carry commands, credential paths, manifests or namespace overrides.
+The controller fixes the image, non-root UID 20002, private state/credential
+mounts, CPU placement and one non-retrying Job. Only an explicit STS-audience
+token is projected into the execution Pod; it has no Kubernetes API token.
+
+Inputs and the first observed Job UID are immutable. Repeated/terminal tasks
+reuse their original result without API access. An ambiguous submit is observed;
+a missing Job fails and cannot be recreated under the same task. Another host
+mutation waits for successful completion; failed/uncertain work requires explicit
+reconciliation. Changed instance/key/UID, injected initialization containers and
+changed Job security/image/command are rejected. This component has cloud-free
+ownership tests. Its worker now invokes B's GPU prepare/join/remove operations
+under a private state lock, checking the frozen input digest and permanent native
+Pod/Job ownership before transport. It verifies the expected Kubernetes namespace
+UID and protected CPU peer definitions, pins GPU SSH host access, updates only
+the GPU peer, and derives credential references outside management payloads.
+Short-lived join material is placed in local scratch and the exact issued token
+is revoked afterward. SSH control sockets also use local scratch when configured;
+durable receipts and peer state remain on shared storage. Generic host success
+cannot mark GPU/connectivity checks ready.
+
+The worker's transport/ownership wrapper has cloud-free tests. Actual SSH/Ansible
+execution through this new worker is not yet live-verified. Connectivity/CUDA
+inspection, the mutual-TLS API, dedicated storage/IAM/image, deployment, state
+handoff and management adapters still require implementation and verification.
+The fixed template/core is not an enabled service. Its executor image must include
+the pinned operator tools and infrastructure dependencies before deployment.
+
+Peer-registry ownership must transfer deliberately to the executor. Do not run an
+independent operator mesh reconciliation from an older local registry: node-side
+revision checks reject stale/conflicting revisions, but they are not a replacement
+for one authoritative registry and serialized updates. Fresh-cluster rebuild and
+manual reconciliation must first recover that authoritative state. Failed or lost
+host work remains cleanup-pending rather than releasing the mutation slot blindly.

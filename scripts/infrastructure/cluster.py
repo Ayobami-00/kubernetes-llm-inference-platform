@@ -96,7 +96,10 @@ class Host:
         multiplex = ["-o", "ControlMaster=no", "-o", "ControlPath=none"]
         if reuse:
             identity = hashlib.sha256(json.dumps(fields, sort_keys=True).encode()).hexdigest()[:16]
-            control_path = private_dir(state_home() / "ssh") / identity
+            socket_home = Path(os.environ.get("KLIP_SSH_SOCKET_HOME", state_home() / "ssh"))
+            if not socket_home.is_absolute():
+                raise ValueError("SSH control sockets require an absolute private directory")
+            control_path = private_dir(socket_home) / identity
             # OpenSSH appends a temporary suffix when creating the master socket.
             if len(str(control_path).encode()) > 85:
                 raise ValueError("Operator state path is too long for an SSH control socket")

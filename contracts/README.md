@@ -1,8 +1,9 @@
 # Schemas and runtime fixtures
 
-`schemas/` contains nineteen self-contained JSON Schema 2020-12 documents generated from the Python
+`schemas/` contains twenty-one self-contained JSON Schema 2020-12 documents generated from the Python
 models, including execution targets, preparations, admissions, requests, sessions and runner
-observations. Python models are authoritative. `additionalProperties: false` rejects unknown fields;
+observations and typed host-executor tasks/observations. Python models are authoritative.
+`additionalProperties: false` rejects unknown fields;
 cross-record, timestamp-ordering and arithmetic rules are additionally enforced by Pydantic and
 the shared validators, because JSON Schema alone does not encode all those checks.
 

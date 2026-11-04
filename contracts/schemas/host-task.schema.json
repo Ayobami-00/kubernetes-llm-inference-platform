@@ -1,0 +1,121 @@
+{
+  "$id": "https://schemas.inference-platform.example/0.1/host-task.schema.json",
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "additionalProperties": false,
+  "properties": {
+    "action": {
+      "enum": [
+        "prepare",
+        "join",
+        "inspect",
+        "remove"
+      ],
+      "title": "Action",
+      "type": "string"
+    },
+    "cluster_id": {
+      "const": "klip",
+      "default": "klip",
+      "title": "Cluster Id",
+      "type": "string"
+    },
+    "deadline": {
+      "format": "date-time",
+      "title": "Deadline",
+      "type": "string"
+    },
+    "drain_timeout_s": {
+      "default": 120,
+      "maximum": 600,
+      "minimum": 1,
+      "title": "Drain Timeout S",
+      "type": "integer"
+    },
+    "id": {
+      "pattern": "^host-[a-f0-9]{24}$",
+      "title": "Id",
+      "type": "string"
+    },
+    "node_name": {
+      "pattern": "^gpu-[a-f0-9]{12,32}$",
+      "title": "Node Name",
+      "type": "string"
+    },
+    "node_uid": {
+      "anyOf": [
+        {
+          "pattern": "^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Node Uid"
+    },
+    "previous_task_id": {
+      "anyOf": [
+        {
+          "pattern": "^host-[a-f0-9]{24}$",
+          "type": "string"
+        },
+        {
+          "type": "null"
+        }
+      ],
+      "default": null,
+      "title": "Previous Task Id"
+    },
+    "private_ip": {
+      "format": "ipv4",
+      "title": "Private Ip",
+      "type": "string"
+    },
+    "provider_instance_id": {
+      "pattern": "^[a-f0-9]{32}$",
+      "title": "Provider Instance Id",
+      "type": "string"
+    },
+    "public_ip": {
+      "format": "ipv4",
+      "title": "Public Ip",
+      "type": "string"
+    },
+    "registry_revision": {
+      "exclusiveMinimum": 0,
+      "title": "Registry Revision",
+      "type": "integer"
+    },
+    "schema_version": {
+      "const": "0.1",
+      "default": "0.1",
+      "title": "Schema Version",
+      "type": "string"
+    },
+    "trusted_host_key": {
+      "maxLength": 256,
+      "title": "Trusted Host Key",
+      "type": "string"
+    },
+    "wireguard_ip": {
+      "format": "ipv4",
+      "title": "Wireguard Ip",
+      "type": "string"
+    }
+  },
+  "required": [
+    "id",
+    "action",
+    "provider_instance_id",
+    "node_name",
+    "public_ip",
+    "private_ip",
+    "wireguard_ip",
+    "trusted_host_key",
+    "registry_revision",
+    "deadline"
+  ],
+  "title": "HostTask",
+  "type": "object"
+}

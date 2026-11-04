@@ -1,0 +1,140 @@
+"""Typed requests to the isolated host executor; never commands or credential paths."""
+
+import base64
+from ipaddress import IPv4Address, IPv4Network
+from typing import Literal, Self
+
+from pydantic import Field, model_validator
+
+from .common import ContractModel, ErrorInfo, NonEmpty, PositiveInt, Sha256, Timestamp
+
+
+def ed25519_host_key(value: str) -> str:
+    fields = value.split() if isinstance(value, str) else []
+    try:
+        blob = base64.b64decode(fields[1], validate=True) if len(fields) == 2 else b""
+    except ValueError:
+        blob = b""
+    if (
+        not isinstance(value, str)
+        or "\n" in value
+        or "\r" in value
+        or len(fields) != 2
+        or fields[0] != "ssh-ed25519"
+        or len(blob) != 51
+        or blob[:19] != b"\x00\x00\x00\x0bssh-ed25519\x00\x00\x00\x20"
+    ):
+        raise ValueError("Expected one Ed25519 public host key")
+    return "ssh-ed25519 " + base64.b64encode(blob).decode()
+
+
+class HostTask(ContractModel):
+    schema_version: Literal["0.1"] = "0.1"
+    id: str = Field(pattern=r"^host-[a-f0-9]{24}$")
+    cluster_id: Literal["klip"] = "klip"
+    action: Literal["prepare", "join", "inspect", "remove"]
+    provider_instance_id: str = Field(pattern=r"^[a-f0-9]{32}$")
+    node_name: str = Field(pattern=r"^gpu-[a-f0-9]{12,32}$")
+    node_uid: str | None = Field(
+        default=None, pattern=r"^[a-f0-9]{8}(?:-[a-f0-9]{4}){3}-[a-f0-9]{12}$"
+    )
+    public_ip: IPv4Address
+    private_ip: IPv4Address
+    wireguard_ip: IPv4Address
+    trusted_host_key: str = Field(max_length=256)
+    registry_revision: PositiveInt
+    deadline: Timestamp
+    previous_task_id: str | None = Field(default=None, pattern=r"^host-[a-f0-9]{24}$")
+    drain_timeout_s: int = Field(default=120, strict=True, ge=1, le=600)
+
+    @model_validator(mode="after")
+    def bounded_identity(self) -> Self:
+        if not self.public_ip.is_global or self.public_ip.is_multicast:
+            raise ValueError("GPU executor requires a public provider IPv4 endpoint")
+        if any(
+            self.private_ip in network
+            for network in (
+                IPv4Network("127.0.0.0/8"),
+                IPv4Network("169.254.0.0/16"),
+                IPv4Network("224.0.0.0/4"),
+                IPv4Network("0.0.0.0/8"),
+                IPv4Network("10.40.0.0/16"),
+                IPv4Network("10.200.0.0/24"),
+                IPv4Network("10.244.0.0/16"),
+                IPv4Network("10.96.0.0/12"),
+            )
+        ):
+            raise ValueError("Invalid provider private IPv4 address")
+        if (
+            self.wireguard_ip not in IPv4Network("10.200.0.0/24")
+            or int(str(self.wireguard_ip).split(".")[-1]) < 67
+            or str(self.wireguard_ip).endswith(".255")
+        ):
+            raise ValueError("GPU addresses must exclude fixed CPU slots and network boundaries")
+        self.trusted_host_key = ed25519_host_key(self.trusted_host_key)
+        if self.action == "prepare":
+            if self.previous_task_id is not None or self.node_uid is not None:
+                raise ValueError("Initial preparation cannot claim a prior task or node UID")
+        elif self.previous_task_id is None:
+            raise ValueError("Follow-up host work requires the original task chain")
+        if self.action in {"inspect", "remove"} and self.node_uid is None:
+            raise ValueError("Inspection/removal requires the observed node UID")
+        if self.previous_task_id == self.id:
+            raise ValueError("Host task cannot refer to itself")
+        return self
+
+
+class HostTaskObservation(ContractModel):
+    schema_version: Literal["0.1"] = "0.1"
+    task_id: str = Field(pattern=r"^host-[a-f0-9]{24}$")
+    input_sha256: Sha256
+    status: Literal["queued", "running", "completed", "failed"]
+    job_uid: NonEmpty | None = None
+    stage: NonEmpty
+    observed_at: Timestamp
+    node_name: NonEmpty | None = None
+    node_uid: NonEmpty | None = None
+    public_wireguard_key: NonEmpty | None = None
+    registry_revision: PositiveInt
+    host_ready: bool = False
+    wireguard_ready: bool = False
+    kubernetes_ready: bool = False
+    cilium_ready: bool = False
+    connectivity_verified: bool = False
+    gpu_canary_verified: bool = False
+    evidence_sha256: Sha256 | None = None
+    gpu_runtime_ready: bool = False
+    cleanup_pending: bool = False
+    error: ErrorInfo | None = None
+
+    @model_validator(mode="after")
+    def consistent_observation(self) -> Self:
+        if self.status == "completed" and self.job_uid is None:
+            raise ValueError("Completed host execution requires its observed Job UID")
+        if self.status == "failed" and self.error is None:
+            raise ValueError("Failed host execution requires an error")
+        if self.status != "failed" and self.error is not None:
+            raise ValueError("Non-failed execution cannot report a terminal error")
+        if (self.node_name is None) != (self.node_uid is None):
+            raise ValueError("Observed node name and UID must be supplied together")
+        if self.gpu_runtime_ready and not (
+            self.host_ready
+            and self.wireguard_ready
+            and self.kubernetes_ready
+            and self.cilium_ready
+            and self.connectivity_verified
+            and self.gpu_canary_verified
+            and self.evidence_sha256 is not None
+            and self.node_uid is not None
+        ):
+            raise ValueError("GPU readiness requires actual host/network/node readiness")
+        if self.status in {"queued", "running"} and self.gpu_runtime_ready:
+            raise ValueError("In-flight host work cannot claim completed GPU verification")
+        if self.public_wireguard_key is not None:
+            try:
+                valid = len(base64.b64decode(self.public_wireguard_key, validate=True)) == 32
+            except ValueError:
+                valid = False
+            if not valid:
+                raise ValueError("Malformed public WireGuard key")
+        return self
