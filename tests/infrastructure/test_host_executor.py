@@ -488,6 +488,8 @@ def test_chart_keeps_host_custody_outside_management_and_job_rbac():
     from common import ROOT, tool
     from image_release import guard_workloads
 
+    if not (ROOT / "artifacts/tools/bin/helm").is_file():
+        pytest.skip("Chart boundary verification requires the pinned infrastructure Helm tool")
     rendered = subprocess.run(
         [
             tool("helm"),
