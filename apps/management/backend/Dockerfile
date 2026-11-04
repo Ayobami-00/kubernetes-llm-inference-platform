@@ -6,7 +6,11 @@ COPY pyproject.toml uv.lock .python-version ./
 COPY scripts/management/stage_workspace.py /tmp/stage_workspace.py
 RUN --mount=type=bind,source=.,target=/workspace-context,readonly \
     python /tmp/stage_workspace.py /workspace-context /app \
-    && uv sync --locked --package platform-management --no-dev  && useradd --uid 10001 --create-home management  && mkdir -p /artifacts /app/artifacts/management  && chown -R 10001:10001 /artifacts /app/artifacts
+    && uv sync --locked --package platform-management --no-dev \
+    && .venv/bin/python -m platform_management.jobs.provider_prerequisites --help >/dev/null \
+    && useradd --uid 10001 --create-home management \
+    && mkdir -p /artifacts /app/artifacts/management \
+    && chown -R 10001:10001 /artifacts /app/artifacts
 COPY configs configs
 COPY datasets/manifests datasets/manifests
 COPY contracts/fixtures contracts/fixtures

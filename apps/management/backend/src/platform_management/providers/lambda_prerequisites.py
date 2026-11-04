@@ -6,9 +6,8 @@ import re
 from ipaddress import IPv4Network
 from typing import Literal
 
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PublicKey
 from platform_contracts.common import ContractModel, Sha256
+from platform_contracts.host_operations import ed25519_host_key
 from pydantic import Field, model_validator
 
 from platform_management.providers.lambda_mutations import (
@@ -43,21 +42,8 @@ class PrerequisiteSpec(ContractModel):
             or len(set(self.cpu_public_ips.values())) != 6
         ):
             raise ValueError("Provider prerequisites require six distinct fixed public CPU /32s")
-        fields = self.public_key.split()
-        if len(fields) != 2 or fields[0] != "ssh-ed25519":
+        if ed25519_host_key(self.public_key) != self.public_key:
             raise ValueError("Only the executor's canonical public Ed25519 key may be registered")
-        try:
-            key = serialization.load_ssh_public_key(self.public_key.encode())
-            if (
-                not isinstance(key, Ed25519PublicKey)
-                or key.public_bytes(
-                    serialization.Encoding.OpenSSH, serialization.PublicFormat.OpenSSH
-                ).decode()
-                != self.public_key
-            ):
-                raise ValueError("Unexpected bootstrap key")
-        except (ValueError, TypeError):
-            raise ValueError("Invalid public bootstrap key") from None
         return self
 
     @property
