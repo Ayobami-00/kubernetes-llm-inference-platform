@@ -8,7 +8,14 @@ from pydantic import ValidationError
 from sqlalchemy import text
 from sqlalchemy.exc import IntegrityError
 
-from platform_management.api.routers import actions, auth, imports, specifications, topology
+from platform_management.api.routers import (
+    actions,
+    auth,
+    bootstrap,
+    imports,
+    specifications,
+    topology,
+)
 from platform_management.api.schemas import ErrorEnvelope
 from platform_management.db.session import session
 from platform_management.observability import RequestLogging
@@ -31,7 +38,14 @@ app = FastAPI(
     openapi_url="/api/openapi.json",
 )
 app.add_middleware(RequestLogging)
-for router in (auth.router, specifications.router, actions.router, topology.router, imports.router):
+for router in (
+    auth.router,
+    specifications.router,
+    actions.router,
+    topology.router,
+    imports.router,
+    bootstrap.router,
+):
     app.include_router(router, prefix="/api/v1")
 
 
@@ -39,8 +53,11 @@ for router in (auth.router, specifications.router, actions.router, topology.rout
 async def bounded_import(request: Request, call_next):
     from platform_management.settings import get_settings
 
-    if request.method == "POST" and request.url.path.startswith("/api/v1/imports/"):
-        limit = get_settings().import_max_bytes
+    is_bootstrap = request.url.path.startswith("/api/v1/bootstrap/")
+    if request.method == "POST" and (
+        request.url.path.startswith("/api/v1/imports/") or is_bootstrap
+    ):
+        limit = 4096 if is_bootstrap else get_settings().import_max_bytes
         try:
             advertised = int(request.headers.get("content-length", "0"))
         except ValueError:
@@ -50,8 +67,8 @@ async def bounded_import(request: Request, call_next):
                 status_code=413,
                 content={
                     "error": {
-                        "code": "import_too_large",
-                        "message": "Import exceeds the size limit",
+                        "code": "bootstrap_too_large" if is_bootstrap else "import_too_large",
+                        "message": "Payload exceeds the size limit",
                         "details": [],
                     }
                 },
@@ -65,8 +82,8 @@ async def bounded_import(request: Request, call_next):
                     status_code=413,
                     content={
                         "error": {
-                            "code": "import_too_large",
-                            "message": "Import exceeds the size limit",
+                            "code": "bootstrap_too_large" if is_bootstrap else "import_too_large",
+                            "message": "Payload exceeds the size limit",
                             "details": [],
                         }
                     },

@@ -59,3 +59,32 @@ conflicting pins, orphan capacity, credential-field filtering and definite failu
 
 Official interface checked on 4 November 2026:
 [Lambda Cloud API](https://docs.lambda.ai/api/cloud).
+
+The host-identity component now provides an operation-scoped callback at
+`POST /api/v1/bootstrap/{operation_id}`. It uses its own Bearer credential and
+cannot be authorized by an administrator session alone. Before launch, `issue`
+requires a separately mounted 32-byte bootstrap seed and a committed real pending
+intent. It records only the nonce hash, fixed HTTPS origin, seed fingerprint,
+20-minute expiry and cloud-init digest. The returned cloud-init is sensitive and
+must go directly to the provider; do not retain it in ordinary artifacts or logs.
+The deployed configuration has no seed reference yet and cannot issue a launch.
+
+Cloud-init generates a fresh Ed25519 host key, disables password/root SSH, sends
+only its public half over verified HTTPS, refuses redirects and bounds retries.
+It never transfers the private host key or master seed. The protected nonce file
+is removed after acceptance; provider/cloud-init root-only launch records can
+retain the short-lived operation nonce until expiry. The receiving API accepts a
+callback while dispatch is in flight, before the provider response is committed.
+It records the first public key transactionally. Identical retries are idempotent;
+a changed key, expired nonce, simulated intent or unattempted/terminated intent
+cannot replace it. Callback bodies are bounded to 4 KiB, including chunked input.
+The endpoint records host identity only; it never marks a worker ready.
+
+The restricted executor must next combine this retained key with the exact
+provider-observed IP, enforce strict SSH verification, and invoke B's typed
+prepare/join/remove path. It must not accept arbitrary shell commands, credential
+paths or replacement CPU peer definitions from management. Keep its SSH/SSM
+privileges outside the management application and artifact mount. Its durable
+operation/Job identity must be reconciled after process loss, rather than starting
+another host operation blindly. Real UI mode stays disabled until that path and
+actual GPU/network readiness are integrated.

@@ -14,6 +14,7 @@ class Settings(BaseSettings):
     database_ca_file: Path | None = None
     admin_password_file: Path = Path("dev/.secrets/admin_password")
     lambda_api_key_file: Path = Path("dev/.secrets/lambda_api_key")
+    bootstrap_seed_file: Path | None = None
     secure_cookies: bool = False
     allowed_origin: str = "http://localhost:5173"
     simulation_step_seconds: float = 2.0

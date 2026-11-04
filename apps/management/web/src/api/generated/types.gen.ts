@@ -905,6 +905,30 @@ export type HostAccess = {
 };
 
 /**
+ * HostAttestation
+ */
+export type HostAttestation = {
+    /**
+     * Host Key
+     */
+    host_key: string;
+};
+
+/**
+ * HostAttestationAccepted
+ */
+export type HostAttestationAccepted = {
+    /**
+     * Fingerprint
+     */
+    fingerprint: string;
+    /**
+     * Status
+     */
+    status: 'accepted';
+};
+
+/**
  * ImportAccepted
  */
 export type ImportAccepted = {
@@ -2870,6 +2894,64 @@ export type GetSessionResponses = {
 };
 
 export type GetSessionResponse = GetSessionResponses[keyof GetSessionResponses];
+
+export type AttestHostData = {
+    body: HostAttestation;
+    path: {
+        /**
+         * Identity
+         */
+        identity: string;
+    };
+    query?: never;
+    url: '/api/v1/bootstrap/{identity}';
+};
+
+export type AttestHostErrors = {
+    /**
+     * Bad Request
+     */
+    400: ErrorEnvelope;
+    /**
+     * Unauthorized
+     */
+    401: ErrorEnvelope;
+    /**
+     * Forbidden
+     */
+    403: ErrorEnvelope;
+    /**
+     * Not Found
+     */
+    404: ErrorEnvelope;
+    /**
+     * Conflict
+     */
+    409: ErrorEnvelope;
+    /**
+     * Request Entity Too Large
+     */
+    413: ErrorEnvelope;
+    /**
+     * Unprocessable Entity
+     */
+    422: ErrorEnvelope;
+    /**
+     * Too Many Requests
+     */
+    429: ErrorEnvelope;
+};
+
+export type AttestHostError = AttestHostErrors[keyof AttestHostErrors];
+
+export type AttestHostResponses = {
+    /**
+     * Successful Response
+     */
+    200: HostAttestationAccepted;
+};
+
+export type AttestHostResponse = AttestHostResponses[keyof AttestHostResponses];
 
 export type GetCapacityData = {
     body?: never;

@@ -1635,6 +1635,41 @@
         "title": "HostAccess",
         "type": "object"
       },
+      "HostAttestation": {
+        "additionalProperties": false,
+        "properties": {
+          "host_key": {
+            "maxLength": 256,
+            "title": "Host Key",
+            "type": "string"
+          }
+        },
+        "required": [
+          "host_key"
+        ],
+        "title": "HostAttestation",
+        "type": "object"
+      },
+      "HostAttestationAccepted": {
+        "additionalProperties": false,
+        "properties": {
+          "fingerprint": {
+            "title": "Fingerprint",
+            "type": "string"
+          },
+          "status": {
+            "const": "accepted",
+            "title": "Status",
+            "type": "string"
+          }
+        },
+        "required": [
+          "status",
+          "fingerprint"
+        ],
+        "title": "HostAttestationAccepted",
+        "type": "object"
+      },
       "ImportAccepted": {
         "additionalProperties": false,
         "properties": {
@@ -4537,6 +4572,10 @@
         "in": "cookie",
         "name": "management_session",
         "type": "apiKey"
+      },
+      "BootstrapCredential": {
+        "scheme": "bearer",
+        "type": "http"
       }
     }
   },
@@ -5316,6 +5355,134 @@
         "summary": "Current",
         "tags": [
           "Authentication"
+        ]
+      }
+    },
+    "/api/v1/bootstrap/{identity}": {
+      "post": {
+        "operationId": "attestHost",
+        "parameters": [
+          {
+            "in": "path",
+            "name": "identity",
+            "required": true,
+            "schema": {
+              "pattern": "^op-[a-f0-9]{16,32}$",
+              "title": "Identity",
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/HostAttestation"
+              }
+            }
+          },
+          "required": true
+        },
+        "responses": {
+          "200": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/HostAttestationAccepted"
+                }
+              }
+            },
+            "description": "Successful Response"
+          },
+          "400": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Bad Request"
+          },
+          "401": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unauthorized"
+          },
+          "403": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Forbidden"
+          },
+          "404": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Not Found"
+          },
+          "409": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Conflict"
+          },
+          "413": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Request Entity Too Large"
+          },
+          "422": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Unprocessable Entity"
+          },
+          "429": {
+            "content": {
+              "application/json": {
+                "schema": {
+                  "$ref": "#/components/schemas/ErrorEnvelope"
+                }
+              }
+            },
+            "description": "Too Many Requests"
+          }
+        },
+        "security": [
+          {
+            "BootstrapCredential": []
+          }
+        ],
+        "summary": "Attest",
+        "tags": [
+          "Host bootstrap"
         ]
       }
     },
