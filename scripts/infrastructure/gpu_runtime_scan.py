@@ -14,8 +14,11 @@ ROOT = Path(__file__).resolve().parents[2]
 LOCK = ROOT / "deploy/gpu-operator.lock.json"
 
 
-def scan(reference, directory):
-    lock = json.loads(LOCK.read_text())
+def scan(reference, directory, *, lock_path=None, kind="gpu"):
+    if kind not in {"gpu", "inference"}:
+        raise ValueError("Unknown public image scan kind")
+    lock_path = lock_path or LOCK
+    lock = json.loads(lock_path.read_text())
     item = lock["images"].get(reference)
     if (
         item is None
@@ -43,9 +46,9 @@ def scan(reference, directory):
         raise ValueError("GPU image scan requires the pinned scanner")
     pinned = reference + "@" + item["digest"]
     record = {
-        "schema_version": "klip-public-gpu-scan.v1",
+        "schema_version": "klip-public-" + kind + "-scan.v1",
         "source_commit": os.environ.get("GITHUB_SHA"),
-        "lock_sha256": hashlib.sha256(LOCK.read_bytes()).hexdigest(),
+        "lock_sha256": hashlib.sha256(lock_path.read_bytes()).hexdigest(),
         "reference": reference,
         "image": pinned,
         "platform": item["platform"],
@@ -138,5 +141,16 @@ if __name__ == "__main__":
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument("--reference", required=True)
     parser.add_argument("--directory", type=Path, required=True)
+    parser.add_argument("--source", choices=["gpu", "inference"], default="gpu")
     args = parser.parse_args()
-    print(json.dumps(scan(args.reference, args.directory), indent=2))
+    print(
+        json.dumps(
+            scan(
+                args.reference,
+                args.directory,
+                lock_path=LOCK if args.source == "gpu" else ROOT / "deploy/inference.lock.json",
+                kind=args.source,
+            ),
+            indent=2,
+        )
+    )

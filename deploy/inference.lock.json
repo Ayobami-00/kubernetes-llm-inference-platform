@@ -1,0 +1,126 @@
+{
+  "schema_version": "klip-inference-artifacts.v1",
+  "versions": {
+    "llm-d": "1.0.0",
+    "vllm": "0.30.0",
+    "envoy-gateway": "1.9.3",
+    "ai-gateway": "1.2.0",
+    "gateway-api": "1.6.2",
+    "inference-extension": "1.6.2"
+  },
+  "sources": {
+    "llm-d": "378b42d18dabe0b9c4ced4e6f3670d93b52db08e",
+    "envoy-gateway": "ec0171b20585a36de7124328c0ceaae72ad0f79f",
+    "ai-gateway": "daa9f891a8afcb18576d4593ad18870d1d18abac"
+  },
+  "charts": {
+    "gateway": {
+      "repository": "oci://docker.io/envoyproxy/gateway-helm",
+      "version": "v1.9.3",
+      "filename": "gateway-helm-v1.9.3.tgz",
+      "sha256": "1a152513adbcdb0527d7bbe3ea9b090abeb87e4ec9f34b2c18ac8c37f3177541"
+    },
+    "gateway-crds": {
+      "repository": "oci://docker.io/envoyproxy/gateway-crds-helm",
+      "version": "v1.9.3",
+      "filename": "gateway-crds-helm-v1.9.3.tgz",
+      "sha256": "aca98b7c7a77a65f50464c0bf4b25caf22391d7988a33b5e9d8e1cc7a78630ba"
+    },
+    "ai": {
+      "repository": "oci://docker.io/envoyproxy/ai-gateway-helm",
+      "version": "v1.2.0",
+      "filename": "ai-gateway-helm-v1.2.0.tgz",
+      "sha256": "21d27d22c752613c2ca41bcf7e8bc8d48ec560137d28d2714a85dc216a336eda"
+    },
+    "ai-crds": {
+      "repository": "oci://docker.io/envoyproxy/ai-gateway-crds-helm",
+      "version": "v1.2.0",
+      "filename": "ai-gateway-crds-helm-v1.2.0.tgz",
+      "sha256": "8b4daa37978dca3311da3b5e4182b8edc2e4243c77c38cfd218d8ae04110e8a9"
+    },
+    "router": {
+      "repository": "oci://ghcr.io/llm-d/charts/llm-d-router-gateway",
+      "version": "v1.0.0",
+      "filename": "llm-d-router-gateway-v1.0.0.tgz",
+      "sha256": "ced5cbcf3ba336ff57c14e66a55c77ace1bd08525e2ce29c45026cb1a1254cc7"
+    }
+  },
+  "artifacts": {
+    "gateway-api": {
+      "url": "https://github.com/kubernetes-sigs/gateway-api/releases/download/v1.6.2/standard-install.yaml",
+      "sha256": "faede450fa178126aba41337737b97d351ebe87d93c910237ce1e072d1ca40d9"
+    },
+    "inference-api": {
+      "url": "https://github.com/kubernetes-sigs/gateway-api-inference-extension/releases/download/v1.6.2/v1-manifests.yaml",
+      "sha256": "f410dfca474608c02903087b47f1ac081706dfb6dfe7f83d00a7cc7e00c4ad0d"
+    },
+    "envoy-ai-integration": {
+      "url": "https://raw.githubusercontent.com/theagentrouter/agent-router/daa9f891a8afcb18576d4593ad18870d1d18abac/manifests/envoy-gateway-values.yaml",
+      "sha256": "b2bf492487a21277ba38da8303337dff0cda59e647a53ff0a6ec16eb5a490a36"
+    },
+    "envoy-inference-integration": {
+      "url": "https://raw.githubusercontent.com/theagentrouter/agent-router/daa9f891a8afcb18576d4593ad18870d1d18abac/examples/inference-pool/envoy-gateway-values-addon.yaml",
+      "sha256": "bb427eb224690ff4404019517fc0c0820133c0fc6b7327fbb9c7c2fcd8b3919d"
+    }
+  },
+  "images": {
+    "docker.io/envoyproxy/ai-gateway-controller:v1.2.0": {
+      "reference": "docker.io/envoyproxy/ai-gateway-controller:v1.2.0",
+      "source_manifest_digest": "sha256:4d663346354321a677c4e942017277f690d0d7715f8e3348a535db174679e4f8",
+      "digest": "sha256:30c2cfea92f39adad64d6dac8504cf1b9031c1080bf6945fa40f0f2ddd140ae2",
+      "image": "docker.io/envoyproxy/ai-gateway-controller@sha256:30c2cfea92f39adad64d6dac8504cf1b9031c1080bf6945fa40f0f2ddd140ae2",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:b80551416305b97e035a0bfe686072bde7fdc7552a495a39541601899dcac693",
+      "compressed_layer_bytes": 47665007
+    },
+    "docker.io/envoyproxy/ai-gateway-extproc:v1.2.0": {
+      "reference": "docker.io/envoyproxy/ai-gateway-extproc:v1.2.0",
+      "source_manifest_digest": "sha256:4af909a6f64ee6b97968995fec88c4fd3c41d020c6bcb7ca07136fdfffaa598c",
+      "digest": "sha256:d5e4351bc7965b6c14d5b0a19c0da4507837859f3d28498f6a8e222e2e8e7802",
+      "image": "docker.io/envoyproxy/ai-gateway-extproc@sha256:d5e4351bc7965b6c14d5b0a19c0da4507837859f3d28498f6a8e222e2e8e7802",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:221e7eb828bec406747a8d68ad6580faba1ef61d770ff42816c085bed84b79f3",
+      "compressed_layer_bytes": 38124190
+    },
+    "docker.io/envoyproxy/gateway:v1.9.3": {
+      "reference": "docker.io/envoyproxy/gateway:v1.9.3",
+      "source_manifest_digest": "sha256:192fc9bdadb6d2462e8cf7bd702ce3dd9648f3310c6038787448a1f509b7cd9f",
+      "digest": "sha256:83dee303a1fda5477339c7d1ba1c311be36bff173c761339393bb57c9502f477",
+      "image": "docker.io/envoyproxy/gateway@sha256:83dee303a1fda5477339c7d1ba1c311be36bff173c761339393bb57c9502f477",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:66944e8e06742bc0ec53412c19635f76e302e8b5e6697b1d13d09d9ea94e6b8f",
+      "compressed_layer_bytes": 75709713
+    },
+    "docker.io/envoyproxy/envoy:distroless-v1.39.5": {
+      "reference": "docker.io/envoyproxy/envoy:distroless-v1.39.5",
+      "source_manifest_digest": "sha256:9d84a586119a27b50437dbb01eccd4722832741539b1ed53c8e9d6da6067a6e0",
+      "digest": "sha256:00c38048aeb4bb4b49d9ec6f3d7742a7c9f3d4d33f0371632a76734c02bebb7d",
+      "image": "docker.io/envoyproxy/envoy@sha256:00c38048aeb4bb4b49d9ec6f3d7742a7c9f3d4d33f0371632a76734c02bebb7d",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:44a67dbbdf6ddbc4bfd5539cbe118400aa55ca5cf601c8263a853b62aeeecfc3",
+      "compressed_layer_bytes": 43352399
+    },
+    "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0": {
+      "reference": "ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0",
+      "source_manifest_digest": "sha256:024188e998f516879f68532016ca24fabca00afbdcc2af9a61b17634e197df2c",
+      "digest": "sha256:8c6b24302ed21a1c4aa6ba2306187236519a8fdc92282998b33e65c6a446c516",
+      "image": "ghcr.io/llm-d/llm-d-router-endpoint-picker@sha256:8c6b24302ed21a1c4aa6ba2306187236519a8fdc92282998b33e65c6a446c516",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:5e4353ff49007f3a7e862b89515b53f2b3a857e2a1edcddba4f5b22c9d69522b",
+      "compressed_layer_bytes": 24444648
+    },
+    "docker.io/vllm/vllm-openai:v0.30.0": {
+      "reference": "docker.io/vllm/vllm-openai:v0.30.0",
+      "source_manifest_digest": "sha256:8a69ffad015f138d7170c4ddc429e230a3bc1c1719f67e14324749df200a4b90",
+      "digest": "sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "image": "docker.io/vllm/vllm-openai@sha256:5f5e535216848d0c52159c8c13a0af04be5f6fe1a84e79914300610796f76d40",
+      "platform": "linux/amd64",
+      "configuration_digest": "sha256:d076d77d8dade699041dbcb6bb989a058e51b532e6367f13f80b5a4e63ee5c53",
+      "compressed_layer_bytes": 8730525875
+    }
+  },
+  "limitations": [
+    "Pins and metadata only; native vulnerability review and live compatibility/readiness checks remain required.",
+    "Single-A10 aggregated serving only; no speculative decoding, disaggregation or serving HA claim."
+  ]
+}

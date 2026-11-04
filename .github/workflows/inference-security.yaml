@@ -1,0 +1,65 @@
+name: Inference image security
+
+on:
+  workflow_dispatch:
+  push:
+    branches: [codex/end-to-end-platform]
+    paths:
+      - 'deploy/inference.lock.json'
+      - '.github/workflows/inference-security.yaml'
+
+permissions:
+  contents: read
+
+concurrency:
+  group: inference-security-${{ github.ref }}
+  cancel-in-progress: false
+
+jobs:
+  scan:
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    strategy:
+      fail-fast: false
+      max-parallel: 3
+      matrix:
+        include:
+          - {name: gateway, reference: 'docker.io/envoyproxy/gateway:v1.9.3'}
+          - {name: proxy, reference: 'docker.io/envoyproxy/envoy:distroless-v1.39.5'}
+          - {name: ai-controller, reference: 'docker.io/envoyproxy/ai-gateway-controller:v1.2.0'}
+          - {name: ai-extproc, reference: 'docker.io/envoyproxy/ai-gateway-extproc:v1.2.0'}
+          - {name: llmd-epp, reference: 'ghcr.io/llm-d/llm-d-router-endpoint-picker:v1.0.0'}
+          - {name: vllm, reference: 'docker.io/vllm/vllm-openai:v0.30.0'}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4
+        with: {persist-credentials: false}
+      - name: Reclaim unused tools on the disposable scanner runner
+        if: matrix.name == 'vllm'
+        run: sudo rm -rf /usr/local/lib/android /usr/share/dotnet /opt/ghc
+      - name: Install checksum-verified scanner
+        run: |
+          set -euo pipefail
+          scanner_dir="$RUNNER_TEMP/klip-inference-trivy"
+          mkdir -p "$scanner_dir"
+          curl --fail --location --retry 3 --max-time 120 \
+            https://github.com/aquasecurity/trivy/releases/download/v0.76.1/trivy_0.76.1_Linux-64bit.tar.gz \
+            --output "$scanner_dir/trivy.tar.gz"
+          printf '%s  %s\n' c7cbe3137fb8a48a17574bede3dd6beb16742d1e9772929940fc90082c39d9c0 "$scanner_dir/trivy.tar.gz" | sha256sum --check -
+          tar --extract --gzip --file "$scanner_dir/trivy.tar.gz" --directory "$scanner_dir" trivy
+          printf '%s\n' "$scanner_dir" >> "$GITHUB_PATH"
+      - name: Retain complete immutable-image findings
+        env:
+          INFERENCE_REFERENCE: ${{ matrix.reference }}
+        run: >-
+          python3 scripts/infrastructure/gpu_runtime_scan.py
+          --source inference --reference "$INFERENCE_REFERENCE"
+          --directory artifacts/security/inference
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4
+        if: always()
+        with:
+          name: inference-${{ matrix.name }}-${{ github.sha }}
+          path: |
+            artifacts/security/inference/scan.json
+            artifacts/security/inference/summary.json
+          if-no-files-found: error
+          retention-days: 90
