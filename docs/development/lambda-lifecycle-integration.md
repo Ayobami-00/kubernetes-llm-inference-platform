@@ -162,3 +162,45 @@ re-exchange issue according to its [security tracker](https://security-tracker.d
 the upstream [OpenSSH release](https://www.openssh.org/releasenotes.html) and checksum
 are recorded in the build helper. A new full scan and an independent exact-image
 runtime review must pass before deployment. No finding is silently suppressed.
+
+Replacement source `6cfd742` built successfully. Its ECR scan has three High,
+nine Medium and three Low findings. The complete Trivy scan has no Critical
+findings and 55 High package/version tuples (including repeated source-package
+attribution). `deploy/host-executor-risk-review.json` retains each tuple and its
+runtime rationale, expires on 11 November, and applies only to the isolated CPU
+executor. This does not approve the retained runc artifact for live GPU use or
+declare these dependencies fixed. The first rejected image and scan remain
+retained. The SSH session policy's follow-up saved plan
+`2df3b6b2262f673904f859aadb4ee020752d640760b1304f5431557e976ae872`
+adds only the required data channel on the fixed executor session-name prefix.
+
+`host_executor_release.py handoff` freezes the six-host public inventory, host-key
+pins, cluster namespace UID, peer registry and public bootstrap key under private
+operator state. SSH private keys are excluded from that file bundle. The executor
+CA key also stays on the operator machine; separate server/client leaf identities
+are staged into different namespace Secrets. `prepare` checks the exact shipped
+source against the image commit, the complete scan, current review and separate
+storage identity. It freezes credential public fingerprints and the rendered chart.
+
+The following initial-install workflow requires the exact reviewed receipt and
+scan directory; `stage` and `deploy` require its printed approval digest:
+
+```sh
+.venv/bin/python scripts/infrastructure/host_executor_release.py handoff
+.venv/bin/python scripts/infrastructure/host_executor_release.py prepare \
+  --receipt artifacts/platform/host-executor-6cfd742/host-executor.json \
+  --security-directory artifacts/security/host-executor-6cfd742
+.venv/bin/python scripts/infrastructure/host_executor_release.py stage --approve-plan <digest>
+.venv/bin/python scripts/infrastructure/host_executor_release.py deploy --approve-plan <digest>
+```
+
+Staging uses an independently identified, non-retrying CPU Job; it never submits
+a fake GPU task. It verifies the mounted private filesystem, STS workload identity,
+cluster UID and strict SSH/sudo transport to all six existing CPUs. It then fences
+the old operator registry. A lost staging Job is not recreated, and different
+retained credentials/files cannot be overwritten on a retry. Namespace/Secret/Job
+UIDs and the preflight result remain in the private release receipt. Only then may
+the two-replica API be deployed. These scripts currently implement initial custody
+installation; upgrades and fresh-cluster recovery require a separate explicit,
+history-preserving procedure. Running `prepare` cannot erase a staged/live release.
+Management adapters, GPU inspection and failure cleanup remain separate gates.

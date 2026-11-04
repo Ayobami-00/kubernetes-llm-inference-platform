@@ -41,6 +41,10 @@ resource "aws_iam_role_policy" "host_executor" {
       Condition = { StringEquals = {
         "ssm:resourceTag/aws:ssmmessages:session-id" = "$${aws:userid}"
       } }
+    },
+    {
+      Effect   = "Allow", Action = ["ssmmessages:OpenDataChannel"],
+      Resource = "arn:aws:ssm:${local.config.region}:${local.config.account_id}:session/klip-host-executor-*"
     }
   ] })
 }

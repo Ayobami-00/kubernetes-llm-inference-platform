@@ -69,6 +69,10 @@ run "host_authority_is_separate_and_exact" {
     condition     = jsondecode(aws_iam_role_policy.host_executor.policy).Statement[1].Condition.StringEquals["ssm:resourceTag/aws:ssmmessages:session-id"] == "$${aws:userid}" && length(aws_efs_mount_target.host_executor) == 3 && aws_efs_mount_target.host_executor["platform-01"].file_system_id != aws_efs_mount_target.artifacts["platform-01"].file_system_id
     error_message = "Session cleanup stays with its federated owner and host state has separate mounts."
   }
+  assert {
+    condition     = jsondecode(aws_iam_role_policy.host_executor.policy).Statement[2].Action == ["ssmmessages:OpenDataChannel"] && jsondecode(aws_iam_role_policy.host_executor.policy).Statement[2].Resource == "arn:aws:ssm:eu-west-2:127811062476:session/klip-host-executor-*"
+    error_message = "Websocket transport may open only the fixed executor session prefix."
+  }
 }
 
 run "ebs_identity_is_bounded_to_the_platform" {
