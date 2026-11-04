@@ -1,11 +1,41 @@
 """Slow storage cannot block admission, overflow memory bounds or silently lose records."""
 
 import json
+import multiprocessing
+import os
 import threading
 from concurrent.futures import ThreadPoolExecutor
 
 import pytest
 from workload_runner.adapters.journal import BoundedJournal, append_batch, journal_status
+
+
+def child_journal(directory, abrupt):
+    from pathlib import Path
+
+    root = Path(directory)
+    journal = BoundedJournal(root / "events", root / "journal-receipts")
+    journal.emit({"fixture": True})
+    if abrupt:
+        os._exit(2)
+    # Deliberately no explicit close: exercise multiprocessing's exit path.
+
+
+@pytest.mark.parametrize("method", ["spawn", "fork"])
+@pytest.mark.parametrize("abrupt", [False, True])
+def test_process_finalizers_flush_without_atexit_but_abrupt_loss_stays_invalid(
+    tmp_path, method, abrupt
+):
+    if method not in multiprocessing.get_all_start_methods():
+        pytest.skip("Start method unavailable on this host")
+    process = multiprocessing.get_context(method).Process(
+        target=child_journal, args=(str(tmp_path), abrupt)
+    )
+    process.start()
+    process.join(timeout=15)
+    assert not process.is_alive()
+    assert process.exitcode == (2 if abrupt else 0)
+    assert journal_status(tmp_path)["status"] == ("failed" if abrupt else "drained")
 
 
 def test_slow_sink_does_not_block_producer_and_drains_every_event(tmp_path):

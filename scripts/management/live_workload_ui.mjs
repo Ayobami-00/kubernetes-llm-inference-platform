@@ -171,6 +171,12 @@ try {
     .first();
   const deadline = Date.now() + 240000;
   while (!(await row.textContent()).includes("completed")) {
+    const text = await row.textContent();
+    if (text.includes("failed") || text.includes("cancelled")) {
+      throw new Error(
+        "Original UI attempt reached a non-completed terminal state",
+      );
+    }
     if (Date.now() > deadline)
       throw new Error("Original UI attempt did not complete");
     await page.waitForTimeout(1000);

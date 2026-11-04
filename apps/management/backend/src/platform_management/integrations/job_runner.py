@@ -291,13 +291,24 @@ class KubernetesJobRunner:
         }
         if "Failed" in conditions:
             partial = self.saved_observation(handle)
+            if (
+                self.binding["runner"] != "kubernetes-fixture:v1"
+                and (not partial or partial.status in {"queued", "running"})
+                and self.finalization_waiting(job)
+            ):
+                return RunnerObservation(status="running", stage="finalizing")
             if partial and partial.result:
-                self.validated_result(handle)
+                try:
+                    self.validated_result(handle)
+                except (ValueError, OSError):
+                    return self.finalization_observation(job)
             return RunnerObservation(
                 status="failed",
                 result=partial.result if partial else None,
                 timeline_origin_at=partial.timeline_origin_at if partial else None,
-                error={
+                error=partial.error
+                if partial and partial.error
+                else {
                     "code": "runner_failed",
                     "message": "Runner Job failed or exceeded its deadline",
                 },
@@ -336,21 +347,32 @@ class KubernetesJobRunner:
         # Separate Pods can briefly read different atomic-renamed files on RWX
         # storage. Never commit a completed run from a stale queued observation.
         # The recorded Job completion fixes the deadline across worker restarts.
-        completed = job.get("status", {}).get("completionTime")
-        if completed:
-            stamp = datetime.fromisoformat(completed.replace("Z", "+00:00"))
-            age = (datetime.now(UTC) - stamp).total_seconds()
-            if -5 <= age < self.binding.get("finalization_allowance_seconds", 120):
-                return RunnerObservation(status="running", stage="finalizing")
+        if self.finalization_waiting(job):
+            return RunnerObservation(status="running", stage="finalizing")
         return RunnerObservation(
             status="failed",
             error={
                 "code": "invalid_result",
-                "message": (
-                    "Completed Job has no consistent final result/observation within its deadline"
-                ),
+                "message": "Terminal Job has no consistent artifacts within its deadline",
             },
         )
+
+    def finalization_waiting(self, job):
+        status = job.get("status", {})
+        completed = status.get("completionTime") or next(
+            (
+                c.get("lastTransitionTime")
+                for c in status.get("conditions", [])
+                if c["type"] == "Failed" and c["status"] == "True"
+            ),
+            None,
+        )
+        if completed:
+            stamp = datetime.fromisoformat(completed.replace("Z", "+00:00"))
+            age = (datetime.now(UTC) - stamp).total_seconds()
+            if -5 <= age < self.binding.get("finalization_allowance_seconds", 120):
+                return True
+        return False
 
     def validated_result(self, handle):
         directory = self.directory(handle)

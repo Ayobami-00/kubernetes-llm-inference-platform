@@ -535,3 +535,22 @@ The new bounded background writer and cached immutable inputs passed 710 offline
 tests (17 optional skips), Ruff/formatting, and all 17 native CPU AIPerf cases.
 Slow-sink, overflow, I/O failure and missing-receipt checks fail closed. Publication
 and fresh AWS acceptance of this change remain pending. No GPU has been rented.
+
+The first journal image (`f857685`) was rolled on 4 November at 00:11:51 UTC.
+Its ordinary management/backend/web checks passed, but Linux native/runner-Job
+checks subsequently failed. The real browser proof imported the new bundle and
+launched `run-45f07250760bebc0` (Job UID
+`f2a2d2a9-3378-4a30-a43f-410d19614f28`); it failed and was not relaunched.
+The private receipt preserves this failed gate. The stack remains an experiment
+environment, and no live GPU or readiness claim follows from this rollout.
+
+The timing strategy is a pure AIPerf component: it does not discover lifecycle
+stop hooks. Linux process shutdown also bypasses ordinary `atexit`. The correction
+drains the journal through a native TimingManager service stop hook, preserves
+native service metadata and adds multiprocessing finalizers as a backstop.
+Fork/spawn tests cover normal draining and deliberate abrupt loss; missing receipts
+still fail. Management also waits a bounded interval for failed-Job partial
+observations on shared storage and retains the original execution error. Root
+checks passed 715 tests (17 optional skips); two focused native cases passed.
+Linux CI and a separately identified AWS/browser attempt must pass before
+acceptance. Earlier failed/invalid artifacts remain unchanged.

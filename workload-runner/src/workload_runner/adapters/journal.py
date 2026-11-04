@@ -8,6 +8,7 @@ import threading
 import time
 from collections import deque
 from functools import lru_cache
+from multiprocessing.util import Finalize
 from pathlib import Path
 
 from workload_runner.artifacts import atomic_json
@@ -61,6 +62,10 @@ class BoundedJournal:
         self.thread = threading.Thread(target=self._write, name="transport-journal", daemon=True)
         self.thread.start()
         atexit.register(self._at_exit)
+        # multiprocessing's Linux exit path calls os._exit after its own
+        # finalizers, bypassing ordinary atexit callbacks. Strategies are not
+        # lifecycle components, so their @on_stop methods are not discovered.
+        self.finalizer = Finalize(None, self._at_exit, exitpriority=10)
 
     def emit(self, value):
         payload = (json.dumps(value, separators=(",", ":"), allow_nan=False) + "\n").encode()

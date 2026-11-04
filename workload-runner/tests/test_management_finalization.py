@@ -79,3 +79,44 @@ def test_missing_result_is_bounded_by_original_job_completion():
     job["status"]["completionTime"] = (datetime.now(UTC) - timedelta(seconds=121)).isoformat()
     assert runner.observe("op-original", "original-uid").error.code == "invalid_result"
     runner.client.request.assert_not_called()
+
+
+def test_failed_job_waits_for_partial_observation_without_erasing_its_error(repo):
+    result = RunResult.model_validate_json(
+        json.dumps(
+            json.loads(
+                (repo / "contracts/fixtures/runs/writer-assist/completed-passing.json").read_text()
+            )["result"]
+        )
+    )
+    runner = object.__new__(KubernetesJobRunner)
+    runner.binding = {"runner": "kubernetes-workload-stub:v1"}
+    runner.name = Mock(return_value="original-job")
+    runner.client = Mock()
+    job = {
+        "status": {
+            "conditions": [
+                {
+                    "type": "Failed",
+                    "status": "True",
+                    "lastTransitionTime": datetime.now(UTC).isoformat(),
+                }
+            ]
+        }
+    }
+    runner.client.job.return_value = job
+    runner.validate_job = Mock(return_value=job)
+    runner.validated_result = Mock(return_value=result)
+    origin = datetime.now(UTC)
+    partial = RunnerObservation(
+        status="failed",
+        result=result,
+        timeline_origin_at=origin,
+        error={"code": "execution_failed", "message": "Synthetic failure"},
+    )
+    runner.saved_observation = Mock(side_effect=[RunnerObservation(status="queued"), partial])
+    assert runner.observe("op-original", "original-uid").stage == "finalizing"
+    observed = runner.observe("op-original", "original-uid")
+    assert observed.status == "failed" and observed.result == result
+    assert observed.timeline_origin_at == origin and observed.error.code == "execution_failed"
+    runner.client.request.assert_not_called()

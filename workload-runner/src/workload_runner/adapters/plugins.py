@@ -15,6 +15,7 @@ from aiperf.common.models.error_models import ErrorDetails
 from aiperf.common.models.record_models import RequestRecord
 from aiperf.credit.structs import TurnToSend
 from aiperf.dataset.loader.raw_payload import RawPayloadDatasetLoader
+from aiperf.timing.manager import TimingManager
 from aiperf.timing.strategies.fixed_schedule import FixedScheduleStrategy
 from aiperf.transports.aiohttp_client import AioHttpClient
 from aiperf.transports.aiohttp_transport import AioHttpTransport
@@ -51,6 +52,15 @@ def engine_clock(directory):
 async def close_journal():
     if directory := run_directory():
         await asyncio.to_thread(journal(str(directory), os.getpid()).close)
+
+
+class PlatformTimingManager(TimingManager):
+    @on_stop
+    async def _timing_manager_stop(self):
+        try:
+            await super()._timing_manager_stop()
+        finally:
+            await close_journal()
 
 
 class PlatformLoader(RawPayloadDatasetLoader):
@@ -132,10 +142,6 @@ class PlatformSchedule(FixedScheduleStrategy):
             )
             atomic_json(runtime_directory() / "engine-clock.json", engine_clock(directory))
         await super().execute_phase()
-
-    @on_stop
-    async def _close_schedule_journal(self):
-        await close_journal()
 
     async def handle_credit_return(self, credit, *, error=None):
         if run_directory() and error:
