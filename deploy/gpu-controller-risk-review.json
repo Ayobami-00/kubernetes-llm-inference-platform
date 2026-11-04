@@ -1,0 +1,80 @@
+{
+  "schema_version": "klip-gpu-controller-risk-review.v1",
+  "reviewed_at": "2026-11-04T05:51:29.185387+00:00",
+  "expires_at": "2026-11-11T05:51:29.185387+00:00",
+  "configuration": {
+    "lock_sha256": "f043710f0d5e24de65d5c6df0336007e3097cc34a10788841887554dbf4d7866",
+    "values_sha256": "9e899b5b243242bfbf32b77e3749e34e9c7eb076d48d5aeb6b036d1c6e82c671",
+    "boundary_sha256": "c9a70fa6215d989812a2811abff121fe5c19c925e1f9e26c0999fa346d74383f"
+  },
+  "scope": "GPU Operator and NFD CPU controllers only. This is not approval of the driver/toolkit/device runtime on GPU hosts.",
+  "conditions": [
+    "No Critical findings; every remaining High tuple must match this review.",
+    "GPU/NFD controller ingress is private, world egress is denied, and CPU placement excludes control-plane hosts.",
+    "Only driver operands may download packages on ports 80/443; no GPU candidate label has yet been assigned.",
+    "NFD topology updater, image-compatibility CLI, GPU sandbox/vGPU/DRA/RDMA/MIG and automatic driver upgrades are disabled.",
+    "New images, changed boundaries, changed findings or expiry require a new review."
+  ],
+  "images": {
+    "nvcr.io/nvidia/gpu-operator:v26.7.2@sha256:e118f631813f93a43fa17332fb2060d3d1f3f150359dd6744f3a9b2f7b7c5707": {
+      "report_file": "operator.json",
+      "report_sha256": "5d7d2a5fc738ffd29d95c3f7919baf2db00249556dffd638e79f0747f9b30a18",
+      "high_findings": [
+        {
+          "finding": [
+            "CVE-2026-111943",
+            "stdlib",
+            "v1.26.6"
+          ],
+          "rationale": "The only outbound TLS application peer is the private Kubernetes API with its mounted cluster CA; world egress is denied to both CPU controllers. No caller-supplied certificate chains or external URLs are accepted. The vulnerable verifier remains present; cluster-CA compromise or changed network exposure requires a fresh review."
+        },
+        {
+          "finding": [
+            "CVE-2026-111943",
+            "stdlib",
+            "v1.27.2"
+          ],
+          "rationale": "The only outbound TLS application peer is the private Kubernetes API with its mounted cluster CA; world egress is denied to both CPU controllers. No caller-supplied certificate chains or external URLs are accepted. The vulnerable verifier remains present; cluster-CA compromise or changed network exposure requires a fresh review."
+        },
+        {
+          "finding": [
+            "CVE-2026-78667",
+            "stdlib",
+            "v1.26.6"
+          ],
+          "rationale": "The controllers expose private health/metrics HTTP endpoints, not a file/range-serving API. Ingress is confined to the operator namespace and DCGM port 9400 from Prometheus. No public service is created; requests cannot select local files. The affected Go standard library is retained."
+        },
+        {
+          "finding": [
+            "CVE-2026-78669",
+            "stdlib",
+            "v1.26.6"
+          ],
+          "rationale": "Only private HTTP health/metrics and the pinned Kubernetes API client are used. There is no public HTTP/2 listener; topology updater is disabled and CPU-controller world egress is denied. Malicious authenticated peers or an API-server compromise can still cause denial of service; bounded resources and reconciliation preserve isolation, not immunity."
+        },
+        {
+          "finding": [
+            "CVE-2026-97031",
+            "stdlib",
+            "v1.26.6"
+          ],
+          "rationale": "No public TLS listener or submitted TLS handshakes are accepted by the configured CPU controllers. Their outbound Kubernetes API uses the cluster CA and fixed in-cluster endpoint. The affected TLS library remains installed; exposing arbitrary TLS peers invalidates this review."
+        }
+      ]
+    },
+    "registry.k8s.io/nfd/node-feature-discovery:v0.20.1@sha256:fe0b7420834216bfafadeb082da3df55be3501a631bc689b8512326fbc2e65e3": {
+      "report_file": "nfd-0.20.1.json",
+      "report_sha256": "42aee791d991944aaadbbd60657f595b13773789288cbe2b99cf2ae4a8a94e8a",
+      "high_findings": [
+        {
+          "finding": [
+            "CVE-2026-78669",
+            "golang.org/x/net",
+            "v0.58.0"
+          ],
+          "rationale": "Only private HTTP health/metrics and the pinned Kubernetes API client are used. There is no public HTTP/2 listener; topology updater is disabled and CPU-controller world egress is denied. Malicious authenticated peers or an API-server compromise can still cause denial of service; bounded resources and reconciliation preserve isolation, not immunity."
+        }
+      ]
+    }
+  }
+}

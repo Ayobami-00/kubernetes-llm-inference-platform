@@ -46,6 +46,8 @@ jobs:
       - run: uv run --locked --group infrastructure python scripts/infrastructure/platform_artifacts.py install
       - name: Fetch checksum-locked service charts
         run: uv run --locked --group infrastructure python scripts/infrastructure/platform_services.py fetch
+      - name: Fetch checksum-locked GPU Operator and patched NFD charts
+        run: uv run --locked --group infrastructure python scripts/infrastructure/gpu_operator.py fetch
       - run: make infra-check
         env:
           # Plugin release metadata otherwise shares the runner's unauthenticated
