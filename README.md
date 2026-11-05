@@ -1,216 +1,238 @@
-# kubernetes-llm-inference-platform
+# Kubernetes LLM Inference Platform
 
-A Kubernetes-native LLM inference platform built with llm-d and vLLM, designed to support multi-tenant serverless, provisioned-throughput, and dedicated GPU serving. It explores SLO-aware routing, tenant isolation, GPU capacity planning, and cost-efficient serving through realistic customer workload simulation, performance experiments, fault injection, and end-to-end observability.
+![Architecture of the inference platform: persistent AWS control-plane and CPU workers, management, durable storage, observability and Lambda GPU serving.](docs/assets/kubernetes-inference-platform.png)
 
-## Architecture
+*Architecture overview. The [validated A10 scope](#architecture-and-validated-scope)
+describes the exact networking, placement and GPU-runtime configuration measured.*
 
-The platform combines independently deployable GPU serving profiles with a persistent CPU environment for control, observability, and experiment results.
+**Deploy LLM serving, run reproducible workloads, and measure whether customers' latency targets are met.**
 
-```mermaid
-flowchart TB
-    C["Customer simulator<br/>Workloads, contracts, sessions, faults"]
-    G["Gateway<br/>Authentication, admission, limits, usage"]
-    R["Authorized pool selection<br/>Tenant + model + service tier"]
+KLIP combines a self-managed Kubernetes cluster, a Python/React management application,
+llm-d and vLLM serving, and an AIPerf-based workload pipeline. Infrastructure, host
+preparation, deployment configuration and observability live alongside the application
+in this monorepo.
 
-    C --> G --> R
+[Measured results](#headline-experiment) · [Architecture](#architecture-and-validated-scope) ·
+[Repository map](#repository-map) · [Run locally](#run-locally) · [Documentation](docs/README.md)
 
-    R --> L["Dedicated large pool<br/>8 GPUs · llm-d + vLLM"]
-    R --> A["Shared model A<br/>2 replicas · 1 GPU each"]
-    R --> B["Shared model B<br/>2 replicas · 1 GPU each"]
-    R --> S["Dedicated latency pool<br/>1 GPU · llm-d + vLLM"]
+## What this project does
 
-    P["Persistent CPU environment<br/>Kubernetes control plane, platform controller,<br/>observability and experiment results"]
-    P -. configuration and lifecycle .-> G
-    P -. configuration and lifecycle .-> R
-    P -.-> L
-    P -.-> A
-    P -.-> B
-    P -.-> S
+- **Builds the platform:** Terraform provisions AWS resources; Ansible prepares hosts,
+  WireGuard connectivity and kubeadm. Three control-plane nodes use stacked etcd;
+  persistent CPU workers host management and telemetry.
+- **Manages durable operations:** an authenticated UI, FastAPI, PostgreSQL and background
+  workers manage versioned configurations, capacity observations, runs and artifacts.
+  Restricted host operations and provider adapters have separate credentials and ownership.
+- **Serves models:** Helm releases configure GPU runtime components, model deployments,
+  authenticated routing and llm-d endpoint selection. Externally retained capacity has
+  explicit safeguards against automatic resize, expiry or deletion.
+- **Exercises customer workloads:** seeded schedules, public-data preparation, ordered
+  sessions and immutable snapshots feed AIPerf. Execution, measurement validity, SLOs
+  and task quality are reported separately.
+- **Makes behavior observable:** Prometheus/Thanos, Grafana, Loki, Tempo, OpenTelemetry,
+  Hubble and DCGM expose infrastructure, application, request-path and GPU diagnostics.
+
+## Headline experiment
+
+**N-gram prompt lookup reduced WriterAssist client p95 completion latency by 20.4%
+in one paired A10 experiment: 854 ms → 679 ms.**
+
+![Matplotlib chart comparing baseline and n-gram p95 completion latency, with a one-second SLO threshold.](docs/assets/experiments/a10-p95-comparison.png)
+
+This was real inference through the private llm-d gateway, using **Qwen3-4B on one
+NVIDIA A10**. One dashboard action activated the two pinned serving configurations,
+ran separate immutable child Jobs, evaluated the results and registered downloadable
+reports. The complete pair took **17 minutes 49 seconds**.
+
+| Measured outcome | Baseline | N-gram |
+| --- | ---: | ---: |
+| Client completion p50 | 527.18 ms | 377.45 ms |
+| Client completion p95 | 853.79 ms | 679.30 ms |
+| Client completion p99 | 1,083.17 ms | 961.24 ms |
+| Within one second | 214/220 · 97.27% | 219/220 · 99.55% |
+| SLO verdict | Passing | Passing |
+| Scored requests / successful outputs | 220 / 220 | 220 / 220 |
+| Common-cohort GLEU | 0.426734 | 0.425763 |
+| Speculative token acceptance estimate | N/A | 11.38% |
+
+Both variants had valid delivery, no scored failures and no missed admissions.
+The fixed target was at least 95% completion within one second, over a 300-second
+window with at least 100 eligible requests. Non-streaming requests provide client
+completion latency; client TTFT is unavailable.
+
+**Why n-gram?** WriterAssist uses JFLEG grammatical-error correction and fluency
+editing. Corrections often preserve contiguous input spans that prompt lookup can
+propose for target-model verification, without loading a separate draft model.
+Fluency rewrites and lookup overhead can reduce the benefit. Prefix caching was
+disabled in both variants.
+
+The same selected JFLEG inputs and seeded arrivals were reused across variants,
+with development data for warmup and test data for scoring. All four references
+were retained outside inference payloads. Each variant had 60 seconds warmup and
+300 scored seconds. N-gram used five speculative tokens and lookup bounds 2–5.
+
+This is **one baseline-first comparison**, with short inputs and possible order/warm-state
+effects. The slightly lower GLEU does not establish quality equivalence. Acceptance is
+a scrape-based diagnostic, not a baseline percentage or a speedup measure. Public
+JFLEG data is a task proxy, not private customer traffic.
+
+- [Detailed measured results and stage timings](docs/experiments/writer-assist-a10-dashboard-2026-11-04.md)
+- [Experiment specification and methodology](experiments/writer-assist-a10/ngram-comparison.md)
+- [Public aggregate data](experiments/writer-assist-a10/results/2026-11-04-summary.json)
+- [Reproduce the custom Matplotlib figures](experiments/writer-assist-a10/README.md)
+- [Run the paired experiment from management](docs/runbooks/dashboard-a10-comparison.md)
+
+## Architecture and validated scope
+
+The lead image shows the broader platform architecture. The measured A10 request path was:
+
+```text
+Management → CPU workload-runner Job → private authenticated llm-d gateway
+           → endpoint picker → vLLM / Qwen3-4B on the A10
 ```
 
-## Shared contracts
+Management, PostgreSQL and Kubernetes control-plane services stay outside the
+per-token inference path. For this experiment, the gateway and endpoint picker ran
+on CPU workers. The inference Service used private HTTP inside the WireGuard-connected
+cluster; the public HTTPS/Route 53 inference path in the diagram was not benchmarked.
+Management itself used authenticated HTTPS.
 
-The first implemented layer is an offline Python contract package. It defines customer requirements,
-traffic scenarios, frozen run inputs and results, Lambda worker groups, serving profiles, operation
-progress, and infrastructure inventory. It includes all five customer examples:
+| Layer | Implementation |
+| --- | --- |
+| AWS foundation | Terraform; private Kubernetes API endpoint; persistent CPU capacity; storage, identity, DNS and monitoring roots |
+| Cluster and host networking | kubeadm with three stacked-etcd control planes; Ansible; host WireGuard; Cilium Pod networking and Hubble |
+| Management | React/TypeScript, FastAPI, durable Python workers, CloudNativePG PostgreSQL and shared artifact storage |
+| GPU and serving | NVIDIA GPU Operator components, device plugin and DCGM; Helm; llm-d gateway/endpoint picker; vLLM |
+| Workload and evaluation | AIPerf 0.13.0; preparation adapters; frozen schedules/snapshots; pure SLO evaluator; task-quality reports |
+| Observability | Prometheus, Thanos, Grafana, Loki, Tempo, OpenTelemetry, DCGM and host/network telemetry |
 
-| Customer | Workload | Dataset basis | Serving candidate |
+The retained A10 used its **preinstalled driver and toolkit**. GPU Operator supplied
+validation/discovery, device exposure and telemetry; driver/toolkit installers were
+disabled for that host. The diagram's fully operator-managed driver/toolkit path is
+a broader deployment option, not the tested host configuration.
+
+HA management and PostgreSQL, backup/restore procedures, and API/worker replacement
+were exercised. The paired-run recovery check preserved the same runner Job,
+snapshot and clock across management Pod replacements; cancellation retained a
+partial result and prevented the next variant from starting.
+
+The single A10 is **not redundant model-serving capacity**. The five customer paths
+have local preparation/execution coverage, but this headline result validates only
+WriterAssist on the stated deployment. Full mixed-GPU performance, sustained failure
+campaigns and a complete destructive destroy/rebuild acceptance remain separate work.
+Time-limited model/EPP vulnerability reviews apply to the private experiment;
+this repository does not claim production certification. See the
+[acceptance ledger](docs/development/end-to-end-platform.md) and
+[security guidance](SECURITY.md).
+
+## Repository map
+
+This is one repository containing the application, shared packages and platform code.
+
+| Location | What it owns |
+| --- | --- |
+| [apps/management/](apps/management/README.md) | Web UI, FastAPI, PostgreSQL persistence, durable jobs, provider integration and restricted host executor |
+| [workload-runner/](workload-runner/README.md) | Data preparation, scenario compilation, AIPerf integration, execution control, quality and reports |
+| [packages/platform-contracts/](packages/platform-contracts/README.md) | Pydantic contracts, loading, immutable snapshots and cross-resource validation |
+| [packages/slo-evaluator/](packages/slo-evaluator/README.md) | Request/session classification, fixed-window SLOs and latency summaries |
+| [configs/](configs/README.md) | Versioned customers, scenarios, worker groups and serving examples |
+| [datasets/](datasets/README.md) | Source manifests, provenance and preparation boundaries |
+| [contracts/](contracts/README.md) | Generated JSON Schemas, management OpenAPI and synthetic runtime fixtures |
+| [infra/](infra/README.md) | Terraform roots/modules, Ansible roles/playbooks and inventory interfaces |
+| [charts/](charts/README.md) | Helm packaging for application, database, model, storage, identity and telemetry boundaries |
+| [deploy/](deploy/README.md) | Dependency/image locks, environment overlays, reviews and release configuration |
+| [observability/](observability/README.md) | Grafana dashboards, dashboard builders and host metric exporters |
+| [dev/](dev/README.md) | Local Compose stack, inference stub, integration environment and container definitions |
+| [experiments/](experiments/README.md) | Experiment methodology, public aggregate observations and preparation evidence |
+| [scripts/](scripts/README.md) | Schema generators, custom plotting, smoke checks and guarded operator commands |
+| [docs/](docs/README.md) | Architecture, development guides, operator runbooks and measured acceptance records |
+| [tests/infrastructure/](tests/infrastructure/) | Offline checks for infrastructure, security boundaries and operator behavior |
+
+### Workload profiles
+
+| Profile | Task proxy | Serving candidate | Evidence scope |
 | --- | --- | --- | --- |
-| WriterAssist | Sentence correction | JFLEG | Dedicated Qwen3-4B |
-| CodeAgent | Recorded coding-call replay | Exgentic v2 / SWE-bench | Dedicated Qwen3-235B-A22B |
-| TutorChat | Multi-turn tutoring | MathDial | Provisioned share of Qwen3-8B |
-| DocFlow | Document-text extraction | CUAD | Best-effort Qwen3-14B |
-| ResearchAgent | Prepared research QA steps | HotpotQA | Provisioned share of the same Qwen3-14B |
+| WriterAssist | JFLEG grammar correction | Dedicated Qwen3-4B | Local pipeline and real A10 comparison above |
+| CodeAgent | Exgentic v2 / SWE-bench-filtered inference replay | Dedicated Qwen3-235B-A22B | Local pipeline; no tool execution or functional-agent score |
+| TutorChat | MathDial tutoring dialogues | Shared Qwen3-8B | Local pipeline; pedagogical quality remains unevaluated |
+| DocFlow | CUAD document-text extraction | Shared Qwen3-14B | Local pipeline; adapted extraction, not OCR or official CUAD scoring |
+| ResearchAgent | HotpotQA evidence/answer steps | Same shared Qwen3-14B deployment | Local pipeline; not a complete web agent |
 
-All traffic, SLO and hardware settings are experimental defaults. The source manifests are not
-prepared datasets, and the runtime fixtures contain synthetic measurements. No cloud resources,
-inference services, dataset preparation, or benchmark execution are implemented by this layer.
+Rates, hardware choices and customer targets are experimental defaults. See
+[customer configuration notes](configs/customers/README.md) for the full mapping.
 
-## Workload execution
+## Run locally
 
-Stream A implements public/synthetic preparation, immutable planning, AIPerf 0.13.0 execution,
-request/session measurement, SLO and task-quality evaluation, cancellation and reports for all five
-profiles and seven scenarios. Local runs use an OpenAI-compatible CPU stub and are explicitly
-synthetic/emulated. Live benchmarking keeps strict artifact, version and readiness preflight.
+### Management UI
 
-Start with the [workload development guide](docs/development/workloads.md),
-[management integration notes](docs/development/workload-integration.md), and
-[recovery runbook](docs/runbooks/workload-recovery.md).
-
-### Install and verify
-
-Install [uv](https://docs.astral.sh/uv/getting-started/installation/), then run these commands from the
-repository root. uv uses the Python 3.12 version selected by `.python-version`.
-
-```bash
-uv sync --locked --all-packages
-uv run --locked --package platform-contracts pytest
-uv run --locked --package platform-contracts ruff check .
-uv run --locked --package platform-contracts ruff format --check .
-bash scripts/check-generated.sh
-```
-
-The package can load and resolve the examples without network access after installation:
-
-```bash
-uv run --locked --package platform-contracts python - <<'PY'
-from pathlib import Path
-from platform_contracts import ServingBinding, build_run_snapshot, load_catalog
-
-catalog = load_catalog(Path.cwd())
-snapshot = build_run_snapshot(
-    catalog,
-    "writer-assist-baseline@1",
-    (
-        ServingBinding(
-            customer_ref="writer-assist@1",
-            serving_profile_ref="gec-baseline@1",
-            worker_group_ref="latency-workers@1",
-            deployment_id="gec",
-        ),
-    ),
-)
-print(snapshot.scenario.ref)
-print(snapshot.scenario.measurement_duration_s)
-PY
-```
-
-This constructs a draft snapshot. `validate_for_execution(snapshot)` deliberately rejects it until
-dataset artifacts, provider selections, version pins, an inventory snapshot, and an admission
-schedule have been supplied. That preflight checks offline completeness, not live capacity or
-deployment readiness.
-
-### Files and generation
-
-- [Python contracts and interface notes](packages/platform-contracts/README.md)
-- [Customer defaults and scenario mappings](configs/customers/README.md)
-- [Dataset provenance and preparation boundaries](datasets/README.md)
-- [Runtime fixtures and schema conventions](contracts/README.md)
-- [AWS access bootstrap and API DNS decisions](docs/runbooks/aws-access.md)
-
-Author configurations under `configs/` and source manifests under `datasets/manifests/`. Generate
-JSON Schemas from the Python models; do not edit the exported schemas by hand:
-
-```bash
-uv run --locked --package platform-contracts python scripts/export-contracts.py
-```
-
-CI runs the same checks and rejects schema drift. The management API exports OpenAPI from its real routes and generates a TypeScript client; see the
-management development guide below for regeneration and drift checks.
-
-## Management application
-
-Stream C adds KLIP, a graph-based local management workspace with authenticated configuration
-authoring, immutable revisions, durable operations, live Lambda inventory and labelled simulation.
+Requires Docker Engine/Desktop with Compose v2:
 
 ```bash
 ./dev/start
 ```
 
-The startup command prompts for the `admin` password on first use, migrates PostgreSQL and seeds
-examples. Open [localhost:5173](http://localhost:5173). See the
-[development guide](docs/development/management.md) and
-[recovery runbook](docs/runbooks/management-recovery.md) for workflows, secrets and verification.
+Choose an admin password on first start, then open <http://localhost:5173>.
+The default local lifecycle is simulated; examples and stub results are labelled.
+No cloud credentials or GPU are required. See the
+[management development guide](docs/development/management.md).
 
-Lambda observations are read-only. Allocation and cluster lifecycle workflows retain their simulation
-adapters. Management can launch A's actual runner as a Kubernetes Job against the local stub, and can
-onboard B-managed GPU capacity for strictly gated live execution. Synthetic results are not live
-model performance measurements.
+### CPU-only workload pipeline
 
-Management integration handoffs, Kubernetes Jobs and immutable imports are described in the
-[integration guide](docs/development/management-integrations.md). Production images, C-owned charts,
-the isolated kind proof and explicit release workflow are in the
-[deployment guide](docs/development/management-deployment.md). Real cloud mutations and benchmark
-execution remain blocked until their downstream readiness requirements are satisfied.
-
-The [end-to-end delivery ledger](docs/development/end-to-end-platform.md) tracks the next live
-milestone: persistent CPU workers, CloudNativePG HA, UI-driven Lambda provisioning, authenticated
-llm-d serving, observability and retained-state rebuild. Management HA placement and verified
-database TLS are implemented as an opt-in overlay; their live acceptance is still pending.
-
-## AWS foundation
-
-Stream B's Terraform foundation provides three continuously running CPU hosts in London for the
-self-managed Kubernetes cluster. It includes native S3 state locking, imported access-bootstrap
-IAM, a private API NLB, dedicated etcd disks and a separately authorized inference DNS root.
-Ansible host preparation, direct WireGuard peers, guarded kubeadm bootstrap, Cilium/Hubble,
-metrics-server, encrypted etcd backups and generic worker operations are implemented as a
-separate rollout. [Live cluster acceptance](docs/runbooks/kubernetes-acceptance.md) passed,
-including external API gateway failover, snapshot restore and generic worker join/removal.
-Terraform does not provision Lambda GPU VMs.
+Requires Python 3.12 and [uv](https://docs.astral.sh/uv/). From the repository root:
 
 ```bash
-make infra-tools
-make infra-check
-make infra-profiles
-make infra-bootstrap-plan
-make infra-preview
-make infra-dns-preview ORIGINS_FILE=infra/terraform/environments/inference-dns/origins.example.tfvars.json
+uv sync --locked --all-packages --all-extras
+uv run --locked --all-packages --all-extras python scripts/smoke-workloads.py \
+  --prepare --output artifacts/workloads/local-smoke
 ```
 
-Preview plans cannot be applied. Review the [provisioning workflow](docs/runbooks/aws-foundation.md)
-and its cost estimate before authorizing live creation. All mutable commands use explicit AWS
-identities and saved-plan digests. Private credentials, recovery state and reports stay outside Git.
+The driver starts a temporary local stub and runs the five standalone and two mixed
+scenarios. Use a fresh output directory for each attempt. Generated text, token usage
+and measurements in this mode are synthetic/emulated. It downloads no benchmark
+corpora and provisions no resources. See the [workload guide](docs/development/workloads.md)
+for individual CLI commands, public preparation and live preflight.
 
-- [Foundation architecture and addressing](docs/architecture/aws-foundation.md)
-- [State recovery](docs/runbooks/terraform-state.md)
-- [Inference origin updates](docs/runbooks/inference-dns.md)
-- [Ansible and Stream C inventory handoff](docs/runbooks/infrastructure-handoff.md)
-- [Retained platform storage](docs/runbooks/platform-storage.md)
-- [Certificate, projected-token and CSI add-ons](docs/runbooks/platform-services.md)
-- [Decommissioning and data deletion](docs/runbooks/foundation-teardown.md)
-- [Live foundation acceptance and Ansible handoff](docs/runbooks/aws-foundation-acceptance.md)
-- [Live Kubernetes acceptance and cleanup](docs/runbooks/kubernetes-acceptance.md)
-
-## CPU cluster bootstrap
+### Reproduce the figures
 
 ```bash
-make cluster-tools
-make cluster-check
-make cluster-preflight
+uv run --locked --group plots python scripts/plot_a10_results.py
 ```
 
-Review the [cluster rollout](docs/runbooks/cluster-bootstrap.md) before applying host changes.
-The [network architecture](docs/architecture/kubernetes-bootstrap.md),
-[backup recovery workflow](docs/runbooks/cluster-recovery.md) and
-[worker operation interface for C](docs/runbooks/worker-host-operations.md) describe ownership,
-credential boundaries and later GPU integration. Local validation is distinct from live
-Kubernetes acceptance; no readiness is inferred from Terraform allocations.
+The Matplotlib script reads the checked-in aggregate results and writes PNG/SVG
+figures under `docs/assets/experiments/`. It needs no cluster, raw dataset or credentials.
 
-## Managed workload integration
+## Development checks
 
-Run the CPU-only A↔C proof with `KLIP_WORKLOAD_INTEGRATION=1 ./dev/test-integration`. It exercises all
-seven workload scenarios through management, artifact downloads, recovery and cancellation. See the
-[A/B/C integration notes](docs/development/workload-integration.md) and
-[live validation runbook](docs/runbooks/live-inference-validation.md) for external capacity imports,
-the first pinned direct-vLLM WriterAssist run, subsequent profiles and 20-minute campaigns.
+```bash
+uv sync --locked --all-packages
+uv run --locked --all-packages pytest
+uv run --locked --all-packages ruff check .
+uv run --locked --all-packages ruff format --check .
+bash scripts/check-generated.sh
+uv run --locked --all-packages python scripts/export-management.py --check
+```
 
-## On-demand A10 comparison
+Frontend checks, PostgreSQL-backed tests, generated clients and opt-in CPU/Kubernetes
+integration commands are documented in [CONTRIBUTING.md](CONTRIBUTING.md). Public-data
+preparation and live GPU tests are separate from offline CI.
 
-The authenticated management **Experiments** page runs a paired WriterAssist
-baseline-versus-n-gram experiment on the retained A10. See the
-[specification](experiments/writer-assist-a10/ngram-comparison.md),
-[dashboard runbook](docs/runbooks/dashboard-a10-comparison.md) and
-[first measured comparison](docs/experiments/writer-assist-a10-dashboard-2026-11-04.md).
-Each execution retains separate child runs, SLO/quality assessments and downloadable
-reports. The workflow does not rent, restart or terminate the GPU VM.
+## Deploy and operate
+
+Start with the [documentation index](docs/README.md),
+[infrastructure overview](infra/README.md) and [deployment guide](docs/development/management-deployment.md).
+Terraform and operator inputs contain project-specific account, region, domain and
+capacity settings; review them before deploying your own environment. Image locks,
+Secret references, artifact storage, readiness and security reviews must be configured
+before a live run. Infrastructure commands may create billable resources.
+
+The [teardown/recovery runbooks](docs/runbooks/foundation-teardown.md) distinguish
+replaceable compute from retained data, keys and state. The manually retained A10 is
+protected from automated expiry and deletion. Source code and runbooks are not proof
+that a complete destructive rebuild has been exercised.
+
+## License
+
+Repository source code is licensed under [Apache-2.0](LICENSE). Datasets, model weights,
+container images and upstream dependencies retain their own licenses; source manifests
+record the dataset evidence. Raw corpora, captured responses, credentials and private
+execution bundles are excluded from Git.

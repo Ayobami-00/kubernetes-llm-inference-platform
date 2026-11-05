@@ -1,22 +1,32 @@
 # End-to-end platform delivery
 
-The active milestone connects the existing workload, infrastructure and management
-implementations. Completion requires live evidence and a retained-state rebuild; local
-rendering or a successful stub run does not satisfy a live gate.
+Current evidence summary as of **4 November 2026**. The reference platform has
+live CPU, management and single-A10 serving evidence. The broader roadmap still
+includes uncompleted rebuild, expansion and sustained-failure gates.
 
-## Acceptance ledger
+## Current acceptance scope
 
-| Gate | Required evidence | Current status |
+| Area | Recorded evidence | Remaining boundary |
 | --- | --- | --- |
-| Persistent platform | Separate CPU workers, real storage, management spreading, PostgreSQL HA and restore | Live, including management/API recovery, database promotion and isolated restore; durable worker ownership and unplanned CPU loss still pending |
-| Lambda lifecycle | UI allocation, trusted bootstrap, joined network-ready GPU worker, safe cleanup | Pending |
-| GPU runtime | Operator-owned stack, allocatable GPU, CUDA validation and health telemetry | Pinned Operator/NFD CPU controllers live; actual GPU installation, CUDA and telemetry ingestion pending |
-| Serving | Pinned Qwen3-4B through authenticated HTTPS gateway and llm-d | Pending |
-| WriterAssist | Real JFLEG canonical run, valid delivery, GLEU and reconciled SLO verdict | Pending |
-| Observability | Provisioned metrics/logs/traces, twelve views, alerts and diagnostic links | Private metrics/logs/traces live, synthetic persisted trace queried; full views, application instrumentation, public dashboard and failure tests pending |
-| Resilience | Stable run identity through management/database faults and sustained runs | API/database faults verified; running-job, CPU/serving loss and sustained tests pending |
-| Rebuild | Actual retained-state teardown, restore, fresh UI-provisioned A10 and repeated run | Pending |
-| Expansion | Sequential A100 profiles, separate mixed capacity, all scenarios and failure campaign | Pending |
+| Persistent platform | Three control planes, three CPU workers, HA management, CloudNativePG promotion/isolated restore and durable artifact access | Full destructive destroy/rebuild acceptance remains unproven |
+| Provider lifecycle | Guarded adapters, prerequisite receipts, restricted executor and durable provider intents | The measured GPU was manually retained; automatic end-to-end GPU provisioning is not inferred |
+| GPU runtime | The A10 joined and exposed one GPU; discovery, plugin/CUDA checks and DCGM observations | This host kept its existing driver/toolkit; full installer ownership was not tested |
+| Serving | Pinned Qwen3-4B through private authenticated llm-d routing and verified effective gateway timeouts | Public inference DNS/HTTPS and redundant model-serving capacity were not benchmarked |
+| WriterAssist | Canonical historical pair and the real dashboard-driven 220-request-per-variant comparison, with valid delivery, GLEU and SLO assessments | One baseline-first A10 comparison is not broad hardware/customer calibration |
+| Observability | Private metrics/logs/traces, dashboards, GPU/server diagnostics, scoped identity/storage and acknowledged alert delivery | Historical acceptance is not a live-health or production-certification claim |
+| Run recovery | Management API/worker replacement preserved the same runner Job/snapshot/clock; cancellation retained partial evidence | Runner loss, sustained serving/node failures and full failure campaigns remain separate tests |
+| Expansion | All five public preparation/local execution paths and seven synthetic scenarios | Other real-model profiles and mixed-GPU capacity remain outside the A10 experiment |
+
+See the [measured dashboard comparison](../experiments/writer-assist-a10-dashboard-2026-11-04.md),
+[experiment methods](../../experiments/writer-assist-a10/ngram-comparison.md) and
+[operator runbook](../runbooks/dashboard-a10-comparison.md). Retained image findings
+and expiring reviews remain explicit. Earlier acceptance records are preserved.
+
+## Implementation history: 3–4 November 2026
+
+The entries below describe the then-current state in delivery order. Statements
+such as “no GPU allocated” or “live gate pending” belong to their historical step;
+use the current scope above for the latest recorded acceptance.
 
 The additional CPU allocation is defined in a separate `platform` Terraform root;
 see the [worker allocation runbook](../runbooks/platform-workers.md). Its reviewed live

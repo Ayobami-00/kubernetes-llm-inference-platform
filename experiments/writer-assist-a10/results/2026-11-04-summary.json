@@ -1,0 +1,203 @@
+{
+  "schema_version": "a10-public-summary.v1",
+  "experiment_id": "experiment-7d1b94581a648a4d9e74",
+  "date": "2026-11-04",
+  "source_comparison_sha256": "79a7719d21054424610034a55fe3b91fc2343b234c3b9dcf9fa0111ff6e33f9a",
+  "source_report_sha256": "f9aeb38b5488767865ba8f1acee7b95d9f3f82fb0d97fbe0983242032891a8f9",
+  "environment": {
+    "gpu": "1 × NVIDIA A10",
+    "model": "Qwen/Qwen3-4B",
+    "model_revision": "1cfa9a7208912126459214e8b04321603b3df60c",
+    "vllm_version": "0.32.0",
+    "request_path": "CPU runner → private llm-d gateway → vLLM",
+    "dataset": "JFLEG",
+    "source_revision": "ee06ff806a208aba815ac45313f4e750a48330a5",
+    "dataset_license": "CC-BY-NC-SA-4.0"
+  },
+  "controls": {
+    "warmup_s": 60,
+    "scored_duration_s": 300,
+    "seed": 42,
+    "streaming": false,
+    "prefix_caching": false,
+    "enable_thinking": false,
+    "temperature": 0,
+    "max_output_tokens": 128,
+    "ngram": {
+      "method": "ngram",
+      "num_speculative_tokens": 5,
+      "prompt_lookup_min": 2,
+      "prompt_lookup_max": 5
+    },
+    "baseline_first": true
+  },
+  "slo": {
+    "metric": "completion_latency_ms",
+    "threshold_ms": 1000,
+    "minimum_attainment_fraction": 0.95,
+    "window_s": 300,
+    "minimum_eligible_requests": 100
+  },
+  "duration": {
+    "total_wall_s": 1069.171231,
+    "report_generated_wall_s": 1068.75371
+  },
+  "percentile_method": "nearest_rank",
+  "quality_method": "JFLEG-compatible corpus GLEU; sorted source IDs, reference seed 0, 500 iterations",
+  "performance_comparable": true,
+  "p95_reduction_percent": 20.437022510027592,
+  "variants": {
+    "baseline": {
+      "run_id": "run-6dc740470bbd8bfc",
+      "execution_status": "completed",
+      "measurement_validity": "valid",
+      "latency": {
+        "p50_ms": 527.180231,
+        "p95_ms": 853.79149,
+        "p99_ms": 1083.16916,
+        "samples": 220
+      },
+      "scored_outcomes": {
+        "cancelled": 0,
+        "completed": 220,
+        "failed": 0,
+        "not_sent": 0,
+        "rejected": 0,
+        "timed_out": 0
+      },
+      "slo_verdict": "passing",
+      "eligible_requests": 220,
+      "within_threshold": 214,
+      "quality": {
+        "coverage": {
+          "eligible": 220,
+          "evaluated": 220,
+          "failed": 0,
+          "missing": 0,
+          "unscorable": 0
+        },
+        "gleu": 0.4267337952625197
+      },
+      "delivery": {
+        "due_admissions": 254,
+        "late_above_100ms": 0,
+        "maximum_lag_ms": 3.218274609909372,
+        "missed_due_admissions": 0
+      },
+      "speculation": {
+        "draft_events": null,
+        "proposed_tokens": null,
+        "accepted_tokens": null,
+        "acceptance_fraction": null,
+        "accepted_tokens_per_draft": null
+      }
+    },
+    "ngram": {
+      "run_id": "run-b6532b3988cc8701",
+      "execution_status": "completed",
+      "measurement_validity": "valid",
+      "latency": {
+        "p50_ms": 377.449767,
+        "p95_ms": 679.301931,
+        "p99_ms": 961.238254,
+        "samples": 220
+      },
+      "scored_outcomes": {
+        "cancelled": 0,
+        "completed": 220,
+        "failed": 0,
+        "not_sent": 0,
+        "rejected": 0,
+        "timed_out": 0
+      },
+      "slo_verdict": "passing",
+      "eligible_requests": 220,
+      "within_threshold": 219,
+      "quality": {
+        "coverage": {
+          "eligible": 220,
+          "evaluated": 220,
+          "failed": 0,
+          "missing": 0,
+          "unscorable": 0
+        },
+        "gleu": 0.42576341526487765
+      },
+      "delivery": {
+        "due_admissions": 254,
+        "late_above_100ms": 0,
+        "maximum_lag_ms": 4.084536291571567,
+        "missed_due_admissions": 0
+      },
+      "speculation": {
+        "draft_events": 2896.551724137931,
+        "proposed_tokens": 14482.758620689656,
+        "accepted_tokens": 1647.9310344827588,
+        "acceptance_fraction": 0.1137857142857143,
+        "accepted_tokens_per_draft": 0.5689285714285715
+      }
+    }
+  },
+  "common_cohort": {
+    "baseline_quality": {
+      "coverage": {
+        "eligible": 220,
+        "evaluated": 220,
+        "failed": 0,
+        "missing": 0,
+        "unscorable": 0
+      },
+      "gleu": 0.4267337952625197
+    },
+    "gleu_reference_sampling": "Same sorted source-ID order, seed 0, 500 iterations",
+    "identical_outputs": 210,
+    "ngram_quality": {
+      "coverage": {
+        "eligible": 220,
+        "evaluated": 220,
+        "failed": 0,
+        "missing": 0,
+        "unscorable": 0
+      },
+      "gleu": 0.42576341526487765
+    },
+    "samples": 220
+  },
+  "paired_latency_uncertainty": {
+    "estimate_ms": -133.09124252272727,
+    "iterations": 1000,
+    "limitation": "Conditional descriptive request-pair bootstrap; not repeated deployment-level evidence.",
+    "metric": "mean paired completion latency delta, ngram minus baseline, ms",
+    "paired_sources": 220,
+    "percentile_95_interval_ms": [
+      -146.12121455,
+      -120.07882379545455
+    ],
+    "seed": 42
+  },
+  "overlap_groups": [
+    {
+      "baseline_source_copy_fraction": "below 50%",
+      "mean_latency_delta_ngram_minus_baseline_ms": -0.5747766666666791,
+      "samples": 12
+    },
+    {
+      "baseline_source_copy_fraction": "50–80%",
+      "mean_latency_delta_ngram_minus_baseline_ms": -104.44416572580646,
+      "samples": 124
+    },
+    {
+      "baseline_source_copy_fraction": "at least 80%",
+      "mean_latency_delta_ngram_minus_baseline_ms": -194.3107081547619,
+      "samples": 84
+    }
+  ],
+  "limitations": [
+    "One baseline-first pair, no randomized deployment repetitions; order and warm-state effects remain.",
+    "Successful-request percentiles have explicit coverage; all eligible failures remain in SLO attainment.",
+    "Public JFLEG task proxy, not private customer traces; measured lengths do not cover all allowed inputs.",
+    "Copy fraction and aggregate acceptance are diagnostic; they do not establish per-request acceptance or causation.",
+    "Private single-A10 experiment with retained security findings; no serving HA or production capacity promise."
+  ],
+  "provenance_note": "Public aggregate transcription of checksum-verified retained results. No prompts, references, responses, credentials or per-request records are included. Raw evidence remains private."
+}

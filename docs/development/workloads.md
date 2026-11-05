@@ -1,7 +1,7 @@
 # Stream A: workloads and evaluation
 
 Stream A prepares data, freezes scenario inputs, runs AIPerf 0.13.0, and evaluates client observations.
-The same execution path serves the CPU-only local stub and a future live inference endpoint.
+The same execution path serves the CPU-only local stub and live inference endpoints.
 The runner doesn't provision infrastructure or implement the management API.
 
 ```mermaid
@@ -200,12 +200,15 @@ docker run --rm -p 8001:8001 klip-inference-stub
 
 The runner image includes AIPerf/data extras and runs as UID 10001; the runtime has no compiler.
 Mount a writable work directory and retain stable absolute artifact paths across preparation,
-planning and execution. For a future Kubernetes Job, use the same entrypoint with
-`run --snapshot /workspace/plan/snapshot.json --output /workspace/attempt`.
+planning and execution. Management-owned Kubernetes Jobs use the execution-only entrypoint
+`execute --manifest /path/to/manifest.json`; management owns attempt identity and lifecycle.
+Use `run --snapshot /workspace/plan/snapshot.json --output /workspace/attempt` for local execution.
 Stage artifacts and settle paths before freezing the snapshot. Execution never relocates or
 rewrites supplied snapshot references. Credentials arrive through environment secret references.
 
 Live benchmarking additionally requires verified serving/model/image pins, tokenizer-compatible
 public preparations, reviewed source metadata, non-fixture inventory, recorded platform versions,
 strict `validate_for_execution` and model-alias readiness. Draft examples intentionally fail this
-preflight. Hardware calibration and live performance claims are separate validation work.
+preflight. The [recorded A10 comparison](../experiments/writer-assist-a10-dashboard-2026-11-04.md)
+supplies measured WriterAssist evidence; broader hardware calibration and profile expansion
+remain separate validation work.

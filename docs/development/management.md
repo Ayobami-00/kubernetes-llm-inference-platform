@@ -1,8 +1,13 @@
 # Management application
 
-KLIP is the local Stream C management application. Its graph connects dataset manifests,
+KLIP is the platform management application. Its local graph connects dataset manifests,
 customer workloads, serving assignments, worker specifications, simulated allocations and runs.
 Select a resource to inspect or edit it in the right-hand panel. Lists provide another way to browse.
+
+This guide describes local development, where lifecycle actions default to simulation.
+The deployed application also has guarded Lambda/host integrations, durable runner
+Jobs and the [real paired A10 experiment](../runbooks/dashboard-a10-comparison.md).
+See [deployment](management-deployment.md) for the separate live configuration.
 
 ## Start from a clean checkout
 
@@ -49,10 +54,12 @@ To enable live Lambda reads, place the API key in `dev/.secrets/lambda_api_key`.
 The worker checks configuration on each refresh; refreshes are coordinated across replicas.
 The key is never sent to the browser. API documentation is at `/api/docs` on the backend port 58000.
 
-Live integration reads instance types, prices, reported regional availability and account instances.
-It has no allocation, termination, AWS or DNS implementation. All application lifecycle actions in
-this milestone are simulated, including preparation, cluster joining and serving deployment.
-Account instances are observational and are not adopted into managed groups.
+The local capacity integration reads instance types, prices, reported regional availability and
+account instances. Default local lifecycle actions are simulated, including preparation,
+cluster joining and serving deployment. Real provider mutation and restricted host-operation
+adapters are separate, explicitly configured integrations with durable ownership/readiness
+checks. Observing an account instance does not adopt it into a managed group. Externally
+retained capacity remains protected from ordinary lifecycle mutations.
 
 Local HTTP uses non-Secure cookies. Before external deployment, configure TLS, the exact allowed
 origin and `MANAGEMENT_SECURE_COOKIES=true`, and complete the external deployment review.

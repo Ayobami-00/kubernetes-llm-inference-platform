@@ -10,6 +10,8 @@ artifacts/
 datasets/raw/
 datasets/prepared/
 .env
+.env.*
+!.env.example
 .DS_Store
 
 node_modules/
@@ -23,6 +25,10 @@ test-results/
 *.tfstate.*
 *.tfplan
 *.auto.tfvars
+*.tfvars
+*.tfvars.json
+!*.example.tfvars
+!*.example.tfvars.json
 *_backend_override.tf
 crash.log
 .tflint.d/
