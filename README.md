@@ -12,6 +12,11 @@ llm-d and vLLM serving, and an AIPerf-based workload pipeline. Infrastructure, h
 preparation, deployment configuration and observability live alongside the application
 in this monorepo.
 
+**Environment status — 5 November 2026:** the AWS experiment environment has been
+decommissioned. Hosted management and Grafana endpoints are offline. The measured
+results, plots and local workflows remain available here. See the
+[decommission record and rebuild prerequisites](docs/runbooks/full-project-decommission.md).
+
 [Measured results](#headline-experiment) · [Architecture](#architecture-and-validated-scope) ·
 [Repository map](#repository-map) · [Run locally](#run-locally) · [Documentation](docs/README.md)
 

@@ -1,5 +1,9 @@
 # On-demand WriterAssist baseline versus n-gram
 
+The reference AWS environment was [decommissioned on 5 November 2026](full-project-decommission.md).
+The hosted dashboard is offline. The instructions below require a newly deployed,
+verified environment; historical resource identities must not be reused as readiness evidence.
+
 Use management → **Experiments** at <https://management.klip-lab.click/experiments>.
 Expand the frozen preset summary, review it, then choose **Run A10 baseline vs
 n-gram**. One durable parent reserves the deployment and creates two ordinary

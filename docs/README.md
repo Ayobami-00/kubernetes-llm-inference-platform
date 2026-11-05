@@ -35,6 +35,7 @@ separates development instructions, deployment procedures and dated evidence.
 - [On-demand dashboard comparison](runbooks/dashboard-a10-comparison.md)
 - [Workload recovery](runbooks/workload-recovery.md), [cluster recovery](runbooks/cluster-recovery.md)
   and [retained-state teardown](runbooks/foundation-teardown.md)
+- [Full AWS decommission, recovery custody and rebuild prerequisites](runbooks/full-project-decommission.md)
 
 Runbooks include project-specific deployment inputs. Commands that mutate resources
 require the documented identities, reviewed plans and retained state. Reading a

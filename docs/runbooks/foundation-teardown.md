@@ -1,5 +1,9 @@
 # Foundation teardown
 
+This procedure retains state and bootstrap resources. The separate
+[full-project decommission record](full-project-decommission.md) describes the
+5 November 2026 retirement, which also removed those retained AWS resources.
+
 Teardown deletes all three CPU instances, their root disks, **all three standalone
 etcd disks**, ENIs/EIPs, NLB and VPC resources. It preserves the state bucket,
 bootstrap IAM roles/policies, domain registration and public hosted zone. This is

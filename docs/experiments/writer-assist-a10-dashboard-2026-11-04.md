@@ -132,12 +132,14 @@ report, separate from serving Pod identities.
 
 ## Access, reproduction and limits
 
-Open <https://management.klip-lab.click/experiments> and find the parent identity.
-[Download its Markdown report](https://management.klip-lab.click/api/v1/artifacts/8028f5f9cee8d8f1a037ddf1b75195881bfbcb4979f991e420d07c8b1a1b3cde),
-comparison JSON, frozen definition, terminal record,
-overlap rows and private disagreements. Child runs retain snapshots, schedules,
-normalized records, responses, raw AIPerf exports and assessments. All six parent
-downloads were fetched through management and SHA-256 verified.
+The hosted management endpoint went offline with the
+[5 November AWS decommission](../runbooks/full-project-decommission.md).
+Public readers can use the [aggregate results and Matplotlib figures](../../experiments/writer-assist-a10/README.md).
+Before decommissioning, the Markdown report, comparison JSON, frozen definition,
+terminal record, overlap rows and private disagreements were downloaded through
+management and SHA-256 verified. Child snapshots, schedules, normalized records,
+responses, raw AIPerf exports and assessments were preserved in the operator's
+encrypted local recovery archive. Private outputs are not published in Git.
 
 The generated report SHA-256 is
 `f9aeb38b5488767865ba8f1acee7b95d9f3f82fb0d97fbe0983242032891a8f9`;

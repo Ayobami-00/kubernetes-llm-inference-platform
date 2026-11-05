@@ -1,8 +1,10 @@
 # End-to-end platform delivery
 
-Current evidence summary as of **4 November 2026**. The reference platform has
-live CPU, management and single-A10 serving evidence. The broader roadmap still
-includes uncompleted rebuild, expansion and sustained-failure gates.
+Current evidence summary as of **5 November 2026**. The reference platform has
+recorded CPU, management and single-A10 serving evidence. Its AWS environment was
+then [decommissioned](../runbooks/full-project-decommission.md); hosted endpoints
+are offline. The broader roadmap still includes uncompleted rebuild, expansion
+and sustained-failure gates.
 
 ## Current acceptance scope
 
