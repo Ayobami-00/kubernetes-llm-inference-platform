@@ -1,0 +1,35 @@
+# Exact historical non-credential findings reviewed for public-source preparation.
+# These do not suppress new findings in the same files or commits.
+
+# Synthetic test idempotency label, not an authentication credential.
+fc0e387f0f44709be8d977263052c07be8ad50f8:apps/management/backend/tests/test_a10_experiments.py:generic-api-key:31
+
+# Synthetic test idempotency label, not an authentication credential.
+fc0e387f0f44709be8d977263052c07be8ad50f8:apps/management/backend/tests/test_a10_experiments.py:generic-api-key:67
+
+# Public immutable tokenizer/model revision, not an API key.
+198e82d7d8259b37d61407d3272945dfe2a3eddb:deploy/environments/lab/experiments/a10/baseline.yaml:generic-api-key:11
+
+# Public immutable tokenizer/model revision, not an API key.
+198e82d7d8259b37d61407d3272945dfe2a3eddb:deploy/environments/lab/experiments/a10/ngram.yaml:generic-api-key:12
+
+# Public immutable tokenizer/model revision, not an API key.
+7e2bc65e508ff252f8f0dabfef9b06170750587b:deploy/environments/lab/candidates/gec-a10-integration-v2.yaml:generic-api-key:12
+
+# Public immutable tokenizer/model revision, not an API key.
+feacae4c1eccd89be72a6b1be684bb4d2884295c:deploy/environments/lab/candidates/gec-a10-integration.yaml:generic-api-key:11
+
+# ACM public key algorithm name, not key material.
+e347fc0a1465fb504c5c5bd9e51a4bbd796b2d61:infra/terraform/environments/platform-frontend/main.tf:generic-api-key:131
+
+# Public immutable tokenizer/model revision, not an API key.
+2b4067320b08eaef53d74fb1210e0e35ea42ce60:experiments/public-preparation-samples.json:generic-api-key:46
+
+# Public immutable tokenizer/model revision, not an API key.
+2b4067320b08eaef53d74fb1210e0e35ea42ce60:experiments/public-preparation-samples.json:generic-api-key:84
+
+# Public immutable tokenizer/model revision, not an API key.
+2b4067320b08eaef53d74fb1210e0e35ea42ce60:experiments/public-preparation-samples.json:generic-api-key:122
+
+# Public immutable tokenizer/model revision, not an API key.
+2b4067320b08eaef53d74fb1210e0e35ea42ce60:experiments/public-preparation-samples.json:generic-api-key:197

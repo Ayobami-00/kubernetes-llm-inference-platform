@@ -1305,6 +1305,9 @@ infrastructure = [
     { name = "cryptography" },
     { name = "platform-contracts" },
 ]
+plots = [
+    { name = "matplotlib" },
+]
 
 [package.metadata]
 
@@ -1321,6 +1324,7 @@ infrastructure = [
     { name = "cryptography", specifier = ">=50,<51" },
     { name = "platform-contracts", editable = "packages/platform-contracts" },
 ]
+plots = [{ name = "matplotlib", specifier = "==3.11.2" }]
 
 [[package]]
 name = "linkify-it-py"
